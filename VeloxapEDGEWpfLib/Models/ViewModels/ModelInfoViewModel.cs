@@ -1,155 +1,142 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using VeloxapEDGEWpfLib.Models;
-using VeloxapEDGEWpfLib.Models.VeloxapEDGEWpfLib.Models;
 
 namespace VeloxapEDGEWpfLib.ViewModels
 {
-    public class ModelInfoViewModel
+    public class ModelInfoViewModel : INotifyPropertyChanged
     {
-        public ObservableCollection<ModelItem> ModelItems { get; set; }
+        private ModelDisplayItem selectedModelItem;
 
-        public ObservableCollection<PropertyItem> Properties { get; set; }
+        public ObservableCollection<ModelDisplayItem> ModelItems { get; }
+
+        public ObservableCollection<PropertyDisplayItem> Properties { get; }
+
+        public ModelDisplayItem SelectedModelItem
+        {
+            get
+            {
+                return selectedModelItem;
+            }
+            set
+            {
+                if (selectedModelItem == value)
+                    return;
+
+                selectedModelItem = value;
+                LoadProperties(selectedModelItem?.ObjectProperties);
+                OnPropertyChanged(nameof(SelectedModelItem));
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         public ModelInfoViewModel()
         {
-            ModelItems = new ObservableCollection<ModelItem>
+            ModelItems = new ObservableCollection<ModelDisplayItem>();
+            Properties = new ObservableCollection<PropertyDisplayItem>();
+        }
+
+        internal ModelInfoViewModel(ModelInfo modelInfo)
+            : this()
+        {
+            LoadModel(modelInfo);
+        }
+
+        private void LoadModel(ModelInfo modelInfo)
+        {
+            if (modelInfo == null)
+                return;
+
+            ModelItems.Add(new ModelDisplayItem
             {
-                new ModelItem { Name = "(Model) IETT" },
+                Name = BuildDisplayName("Model", modelInfo.getoName(), 0),
+                ObjectProperties = modelInfo.getoObjectProperty() ?? new List<ObjectProperty>()
+            });
 
-                new ModelItem { Name = "(Entity) D_ARAC_CC" },
-                new ModelItem { Name = "(Entity) T_VV" },
-                new ModelItem { Name = "(Entity) D_GUZERGAH" },
-                new ModelItem { Name = "(Entity) D_HAT" },
-                new ModelItem { Name = "(Entity) D_KILAVUZ" },
-                new ModelItem { Name = "(Entity) D_TARIH" },
-                new ModelItem { Name = "(Entity) F_SEFER" },
-                new ModelItem { Name = "(Entity) T_DurC_ak2" },
-                new ModelItem { Name = "(Entity) D_PERSONEL" },
-                new ModelItem { Name = "(Entity) T_TESTTABLE" },
-
-                new ModelItem { Name = "(Relationship) R/1" },
-                new ModelItem { Name = "(Relationship) R/2" },
-                new ModelItem { Name = "(Relationship) R/4" },
-                new ModelItem { Name = "(Relationship) R/5" },
-                new ModelItem { Name = "(Relationship) R/6" },
-                new ModelItem { Name = "(Relationship) R/7" },
-                new ModelItem { Name = "(Relationship) R_3" }
-            };
-
-            Properties = new ObservableCollection<PropertyItem>
+            var modelObjects = modelInfo.getoModelObject();
+            if (modelObjects != null)
             {
-                new PropertyItem
-                {
-                    Property = "Auto_Created_Initial",
-                    DataType = "I4",
-                    Value = "1",
-                    AsString = "1"
-                },
+                foreach (var modelObject in modelObjects)
+                    AddModelObject(modelObject, 0);
+            }
 
-                new PropertyItem
-                {
-                    Property = "Definition",
-                    DataType = "Str",
-                    Value = "model tanimi",
-                    AsString = "model tanimi"
-                },
+            if (ModelItems.Count > 0)
+                SelectedModelItem = ModelItems[0];
+        }
 
-                new PropertyItem
-                {
-                    Property = "Name",
-                    DataType = "Str",
-                    Value = "IETT",
-                    AsString = "IETT"
-                },
+        private void AddModelObject(ModelObject modelObject, int level)
+        {
+            if (modelObject == null)
+                return;
 
-                new PropertyItem
-                {
-                    Property = "Long_Id",
-                    DataType = "Id",
-                    Value = "{799A0437-D91A-4CC5-998E}",
-                    AsString = "{799A0437-D91A-4CC5-998E}"
-                },
+            ModelItems.Add(new ModelDisplayItem
+            {
+                Name = BuildDisplayName(modelObject.getoClassName(), modelObject.getoName(), level),
+                ObjectProperties = modelObject.getoObjectProperty() ?? new List<ObjectProperty>()
+            });
 
-                new PropertyItem
-                {
-                    Property = "Owner_Path",
-                    DataType = "Str",
-                    Value = "",
-                    AsString = ""
-                },
+            var childObjects = modelObject.getoModelObject();
+            if (childObjects == null)
+                return;
 
-                new PropertyItem
-                {
-                    Property = "Type",
-                    DataType = "I4",
-                    Value = "Physical",
-                    AsString = "2"
-                },
+            foreach (var childObject in childObjects)
+                AddModelObject(childObject, level + 1);
+        }
 
-                new PropertyItem
-                {
-                    Property = "Naming_Standards",
-                    DataType = "Str",
-                    Value = "",
-                    AsString = ""
-                },
+        private void LoadProperties(IEnumerable<ObjectProperty> objectProperties)
+        {
+            Properties.Clear();
 
-                new PropertyItem
-                {
-                    Property = "Allow_Special_Characters",
-                    DataType = "Bool",
-                    Value = "false",
-                    AsString = "False"
-                },
+            if (objectProperties == null)
+                return;
 
-                new PropertyItem
-                {
-                    Property = "Remove_Vowels",
-                    DataType = "Bool",
-                    Value = "false",
-                    AsString = "False"
-                },
+            foreach (var objectProperty in objectProperties)
+                Properties.Add(ToPropertyItem(objectProperty));
+        }
 
-                new PropertyItem
-                {
-                    Property = "Special_Characters",
-                    DataType = "I4",
-                    Value = "0",
-                    AsString = "0"
-                },
-
-                new PropertyItem
-                {
-                    Property = "Tracking_History_Object",
-                    DataType = "I4",
-                    Value = "1048575",
-                    AsString = "1048575"
-                },
-
-                new PropertyItem
-                {
-                    Property = "Enforce_Unique_Name",
-                    DataType = "I4",
-                    Value = "NotUnique",
-                    AsString = "0"
-                },
-
-                new PropertyItem
-                {
-                    Property = "Target_Server",
-                    DataType = "I4",
-                    Value = "SybaseIQ",
-                    AsString = "197"
-                },
-
-                new PropertyItem
-                {
-                    Property = "DBMS_Major_Version",
-                    DataType = "I4",
-                    Value = "15",
-                    AsString = "15"
-                }
+        private static PropertyDisplayItem ToPropertyItem(ObjectProperty objectProperty)
+        {
+            return new PropertyDisplayItem
+            {
+                Property = objectProperty.getoPropertyClassName(),
+                DataType = objectProperty.getoPropertyType(),
+                Value = objectProperty.getoPropertyValue(),
+                AsString = objectProperty.getoPropertyFormatAsString()
             };
+        }
+
+        private static string BuildDisplayName(string className, string name, int level)
+        {
+            string prefix = level <= 0 ? string.Empty : new string(' ', level * 2);
+            string safeClassName = string.IsNullOrWhiteSpace(className) ? "Object" : className;
+            string safeName = string.IsNullOrWhiteSpace(name) ? "(unnamed)" : name;
+
+            return $"{prefix}({safeClassName}) {safeName}";
+        }
+
+        private void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public sealed class ModelDisplayItem
+        {
+            public string Name { get; set; }
+
+            internal List<ObjectProperty> ObjectProperties { get; set; } = new List<ObjectProperty>();
+        }
+
+        public sealed class PropertyDisplayItem
+        {
+            public string Property { get; set; }
+
+            public string DataType { get; set; }
+
+            public string Value { get; set; }
+
+            public string AsString { get; set; }
         }
     }
 }

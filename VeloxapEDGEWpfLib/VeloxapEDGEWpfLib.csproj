@@ -22,6 +22,8 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,6 +32,8 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Interop.SCAPI">
@@ -52,8 +56,12 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Models\ModelItem.cs" />
-    <Compile Include="Models\PropertyItem.cs" />
+    <Compile Include="Models\CrossRuleValidationEngine.cs" />
+    <Compile Include="Models\ModelInfo.cs" />
+    <Compile Include="Models\ModelLoad.cs" />
+    <Compile Include="Models\ModelObject.cs" />
+    <Compile Include="Models\ObjectProperty.cs" />
+    <Compile Include="Models\RuleDependencyExtractor.cs" />
     <Compile Include="Models\ViewModels\ModelInfoViewModel.cs" />
     <Compile Include="Pages\ModelInfoView.xaml.cs">
       <DependentUpon>ModelInfoView.xaml</DependentUpon>
@@ -67,6 +75,7 @@
     <Compile Include="Pages\ValidationRulesView.xaml.cs">
       <DependentUpon>ValidationRulesView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="VeloxapEDGErwinLib.cs" />
     <Compile Include="Window1.xaml.cs">
       <DependentUpon>Window1.xaml</DependentUpon>
     </Compile>

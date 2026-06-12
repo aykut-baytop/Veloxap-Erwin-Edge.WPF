@@ -35,7 +35,16 @@
                        FontWeight="SemiBold"
                        Margin="8,8,8,24"/>
 
-<RadioButton x:Name="rbModelInfo"
+                <TextBlock Text="Ana Model"
+           Foreground="#9CA3AF"
+           FontSize="12"
+           Margin="8,0,8,6"/>
+
+                <ComboBox x:Name="cmbMainModel"
+          Margin="8,0,8,20"
+          Height="36"/>
+
+                <RadioButton x:Name="rbModelInfo"
              GroupName="MainMenu"
              Content="Model Bilgileri"
              Style="{StaticResource SideMenuButtonStyle}"

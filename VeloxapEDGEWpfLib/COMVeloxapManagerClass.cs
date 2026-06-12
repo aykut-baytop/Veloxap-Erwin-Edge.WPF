@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using VeloxapEDGEWpfLib;
 
@@ -18,6 +19,36 @@ namespace VeloxapEDGEWpf
         public COMVeloxapManagerClass() { }
 
         public void Run()
+        {
+            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+            {
+                RunWindow();
+                return;
+            }
+
+            Exception startupError = null;
+            var uiThread = new Thread(() =>
+            {
+                try
+                {
+                    RunWindow();
+                }
+                catch (Exception ex)
+                {
+                    startupError = ex;
+                }
+            });
+
+            uiThread.SetApartmentState(ApartmentState.STA);
+            uiThread.IsBackground = false;
+            uiThread.Start();
+            uiThread.Join();
+
+            if (startupError != null)
+                throw new InvalidOperationException("Veloxap EDGE WPF add-in failed to start.", startupError);
+        }
+
+        private static void RunWindow()
         {
             SCAPI.Application app = new SCAPI.Application();
 
