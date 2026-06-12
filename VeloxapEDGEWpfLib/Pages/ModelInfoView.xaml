@@ -1,0 +1,106 @@
+﻿<UserControl x:Class="VeloxapEDGEWpfLib.Pages.ModelInfoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Model Bilgileri"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Foreground="#111827"/>
+
+            <TextBlock Text="Seçili modele ait property ve değer bilgilerini görüntüleyin."
+                       Margin="0,6,0,0"
+                       Foreground="#6B7280"
+                       FontSize="13"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Sol model listesi -->
+            <Border Background="#F9FAFB"
+                    BorderBrush="#E5E7EB"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="12">
+
+                <DockPanel>
+                    <TextBlock Text="Modeller"
+                               DockPanel.Dock="Top"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               Foreground="#374151"
+                               Margin="0,0,0,12"/>
+
+                    <ListBox ItemsSource="{Binding ModelItems}"
+         DisplayMemberPath="Name"
+         BorderThickness="0"
+         Background="Transparent"/>
+                </DockPanel>
+            </Border>
+
+            <!-- Sağ property tablosu -->
+            <Border Grid.Column="2"
+                    Background="#F9FAFB"
+                    BorderBrush="#E5E7EB"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="12">
+
+                <DockPanel>
+                    <TextBlock Text="Property Detayları"
+                               DockPanel.Dock="Top"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               Foreground="#374151"
+                               Margin="0,0,0,12"/>
+
+                    <DataGrid ItemsSource="{Binding Properties}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="None"
+                              RowHeight="36"
+                              ColumnHeaderHeight="38"
+                              BorderThickness="0"
+                              Background="White"
+                              AlternatingRowBackground="#F3F4F6">
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Property"
+                                                Binding="{Binding Property}"
+                                                Width="*"/>
+
+                            <DataGridTextColumn Header="DT"
+                                                Binding="{Binding DataType}"
+                                                Width="140"/>
+
+                            <DataGridTextColumn Header="Value"
+                                                Binding="{Binding Value}"
+                                                Width="180"/>
+
+                            <DataGridTextColumn Header="as String"
+                                                Binding="{Binding AsString}"
+                                                Width="180"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,71 @@
+﻿<Window x:Class="VeloxapEDGEWpfLib.Window1"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:VeloxapEDGEWpfLib"
+        xmlns:pages="clr-namespace:VeloxapEDGEWpfLib.Pages"
+        mc:Ignorable="d"
+        Title="Window1" Height="450" Width="800">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+
+                <ResourceDictionary Source="Themes/Styles.xaml"/>
+
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sol modern menü -->
+        <Border Background="#111827"
+            CornerRadius="14"
+            Padding="12"
+            Margin="0,0,16,0">
+
+            <StackPanel>
+                <TextBlock Text="Veloxap EDGE"
+                       Foreground="White"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Margin="8,8,8,24"/>
+
+<RadioButton x:Name="rbModelInfo"
+             GroupName="MainMenu"
+             Content="Model Bilgileri"
+             Style="{StaticResource SideMenuButtonStyle}"
+             IsChecked="True"/>
+
+<RadioButton x:Name="rbValidation"
+             GroupName="MainMenu"
+             Content="Model Validasyon"
+             Style="{StaticResource SideMenuButtonStyle}"/>
+
+<RadioButton x:Name="rbRules"
+             GroupName="MainMenu"
+             Content="Validasyon Kuralları"
+             Style="{StaticResource SideMenuButtonStyle}"/>
+
+<RadioButton x:Name="rbSettings"
+             GroupName="MainMenu"
+             Content="Ayarlar"
+             Style="{StaticResource SideMenuButtonStyle}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- İçerik alanı -->
+        <Border Grid.Column="1"
+            Background="White"
+            CornerRadius="14"
+            Padding="20">
+            <!--<pages:ModelInfoView/>-->
+            <ContentControl x:Name="MainContent"/>
+            <!--<ContentControl Content="{Binding SelectedPage}"/>-->
+        </Border>
+    </Grid>
+</Window>
