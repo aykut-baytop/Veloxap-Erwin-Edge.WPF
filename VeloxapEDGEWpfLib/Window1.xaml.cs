@@ -50,7 +50,6 @@ namespace VeloxapEDGEWpfLib
             rbModelInfo.Checked += Menu_Checked;
             rbValidation.Checked += Menu_Checked;
             rbRules.Checked += Menu_Checked;
-            rbSettings.Checked += Menu_Checked;
             cmbMainModel.SelectionChanged += CmbMainModel_SelectionChanged;
 
             MainContent.Content = new ModelInfoView();
@@ -107,8 +106,24 @@ namespace VeloxapEDGEWpfLib
                 }
             }
 
-            else if (sender == rbSettings)
-                MainContent.Content = new SettingsView();
+        }
+
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            ClearMenuSelection();
+            ShowSettingsView();
+        }
+
+        private void ClearMenuSelection()
+        {
+            rbModelInfo.IsChecked = false;
+            rbValidation.IsChecked = false;
+            rbRules.IsChecked = false;
+        }
+
+        private void ShowSettingsView()
+        {
+            MainContent.Content = new SettingsView();
         }
 
         private void ModelInfo_Checked(object sender, RoutedEventArgs e)

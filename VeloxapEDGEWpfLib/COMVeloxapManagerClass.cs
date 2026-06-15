@@ -65,7 +65,7 @@ namespace VeloxapEDGEWpf
 
             using (var key = Registry.ClassesRoot.OpenSubKey(clsid, true))
             {
-                key?.SetValue("", "ErwinTools AddIn");
+                key?.SetValue("", "Veloxap ErwinTools AddIn");
             }
         }
 

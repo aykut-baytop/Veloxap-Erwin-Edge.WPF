@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Configuration;
 
 namespace VeloxapEDGEWpfLib.Services
 {
     internal static class RuleApiSettings
     {
+        private const string ApiBaseUrlKey = "ApiBaseUrl";
         private const string AuthLoginUrlKey = "AuthLoginUrl";
         private const string AuthUsernameKey = "AuthUsername";
         private const string AuthPasswordKey = "AuthPassword";
@@ -12,16 +14,22 @@ namespace VeloxapEDGEWpfLib.Services
         private const string AlterDdlUrlKey = "AlterDdlUrl";
         private const string ApprovalStartByCatalogUrlKey = "ApprovalStartByCatalogUrl";
 
-        private const string DefaultAuthLoginUrl = "http://localhost:8181/api/auth/login";
+        private const string DefaultApiBaseUrl = "http://localhost:8181/api/";
+        private const string DefaultAuthLoginUrl = "auth/login";
         private const string DefaultAuthUsername = "mds";
         private const string DefaultAuthPassword = "Mdsap1234";
-        private const string DefaultRulesByModelUrl = "http://localhost:8181/api/rules/by-model";
-        private const string DefaultAlterDdlUrl = "http://localhost:8181/api/compare/alterDDL";
-        private const string DefaultApprovalStartByCatalogUrl = "http://localhost:8181/api/approval/start-by-catalog";
+        private const string DefaultRulesByModelUrl = "rules/by-model";
+        private const string DefaultAlterDdlUrl = "compare/alterDDL";
+        private const string DefaultApprovalStartByCatalogUrl = "approval/start-by-catalog";
+
+        public static string GetApiBaseUrl()
+        {
+            return EnsureTrailingSlash(GetSetting(ApiBaseUrlKey, DefaultApiBaseUrl));
+        }
 
         public static string GetAuthLoginUrl()
         {
-            return GetSetting(AuthLoginUrlKey, DefaultAuthLoginUrl);
+            return GetServiceUrl(AuthLoginUrlKey, DefaultAuthLoginUrl);
         }
 
         public static string GetAuthUsername()
@@ -36,17 +44,41 @@ namespace VeloxapEDGEWpfLib.Services
 
         public static string GetRulesByModelUrl()
         {
-            return GetSetting(RulesByModelUrlKey, DefaultRulesByModelUrl);
+            return GetServiceUrl(RulesByModelUrlKey, DefaultRulesByModelUrl);
         }
 
         public static string GetAlterDdlUrl()
         {
-            return GetSetting(AlterDdlUrlKey, DefaultAlterDdlUrl);
+            return GetServiceUrl(AlterDdlUrlKey, DefaultAlterDdlUrl);
         }
 
         public static string GetApprovalStartByCatalogUrl()
         {
-            return GetSetting(ApprovalStartByCatalogUrlKey, DefaultApprovalStartByCatalogUrl);
+            return GetServiceUrl(ApprovalStartByCatalogUrlKey, DefaultApprovalStartByCatalogUrl);
+        }
+
+        public static List<KeyValuePair<string, string>> GetDefaultAppSettings()
+        {
+            return new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>(ApiBaseUrlKey, DefaultApiBaseUrl),
+                new KeyValuePair<string, string>(AuthLoginUrlKey, DefaultAuthLoginUrl),
+                new KeyValuePair<string, string>(AuthUsernameKey, DefaultAuthUsername),
+                new KeyValuePair<string, string>(AuthPasswordKey, DefaultAuthPassword),
+                new KeyValuePair<string, string>(RulesByModelUrlKey, DefaultRulesByModelUrl),
+                new KeyValuePair<string, string>(AlterDdlUrlKey, DefaultAlterDdlUrl),
+                new KeyValuePair<string, string>(ApprovalStartByCatalogUrlKey, DefaultApprovalStartByCatalogUrl)
+            };
+        }
+
+        private static string GetServiceUrl(string key, string defaultEndpoint)
+        {
+            string configuredValue = GetSetting(key, defaultEndpoint);
+
+            if (IsAbsoluteUrl(configuredValue))
+                return configuredValue.Trim();
+
+            return CombineUrl(GetApiBaseUrl(), configuredValue);
         }
 
         private static string GetSetting(string key, string defaultValue)
@@ -59,6 +91,40 @@ namespace VeloxapEDGEWpfLib.Services
             return string.IsNullOrWhiteSpace(configuredValue)
                 ? defaultValue
                 : configuredValue.Trim();
+        }
+
+        private static string CombineUrl(string baseUrl, string endpoint)
+        {
+            baseUrl = EnsureTrailingSlash(baseUrl);
+            endpoint = (endpoint ?? string.Empty).Trim();
+
+            while (endpoint.StartsWith("/", StringComparison.Ordinal))
+                endpoint = endpoint.Substring(1);
+
+            if (string.IsNullOrWhiteSpace(endpoint))
+                return baseUrl;
+
+            return baseUrl + endpoint;
+        }
+
+        private static string EnsureTrailingSlash(string url)
+        {
+            url = string.IsNullOrWhiteSpace(url)
+                ? DefaultApiBaseUrl
+                : url.Trim();
+
+            return url.EndsWith("/", StringComparison.Ordinal)
+                ? url
+                : url + "/";
+        }
+
+        private static bool IsAbsoluteUrl(string value)
+        {
+            Uri uri;
+            return Uri.TryCreate(value, UriKind.Absolute, out uri)
+                && !string.IsNullOrWhiteSpace(uri.Scheme)
+                && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
         }
 
         private static string ReadHostAppSetting(string key)
