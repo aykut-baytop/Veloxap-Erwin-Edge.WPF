@@ -108,6 +108,56 @@ namespace VeloxapEDGEWpfLib.Services
             }
         }
 
+        public async Task<string> StartApprovalByCatalogAsync(
+            string serviceUrl,
+            string cName,
+            string cLongId,
+            int versionId,
+            int targetVersionId,
+            string description,
+            string alterDdl)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Approval servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            var serializer = new JavaScriptSerializer
+            {
+                MaxJsonLength = int.MaxValue
+            };
+
+            string payload = serializer.Serialize(new Dictionary<string, object>
+            {
+                { "cName", cName ?? string.Empty },
+                { "cLongId", cLongId ?? string.Empty },
+                { "versionId", versionId },
+                { "targetVersionId", targetVersionId },
+                { "description", description ?? string.Empty },
+                { "alterDDL", alterDdl ?? string.Empty }
+            });
+
+            ApiTraceLogger.Info(
+                "APPROVAL START REQUEST" + Environment.NewLine +
+                "Url: " + serviceUrl + Environment.NewLine +
+                "BodyLength: " + payload.Length + Environment.NewLine +
+                "BodyPreview: " + ApiTraceLogger.Truncate(payload, 2000));
+
+            using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
+            {
+                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "APPROVAL START RESPONSE" + Environment.NewLine +
+                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                response.EnsureSuccessStatusCode();
+                return json ?? string.Empty;
+            }
+        }
+
         private static string ExtractDdl(string json)
         {
             if (string.IsNullOrWhiteSpace(json))

@@ -79,7 +79,12 @@ namespace VeloxapEDGEWpfLib
             else if (sender == rbValidation)
             {
                 await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-                MainContent.Content = new ModelValidationView(currentModelInfo, rules, GetRuleService());
+                MainContent.Content = new ModelValidationView(
+                    currentModelInfo,
+                    rules,
+                    GetRuleService(),
+                    selectedModelName,
+                    selectedModelLongId);
             }
 
             else if (sender == rbRules)
@@ -199,7 +204,12 @@ namespace VeloxapEDGEWpfLib
             else if (rbValidation.IsChecked == true)
             {
                 await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-                MainContent.Content = new ModelValidationView(currentModelInfo, rules, GetRuleService());
+                MainContent.Content = new ModelValidationView(
+                    currentModelInfo,
+                    rules,
+                    GetRuleService(),
+                    selectedModelName,
+                    selectedModelLongId);
             }
         }
 

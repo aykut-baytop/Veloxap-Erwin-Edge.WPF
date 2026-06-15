@@ -16,21 +16,35 @@ namespace VeloxapEDGEWpfLib.Pages
         private readonly ModelInfo modelInfo;
         private readonly List<string> validationRules;
         private readonly RuleService ruleService;
+        private readonly string catalogName;
+        private readonly string catalogLongId;
+        private string currentAlterDdl;
         private bool isInitializing;
         private bool isUpdatingTargetVersion;
         private bool isValidationOk;
+        private bool isSendingApproval;
 
         public ModelValidationView()
-            : this(null, null, null)
+            : this(null, null, null, null, null)
         {
         }
 
         internal ModelValidationView(ModelInfo modelInfo, IEnumerable<string> validationRules)
-            : this(modelInfo, validationRules, null)
+            : this(modelInfo, validationRules, null, null, null)
         {
         }
 
         internal ModelValidationView(ModelInfo modelInfo, IEnumerable<string> validationRules, RuleService ruleService)
+            : this(modelInfo, validationRules, ruleService, null, null)
+        {
+        }
+
+        internal ModelValidationView(
+            ModelInfo modelInfo,
+            IEnumerable<string> validationRules,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId)
         {
             InitializeComponent();
 
@@ -38,6 +52,8 @@ namespace VeloxapEDGEWpfLib.Pages
             this.validationRules = validationRules?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
                 ?? new List<string>();
             this.ruleService = ruleService;
+            this.catalogName = catalogName;
+            this.catalogLongId = catalogLongId;
 
             LoadVersionSelectors();
             ResetValidationState("Validasyon bekleniyor.");
@@ -78,12 +94,86 @@ namespace VeloxapEDGEWpfLib.Pages
             RunValidation();
         }
 
-        private void BtnSendApproval_Click(object sender, RoutedEventArgs e)
+        private async void BtnSendApproval_Click(object sender, RoutedEventArgs e)
         {
             if (!isValidationOk)
                 return;
 
-            SetStatus("Validasyon başarılı. Onaya gönder akışı bir sonraki aşamada bağlanacak.");
+            await SendApprovalAsync();
+        }
+
+        private async Task SendApprovalAsync()
+        {
+            if (isSendingApproval)
+                return;
+
+            if (ruleService == null)
+            {
+                SetStatus("Approval servisi kullanilabilir degil.");
+                return;
+            }
+
+            var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
+            if (sourceVersion == null)
+            {
+                SetStatus("Onaya gondermek icin kaynak versiyon secilmeli.");
+                return;
+            }
+
+            if (!int.TryParse(sourceVersion.VersionNo, out int versionId))
+            {
+                SetStatus("Kaynak versiyon numarasi okunamadi.");
+                return;
+            }
+
+            int targetVersionId = versionId - 1;
+            if (targetVersionId < 1)
+            {
+                SetStatus("Onaya gondermek icin onceki hedef versiyon bulunamadi.");
+                return;
+            }
+
+            string cName = ResolveCatalogName();
+            string cLongId = ResolveCatalogLongId(sourceVersion);
+
+            if (string.IsNullOrWhiteSpace(cName) || string.IsNullOrWhiteSpace(cLongId))
+            {
+                SetStatus("Onaya gondermek icin cName veya cLongId okunamadi.");
+                return;
+            }
+
+            try
+            {
+                isSendingApproval = true;
+                btnSendApproval.IsEnabled = false;
+                SetStatus("Onaya gonderiliyor...");
+
+                string response = await ruleService.StartApprovalByCatalogAsync(
+                    RuleApiSettings.GetApprovalStartByCatalogUrl(),
+                    cName,
+                    cLongId,
+                    versionId,
+                    targetVersionId,
+                    string.Empty,
+                    currentAlterDdl ?? string.Empty);
+
+                SetStatus(
+                    "Onaya gonderildi. cName: " + cName +
+                    ", cLongId: " + cLongId +
+                    ", versionId: " + versionId +
+                    ", targetVersionId: " + targetVersionId +
+                    ", responseLength: " + (response == null ? 0 : response.Length) + ".");
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Onaya gonderme istegi sirasinda hata olustu.");
+                txtValidationResults.Text = ex.ToString();
+            }
+            finally
+            {
+                isSendingApproval = false;
+                btnSendApproval.IsEnabled = isValidationOk;
+            }
         }
 
         private void RunValidation()
@@ -175,14 +265,20 @@ namespace VeloxapEDGEWpfLib.Pages
 
             if (sourceVersion == null || targetVersion == null)
             {
+                currentAlterDdl = string.Empty;
                 txtAlterDdl.Text = "Kaynak ve hedef versiyon seçimi bekleniyor.";
                 return;
             }
 
             try
             {
+                currentAlterDdl = string.Empty;
                 txtAlterDdl.Text = "Alter DDL hazırlanıyor...";
                 string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
+
+                currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
+                    ? string.Empty
+                    : ddl;
 
                 txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
                     ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
@@ -190,6 +286,7 @@ namespace VeloxapEDGEWpfLib.Pages
             }
             catch (Exception ex)
             {
+                currentAlterDdl = string.Empty;
                 txtAlterDdl.Text = ex.ToString();
                 SetStatus("Alter DDL isteği sırasında hata oluştu.");
             }
@@ -368,6 +465,28 @@ namespace VeloxapEDGEWpfLib.Pages
         private void SetStatus(string message)
         {
             txtStatusMessage.Text = message ?? string.Empty;
+        }
+
+        private string ResolveCatalogName()
+        {
+            if (!string.IsNullOrWhiteSpace(catalogName))
+                return catalogName.Trim();
+
+            string modelName = modelInfo?.getoName();
+            return string.IsNullOrWhiteSpace(modelName) ? string.Empty : modelName.Trim();
+        }
+
+        private string ResolveCatalogLongId(VersionOption sourceVersion)
+        {
+            if (!string.IsNullOrWhiteSpace(catalogLongId))
+                return catalogLongId.Trim();
+
+            if (!string.IsNullOrWhiteSpace(sourceVersion?.ModelLongId))
+                return sourceVersion.ModelLongId.Trim();
+
+            string locator = modelInfo?.getoLocation();
+            string modelLongId = ExtractQueryValue(locator, "modelLongId");
+            return string.IsNullOrWhiteSpace(modelLongId) ? string.Empty : modelLongId.Trim();
         }
 
         private static List<VersionOption> LoadAvailableVersions(ModelInfo modelInfo)
