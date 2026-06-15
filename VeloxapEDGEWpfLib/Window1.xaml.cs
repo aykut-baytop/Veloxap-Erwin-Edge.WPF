@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,6 +16,7 @@ using System.Windows.Shapes;
 using VeloxapEDGErwinTools.AddIn;
 using VeloxapEDGEWpfLib.Models;
 using VeloxapEDGEWpfLib.Pages;
+using VeloxapEDGEWpfLib.Services;
 
 namespace VeloxapEDGEWpfLib
 {
@@ -25,13 +27,19 @@ namespace VeloxapEDGEWpfLib
     {
         private VeloxapEDGErwinLib veloxapEDGErwinLib;
         private List<string> rules;
+        private List<Rule> validationRules;
         private List<(string value, string key1, string key2)> models;
+        private AuthTokenProvider authTokenProvider;
+        private CookieContainer apiCookieContainer;
+        private RuleService ruleService;
 
         private string selectedModelLongId;
         private string selectedModelName;
         private string selectedModelVersionNo;
         private List<(int key, string val)> selectedModelAllVersions;
         private ModelInfo currentModelInfo;
+        private string loadedRulesModelKey;
+        private string lastRuleRequestTrace;
 
         private bool isValidationActive;
         private bool isValidationOk;
@@ -53,21 +61,46 @@ namespace VeloxapEDGEWpfLib
             veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref app);
             models = new List<(string value, string key1, string key2)>();
             rules = new List<string>();
+            validationRules = new List<Rule>();
+            apiCookieContainer = new CookieContainer();
+            authTokenProvider = new AuthTokenProvider(CreatePlainHttpClient(apiCookieContainer));
+            ruleService = new RuleService(CreateAuthorizedHttpClient(authTokenProvider, apiCookieContainer));
             isValidationActive = true;
             isValidationOk = false;
+            _ = InitializeAuthenticationAsync();
             PopulateModels();
         }
 
-        private void Menu_Checked(object sender, RoutedEventArgs e)
+        private async void Menu_Checked(object sender, RoutedEventArgs e)
         {
             if (sender == rbModelInfo)
                 MainContent.Content = new ModelInfoView(currentModelInfo);
 
             else if (sender == rbValidation)
-                MainContent.Content = new ModelValidationView();
+            {
+                await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+                MainContent.Content = new ModelValidationView(currentModelInfo, rules);
+            }
 
             else if (sender == rbRules)
-                MainContent.Content = new ValidationRulesView();
+            {
+                var rulesView = new ValidationRulesView(validationRules);
+                MainContent.Content = rulesView;
+                rulesView.ShowLoading();
+                rulesView.ShowTrace(BuildRuleTraceMessage("İstek hazırlanıyor.", null));
+
+                bool isLoaded = await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+                if (isLoaded)
+                {
+                    rulesView.LoadRules(validationRules);
+                    rulesView.ShowTrace(lastRuleRequestTrace);
+                }
+                else
+                {
+                    rulesView.ShowError("Modele ait kural bulunamadı veya validasyon servisine erişilemedi.");
+                    rulesView.ShowTrace(lastRuleRequestTrace);
+                }
+            }
 
             else if (sender == rbSettings)
                 MainContent.Content = new SettingsView();
@@ -125,7 +158,7 @@ namespace VeloxapEDGEWpfLib
 
         }
 
-        private void CmbMainModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void CmbMainModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var selectedModel = cmbMainModel.SelectedItem as ModelSelection;
             if (veloxapEDGErwinLib == null || selectedModel == null)
@@ -133,13 +166,292 @@ namespace VeloxapEDGEWpfLib
 
             selectedModelName = selectedModel.Name;
             selectedModelLongId = selectedModel.ObjectId;
+            SetSelectedModelRuleParameters(selectedModel.Name);
+            ClearValidationRules();
 
             currentModelInfo = veloxapEDGErwinLib.loadModelObject(
                 selectedModel.ObjectId,
                 selectedModel.PersistenceObjectId);
 
             if (rbModelInfo.IsChecked == true)
+            {
                 MainContent.Content = new ModelInfoView(currentModelInfo);
+            }
+            else if (rbRules.IsChecked == true)
+            {
+                var rulesView = new ValidationRulesView(validationRules);
+                MainContent.Content = rulesView;
+                rulesView.ShowLoading();
+                rulesView.ShowTrace(BuildRuleTraceMessage("İstek hazırlanıyor.", null));
+
+                bool isLoaded = await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+                if (isLoaded)
+                {
+                    rulesView.LoadRules(validationRules);
+                    rulesView.ShowTrace(lastRuleRequestTrace);
+                }
+                else
+                {
+                    rulesView.ShowError("Modele ait kural bulunamadı veya validasyon servisine erişilemedi.");
+                    rulesView.ShowTrace(lastRuleRequestTrace);
+                }
+            }
+            else if (rbValidation.IsChecked == true)
+            {
+                await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+                MainContent.Content = new ModelValidationView(currentModelInfo, rules);
+            }
+        }
+
+        private async Task<bool> LoadValidationRulesForSelectedModelAsync(bool showErrors)
+        {
+            EnsureRuleCollections();
+
+            if (string.IsNullOrWhiteSpace(selectedModelName) || string.IsNullOrWhiteSpace(selectedModelLongId))
+            {
+                lastRuleRequestTrace = BuildRuleTraceMessage("Model parametreleri boş.", null);
+                ApiTraceLogger.Info(lastRuleRequestTrace);
+                ClearValidationRules();
+                return false;
+            }
+
+            string currentModelKey = selectedModelName + "|" + selectedModelLongId;
+            if (string.Equals(loadedRulesModelKey, currentModelKey, StringComparison.OrdinalIgnoreCase))
+            {
+                lastRuleRequestTrace = BuildRuleTraceMessage("Cache kullanıldı.", null);
+                return true;
+            }
+
+            ClearValidationRules();
+            string serviceUrl = null;
+
+            try
+            {
+                serviceUrl = BuildRulesByModelUrl(
+                    RuleApiSettings.GetRulesByModelUrl(),
+                    selectedModelName,
+                    selectedModelLongId);
+
+                lastRuleRequestTrace = BuildRuleTraceMessage("İstek gönderiliyor.", serviceUrl);
+                ApiTraceLogger.Info(lastRuleRequestTrace);
+
+                List<Rule> serviceRules = await GetRuleService().GetRulesAsync(serviceUrl);
+
+                validationRules.AddRange(serviceRules ?? new List<Rule>());
+                rules.AddRange(validationRules
+                    .Select(rule => rule.RuleText)
+                    .Where(ruleText => !string.IsNullOrWhiteSpace(ruleText)));
+
+                loadedRulesModelKey = currentModelKey;
+                lastRuleRequestTrace = BuildRuleTraceMessage(
+                    "İstek tamamlandı. Kural sayısı: " + validationRules.Count,
+                    serviceUrl);
+                ApiTraceLogger.Info(lastRuleRequestTrace);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ClearValidationRules();
+                lastRuleRequestTrace = BuildRuleTraceMessage("İstek hatası: " + ex.Message, serviceUrl);
+                ApiTraceLogger.Error(lastRuleRequestTrace, ex);
+
+                if (showErrors)
+                {
+                    MessageBox.Show(
+                        "Validasyon Erişim Sorunu!\nModele ait kural bulunamadı!\n\n" + ex.Message,
+                        "Validasyon Kuralları",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+
+                return false;
+            }
+        }
+
+        private void ClearValidationRules()
+        {
+            EnsureRuleCollections();
+            rules.Clear();
+            validationRules.Clear();
+            loadedRulesModelKey = null;
+        }
+
+        private void EnsureRuleCollections()
+        {
+            if (rules == null)
+                rules = new List<string>();
+
+            if (validationRules == null)
+                validationRules = new List<Rule>();
+        }
+
+        private async Task InitializeAuthenticationAsync()
+        {
+            try
+            {
+                await GetAuthTokenProvider().GetTokenAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Servis login işlemi başarısız.\n\n" + ex.Message,
+                    "Servis Login",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private RuleService GetRuleService()
+        {
+            if (ruleService == null)
+                ruleService = new RuleService(CreateAuthorizedHttpClient(
+                    GetAuthTokenProvider(),
+                    GetApiCookieContainer()));
+
+            return ruleService;
+        }
+
+        private AuthTokenProvider GetAuthTokenProvider()
+        {
+            if (authTokenProvider == null)
+                authTokenProvider = new AuthTokenProvider(CreatePlainHttpClient(GetApiCookieContainer()));
+
+            return authTokenProvider;
+        }
+
+        private CookieContainer GetApiCookieContainer()
+        {
+            if (apiCookieContainer == null)
+                apiCookieContainer = new CookieContainer();
+
+            return apiCookieContainer;
+        }
+
+        private static HttpClient CreatePlainHttpClient(CookieContainer cookieContainer)
+        {
+            return new HttpClient(CreateHttpClientHandler(cookieContainer));
+        }
+
+        private static HttpClient CreateAuthorizedHttpClient(
+            AuthTokenProvider tokenProvider,
+            CookieContainer cookieContainer)
+        {
+            return new HttpClient(new BearerTokenHandler(
+                tokenProvider,
+                CreateHttpClientHandler(cookieContainer)));
+        }
+
+        private static HttpClientHandler CreateHttpClientHandler(CookieContainer cookieContainer)
+        {
+            return new HttpClientHandler
+            {
+                UseCookies = true,
+                CookieContainer = cookieContainer ?? new CookieContainer()
+            };
+        }
+
+        private static string BuildRulesByModelUrl(string baseUrl, string modelName, string modelLongId)
+        {
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                baseUrl = RuleApiSettings.GetRulesByModelUrl();
+
+            string separator = baseUrl.Contains("?")
+                ? (baseUrl.EndsWith("?") || baseUrl.EndsWith("&") ? string.Empty : "&")
+                : "?";
+
+            return baseUrl
+                + separator
+                + "cName="
+                + Uri.EscapeDataString(modelName ?? string.Empty)
+                + "&cLongId="
+                + Uri.EscapeDataString(modelLongId ?? string.Empty);
+        }
+
+        private string BuildRuleTraceMessage(string status, string serviceUrl)
+        {
+            var selectedModel = cmbMainModel == null ? null : cmbMainModel.SelectedItem as ModelSelection;
+            string rawValue = selectedModel == null ? string.Empty : selectedModel.Name;
+
+            var builder = new StringBuilder();
+            builder.AppendLine(status ?? string.Empty);
+            builder.AppendLine("LogFile: " + ApiTraceLogger.LogFilePath);
+            builder.AppendLine("RulesUrl: " + (serviceUrl ?? string.Empty));
+            builder.AppendLine("Parsed cName: " + (selectedModelName ?? string.Empty));
+            builder.AppendLine("Parsed version: " + (selectedModelVersionNo ?? string.Empty));
+            builder.AppendLine("Parsed cLongId: " + (selectedModelLongId ?? string.Empty));
+            builder.AppendLine("Selected raw: " + rawValue);
+
+            return builder.ToString();
+        }
+
+        private void SetSelectedModelRuleParameters(string selectedModelValue)
+        {
+            if (string.IsNullOrWhiteSpace(selectedModelValue))
+                return;
+
+            string versionNo = ExtractSelectedModelQueryValue(selectedModelValue, "version");
+            string modelLongId = ExtractSelectedModelQueryValue(selectedModelValue, "modelLongId");
+
+            if (!string.IsNullOrWhiteSpace(versionNo))
+            {
+                selectedModelVersionNo = versionNo;
+                selectedModelName = "Version " + versionNo;
+            }
+            else
+            {
+                string parsedModelName = ExtractSelectedModelName(selectedModelValue);
+                if (!string.IsNullOrWhiteSpace(parsedModelName))
+                    selectedModelName = parsedModelName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(modelLongId))
+                selectedModelLongId = modelLongId;
+
+            ApiTraceLogger.Info(
+                "SELECTED MODEL PARSE" + Environment.NewLine +
+                "SelectedRaw: " + selectedModelValue + Environment.NewLine +
+                "ParsedVersion: " + (selectedModelVersionNo ?? string.Empty) + Environment.NewLine +
+                "ParsedRuleName: " + (selectedModelName ?? string.Empty) + Environment.NewLine +
+                "ParsedModelLongId: " + (selectedModelLongId ?? string.Empty));
+        }
+
+        private static string ExtractSelectedModelQueryValue(string selectedModelValue, string key)
+        {
+            if (string.IsNullOrWhiteSpace(selectedModelValue) || string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            string marker = key + "=";
+            int start = selectedModelValue.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (start < 0)
+                return string.Empty;
+
+            start += marker.Length;
+
+            int end = selectedModelValue.IndexOfAny(new[] { '&', ')', ',', ' ', '\r', '\n', '\t' }, start);
+            if (end < 0)
+                end = selectedModelValue.Length;
+
+            if (end <= start)
+                return string.Empty;
+
+            return Uri.UnescapeDataString(selectedModelValue.Substring(start, end - start).Trim());
+        }
+
+        private static string ExtractSelectedModelName(string selectedModelValue)
+        {
+            if (string.IsNullOrWhiteSpace(selectedModelValue))
+                return string.Empty;
+
+            int queryIndex = selectedModelValue.IndexOf('?');
+            if (queryIndex <= 0)
+                return string.Empty;
+
+            string beforeQuery = selectedModelValue.Substring(0, queryIndex);
+            int lastSlash = beforeQuery.LastIndexOf('/');
+            if (lastSlash < 0 || lastSlash == beforeQuery.Length - 1)
+                return string.Empty;
+
+            return beforeQuery.Substring(lastSlash + 1).Trim();
         }
 
         private sealed class ModelSelection

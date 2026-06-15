@@ -1,28 +1,299 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using VeloxapEDGEWpfLib.Models;
 
 namespace VeloxapEDGEWpfLib.Pages
 {
-    /// <summary>
-    /// Interaction logic for ModelValidationView.xaml
-    /// </summary>
     public partial class ModelValidationView : UserControl
     {
+        private readonly ModelInfo modelInfo;
+        private readonly List<string> validationRules;
+        private bool isInitializing;
+        private bool isValidationOk;
+
         public ModelValidationView()
+            : this(null, null)
+        {
+        }
+
+        internal ModelValidationView(ModelInfo modelInfo, IEnumerable<string> validationRules)
         {
             InitializeComponent();
+
+            this.modelInfo = modelInfo;
+            this.validationRules = validationRules?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
+                ?? new List<string>();
+
+            LoadVersionSelectors();
+            ResetValidationState("Validasyon bekleniyor.");
+        }
+
+        private void LoadVersionSelectors()
+        {
+            isInitializing = true;
+
+            var versions = LoadAvailableVersions(modelInfo);
+            cmbSourceVersion.ItemsSource = versions;
+            cmbTargetVersion.ItemsSource = versions.ToList();
+
+            if (versions.Count > 0)
+            {
+                cmbSourceVersion.SelectedIndex = 0;
+                cmbTargetVersion.SelectedIndex = versions.Count > 1 ? 1 : 0;
+            }
+
+            isInitializing = false;
+            _ = RefreshAlterDdlPreviewAsync();
+        }
+
+        private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (isInitializing)
+                return;
+
+            ResetValidationState("Versiyon seçimi değişti. Validasyon tekrar çalıştırılmalı.");
+            await RefreshAlterDdlPreviewAsync();
+        }
+
+        private void BtnRunValidation_Click(object sender, RoutedEventArgs e)
+        {
+            RunValidation();
+        }
+
+        private void BtnSendApproval_Click(object sender, RoutedEventArgs e)
+        {
+            if (!isValidationOk)
+                return;
+
+            SetStatus("Validasyon başarılı. Onaya gönder akışı bir sonraki aşamada bağlanacak.");
+        }
+
+        private void RunValidation()
+        {
+            if (modelInfo == null)
+            {
+                ResetValidationState("Seçili model bulunamadı.");
+                txtValidationResults.Text = "Validasyon çalıştırmak için önce bir model seçilmeli.";
+                return;
+            }
+
+            var rules = GetValidationRules().ToList();
+            if (rules.Count == 0)
+            {
+                ResetValidationState("Validasyon kuralı bulunamadı.");
+                txtValidationResults.Text =
+                    "Kural listesi boş. ValidationRulesView veya kalıcı kural kaynağı bağlandığında bu test çalışacak.";
+                return;
+            }
+
+            try
+            {
+                SetStatus("Validasyon çalışıyor...");
+                var issues = CrossRuleValidationEngine.Validate(modelInfo, rules, runParallel: true);
+
+                isValidationOk = issues.Count == 0;
+                btnSendApproval.IsEnabled = isValidationOk;
+
+                txtValidationResults.Text = FormatValidationResults(issues);
+                SetStatus(FormatValidationSummary(issues));
+            }
+            catch (Exception ex)
+            {
+                ResetValidationState("Validasyon sırasında hata oluştu.");
+                txtValidationResults.Text = ex.ToString();
+            }
+        }
+
+        private IEnumerable<string> GetValidationRules()
+        {
+            // TODO: ValidationRulesView veya kalıcı kural kaynağı hazır olduğunda kuralları buradan döndür.
+            return validationRules;
+        }
+
+        private static string FormatValidationResults(IReadOnlyCollection<CrossValidationIssue> issues)
+        {
+            if (issues == null || issues.Count == 0)
+                return "Validasyon hatası bulunamadı.";
+
+            var builder = new StringBuilder();
+            int index = 1;
+
+            foreach (var issue in issues)
+            {
+                builder.AppendLine($"{index}. {issue.Message}");
+                builder.AppendLine($"   Kural: {issue.RuleText}");
+                builder.AppendLine($"   Nesne: {issue.CheckObjectPath}");
+                builder.AppendLine($"   Property: {issue.PropertyName}");
+                builder.AppendLine($"   Beklenen: {issue.ExpectedValue}");
+                builder.AppendLine($"   Gerçek: {issue.ActualValue}");
+                builder.AppendLine();
+                index++;
+            }
+
+            return builder.ToString();
+        }
+
+        private static string FormatValidationSummary(IReadOnlyCollection<CrossValidationIssue> issues)
+        {
+            if (issues == null || issues.Count == 0)
+                return "Validasyon başarılı. Onaya gönderilebilir.";
+
+            var builder = new StringBuilder();
+            builder.AppendLine($"Validasyon tamamlandı. {issues.Count} hata bulundu.");
+
+            foreach (var issue in issues.Take(3))
+                builder.AppendLine("- " + (issue.CheckObjectPath ?? issue.Message));
+
+            if (issues.Count > 3)
+                builder.AppendLine("Detaylar Validasyon Sonuçları sekmesinde.");
+
+            return builder.ToString();
+        }
+
+        private async Task RefreshAlterDdlPreviewAsync()
+        {
+            var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
+            var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
+
+            if (sourceVersion == null || targetVersion == null)
+            {
+                txtAlterDdl.Text = "Kaynak ve hedef versiyon seçimi bekleniyor.";
+                return;
+            }
+
+            try
+            {
+                txtAlterDdl.Text = "Alter DDL hazırlanıyor...";
+                string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
+
+                txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
+                    ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
+                    : ddl;
+            }
+            catch (Exception ex)
+            {
+                txtAlterDdl.Text = ex.ToString();
+                SetStatus("Alter DDL isteği sırasında hata oluştu.");
+            }
+        }
+
+        private Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
+        {
+            // TODO: Alter DDL API entegrasyonu burada yapılacak.
+            // sourceVersion ve targetVersion içindeki VersionNo/ModelLongId/Locator değerleri istek payload'ı için hazır.
+            return Task.FromResult(string.Empty);
+        }
+
+        private static string BuildAlterDdlPlaceholder(VersionOption sourceVersion, VersionOption targetVersion)
+        {
+            var builder = new StringBuilder();
+
+            builder.AppendLine("Alter DDL API entegrasyonu bekleniyor.");
+            builder.AppendLine();
+            builder.AppendLine($"Kaynak: {sourceVersion.DisplayName}");
+            builder.AppendLine($"Hedef: {targetVersion.DisplayName}");
+            builder.AppendLine();
+            builder.AppendLine("RequestAlterDdlFromApiAsync methodu doldurulduğunda sonuç burada gösterilecek.");
+
+            return builder.ToString();
+        }
+
+        private void ResetValidationState(string message)
+        {
+            isValidationOk = false;
+            btnSendApproval.IsEnabled = false;
+            SetStatus(message);
+        }
+
+        private void SetStatus(string message)
+        {
+            txtStatusMessage.Text = message ?? string.Empty;
+        }
+
+        private static List<VersionOption> LoadAvailableVersions(ModelInfo modelInfo)
+        {
+            var currentVersion = BuildCurrentVersionOption(modelInfo);
+
+            if (!int.TryParse(currentVersion.VersionNo, out int latestVersion) || latestVersion < 1)
+                return new List<VersionOption> { currentVersion };
+
+            var versions = new List<VersionOption>();
+            for (int version = latestVersion; version >= 1; version--)
+            {
+                versions.Add(new VersionOption(
+                    BuildVersionDisplayName(modelInfo, version),
+                    version.ToString(),
+                    currentVersion.ModelLongId,
+                    currentVersion.Locator));
+            }
+
+            return versions;
+        }
+
+        private static VersionOption BuildCurrentVersionOption(ModelInfo modelInfo)
+        {
+            string modelName = modelInfo?.getoName();
+            string locator = modelInfo?.getoLocation();
+            string versionNo = ExtractQueryValue(locator, "version");
+            string modelLongId = ExtractQueryValue(locator, "modelLongId");
+
+            string displayName = string.IsNullOrWhiteSpace(versionNo)
+                ? "Geçerli Versiyon"
+                : "Versiyon " + versionNo;
+
+            if (!string.IsNullOrWhiteSpace(modelName))
+                displayName += " - " + modelName;
+
+            return new VersionOption(displayName, versionNo, modelLongId, locator);
+        }
+
+        private static string BuildVersionDisplayName(ModelInfo modelInfo, int version)
+        {
+            string modelName = modelInfo?.getoName();
+            string displayName = "Versiyon " + version;
+
+            if (!string.IsNullOrWhiteSpace(modelName))
+                displayName += " - " + modelName;
+
+            return displayName;
+        }
+
+        private static string ExtractQueryValue(string value, string key)
+        {
+            if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            var match = Regex.Match(
+                value,
+                @"(?:\?|&)" + Regex.Escape(key) + @"=([^&\s\)]+)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            return match.Success ? Uri.UnescapeDataString(match.Groups[1].Value) : string.Empty;
+        }
+
+        private sealed class VersionOption
+        {
+            public VersionOption(string displayName, string versionNo, string modelLongId, string locator)
+            {
+                DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Versiyon" : displayName;
+                VersionNo = versionNo ?? string.Empty;
+                ModelLongId = modelLongId ?? string.Empty;
+                Locator = locator ?? string.Empty;
+            }
+
+            public string DisplayName { get; }
+
+            public string VersionNo { get; }
+
+            public string ModelLongId { get; }
+
+            public string Locator { get; }
         }
     }
 }
