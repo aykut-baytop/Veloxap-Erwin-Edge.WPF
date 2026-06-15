@@ -9,11 +9,13 @@ namespace VeloxapEDGEWpfLib.Services
         private const string AuthUsernameKey = "AuthUsername";
         private const string AuthPasswordKey = "AuthPassword";
         private const string RulesByModelUrlKey = "ValidationRulesByModelUrl";
+        private const string AlterDdlUrlKey = "AlterDdlUrl";
 
         private const string DefaultAuthLoginUrl = "http://localhost:8181/api/auth/login";
         private const string DefaultAuthUsername = "mds";
         private const string DefaultAuthPassword = "Mdsap1234";
         private const string DefaultRulesByModelUrl = "http://localhost:8181/api/rules/by-model";
+        private const string DefaultAlterDdlUrl = "http://localhost:8181/api/compare/alterDDL";
 
         public static string GetAuthLoginUrl()
         {
@@ -33,6 +35,11 @@ namespace VeloxapEDGEWpfLib.Services
         public static string GetRulesByModelUrl()
         {
             return GetSetting(RulesByModelUrlKey, DefaultRulesByModelUrl);
+        }
+
+        public static string GetAlterDdlUrl()
+        {
+            return GetSetting(AlterDdlUrlKey, DefaultAlterDdlUrl);
         }
 
         private static string GetSetting(string key, string defaultValue)

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using VeloxapEDGEWpfLib.Models;
+using VeloxapEDGEWpfLib.Services;
 
 namespace VeloxapEDGEWpfLib.Pages
 {
@@ -14,21 +15,29 @@ namespace VeloxapEDGEWpfLib.Pages
     {
         private readonly ModelInfo modelInfo;
         private readonly List<string> validationRules;
+        private readonly RuleService ruleService;
         private bool isInitializing;
+        private bool isUpdatingTargetVersion;
         private bool isValidationOk;
 
         public ModelValidationView()
-            : this(null, null)
+            : this(null, null, null)
         {
         }
 
         internal ModelValidationView(ModelInfo modelInfo, IEnumerable<string> validationRules)
+            : this(modelInfo, validationRules, null)
+        {
+        }
+
+        internal ModelValidationView(ModelInfo modelInfo, IEnumerable<string> validationRules, RuleService ruleService)
         {
             InitializeComponent();
 
             this.modelInfo = modelInfo;
             this.validationRules = validationRules?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
                 ?? new List<string>();
+            this.ruleService = ruleService;
 
             LoadVersionSelectors();
             ResetValidationState("Validasyon bekleniyor.");
@@ -45,7 +54,7 @@ namespace VeloxapEDGEWpfLib.Pages
             if (versions.Count > 0)
             {
                 cmbSourceVersion.SelectedIndex = 0;
-                cmbTargetVersion.SelectedIndex = versions.Count > 1 ? 1 : 0;
+                SelectPreviousTargetVersion();
             }
 
             isInitializing = false;
@@ -54,8 +63,11 @@ namespace VeloxapEDGEWpfLib.Pages
 
         private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (isInitializing)
+            if (isInitializing || isUpdatingTargetVersion)
                 return;
+
+            if (sender == cmbSourceVersion)
+                SelectPreviousTargetVersion();
 
             ResetValidationState("Versiyon seçimi değişti. Validasyon tekrar çalıştırılmalı.");
             await RefreshAlterDdlPreviewAsync();
@@ -183,23 +195,165 @@ namespace VeloxapEDGEWpfLib.Pages
             }
         }
 
-        private Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
+        private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
         {
-            // TODO: Alter DDL API entegrasyonu burada yapılacak.
-            // sourceVersion ve targetVersion içindeki VersionNo/ModelLongId/Locator değerleri istek payload'ı için hazır.
-            return Task.FromResult(string.Empty);
+            if (ruleService == null)
+                return string.Empty;
+
+            if (!int.TryParse(sourceVersion.VersionNo, out int sourceVNo))
+                throw new InvalidOperationException("Kaynak versiyon numarasi okunamadi.");
+
+            int targetVNo = sourceVNo - 1;
+            if (targetVNo < 1)
+                throw new InvalidOperationException("Alter DDL icin onceki versiyon bulunamadi.");
+
+            string path = ExtractAlterDdlPath(sourceVersion.Locator);
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidOperationException("Alter DDL path degeri secili modelden okunamadi.");
+
+            string ddl = await ruleService.GetAlterDdlAsync(
+                RuleApiSettings.GetAlterDdlUrl(),
+                path,
+                sourceVNo,
+                targetVNo);
+
+            SetStatus("Alter DDL hazirlandi. Kaynak: " + sourceVNo + ", Hedef: " + targetVNo + ".");
+            return FormatDdlForDisplay(ddl);
+        }
+
+        private void SelectPreviousTargetVersion()
+        {
+            var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
+            if (sourceVersion == null || !int.TryParse(sourceVersion.VersionNo, out int sourceVNo))
+                return;
+
+            string targetVersionNo = (sourceVNo - 1).ToString();
+            var targetVersion = cmbTargetVersion.Items
+                .OfType<VersionOption>()
+                .FirstOrDefault(option => string.Equals(
+                    option.VersionNo,
+                    targetVersionNo,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (targetVersion == null)
+                return;
+
+            try
+            {
+                isUpdatingTargetVersion = true;
+                cmbTargetVersion.SelectedItem = targetVersion;
+            }
+            finally
+            {
+                isUpdatingTargetVersion = false;
+            }
+        }
+
+        private static string ExtractAlterDdlPath(string locator)
+        {
+            if (string.IsNullOrWhiteSpace(locator))
+                return string.Empty;
+
+            string value = locator.Trim();
+            int start = value.IndexOf("Mart//", StringComparison.OrdinalIgnoreCase);
+
+            if (start < 0)
+                start = value.IndexOf("Mart/", StringComparison.OrdinalIgnoreCase);
+
+            if (start < 0)
+                start = 0;
+
+            int end = value.IndexOf('?', start);
+            if (end < 0)
+                end = value.Length;
+
+            if (end <= start)
+                return string.Empty;
+
+            string path = value.Substring(start, end - start).Trim(' ', '(', ')');
+            while (path.Contains("//"))
+                path = path.Replace("//", "/");
+
+            return Uri.UnescapeDataString(path);
+        }
+
+        private static string FormatDdlForDisplay(string ddl)
+        {
+            if (string.IsNullOrEmpty(ddl))
+                return string.Empty;
+
+            var builder = new StringBuilder(ddl.Length);
+
+            for (int i = 0; i < ddl.Length; i++)
+            {
+                char current = ddl[i];
+
+                if (current == '\r')
+                {
+                    if (i + 1 < ddl.Length && ddl[i + 1] == '\n')
+                        i++;
+
+                    builder.Append(Environment.NewLine);
+                    continue;
+                }
+
+                if (current == '\n')
+                {
+                    builder.Append(Environment.NewLine);
+                    continue;
+                }
+
+                if (current != '\\' || i == ddl.Length - 1)
+                {
+                    builder.Append(current);
+                    continue;
+                }
+
+                if (i + 3 < ddl.Length && ddl[i + 1] == 'r' && ddl[i + 2] == '\\' && ddl[i + 3] == 'n')
+                {
+                    builder.Append(Environment.NewLine);
+                    i += 3;
+                    continue;
+                }
+
+                char next = ddl[i + 1];
+                switch (next)
+                {
+                    case 'n':
+                        builder.Append(Environment.NewLine);
+                        i++;
+                        break;
+                    case 'r':
+                        builder.Append(Environment.NewLine);
+                        i++;
+                        break;
+                    case 't':
+                        builder.Append('\t');
+                        i++;
+                        break;
+                    case '\\':
+                        builder.Append('\\');
+                        i++;
+                        break;
+                    default:
+                        builder.Append(current);
+                        break;
+                }
+            }
+
+            return builder.ToString();
         }
 
         private static string BuildAlterDdlPlaceholder(VersionOption sourceVersion, VersionOption targetVersion)
         {
             var builder = new StringBuilder();
 
-            builder.AppendLine("Alter DDL API entegrasyonu bekleniyor.");
+            builder.AppendLine("Alter DDL cevabi bos dondu.");
             builder.AppendLine();
             builder.AppendLine($"Kaynak: {sourceVersion.DisplayName}");
             builder.AppendLine($"Hedef: {targetVersion.DisplayName}");
             builder.AppendLine();
-            builder.AppendLine("RequestAlterDdlFromApiAsync methodu doldurulduğunda sonuç burada gösterilecek.");
+            builder.AppendLine("API ddl alani dolu dondugunde sonuc burada gosterilecek.");
 
             return builder.ToString();
         }

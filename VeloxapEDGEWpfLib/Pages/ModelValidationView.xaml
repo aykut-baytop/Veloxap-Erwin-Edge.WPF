@@ -88,6 +88,7 @@
                         <TextBlock Text="Hedef Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbTargetVersion"
                                   Height="34"
+                                  IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
                                   SelectionChanged="VersionSelection_Changed"/>
                     </StackPanel>
