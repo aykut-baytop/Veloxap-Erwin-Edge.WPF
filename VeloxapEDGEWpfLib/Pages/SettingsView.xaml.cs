@@ -113,7 +113,7 @@ namespace VeloxapEDGEWpfLib.Pages
         private void LoadCredentialFields()
         {
             txtAuthUsername.Text = GetUserSettingValue(AuthUsernameKey);
-            pwdAuthPassword.Password = GetUserSettingValue(AuthPasswordKey);
+            pwdAuthPassword.Password = GetPasswordForInput(GetUserSettingValue(AuthPasswordKey));
         }
 
         private string GetUserSettingValue(string key)
@@ -127,7 +127,7 @@ namespace VeloxapEDGEWpfLib.Pages
         private void UpdateUserSettingsFromCredentialFields()
         {
             SetUserSettingValue(AuthUsernameKey, txtAuthUsername.Text);
-            SetUserSettingValue(AuthPasswordKey, pwdAuthPassword.Password);
+            SetUserSettingValue(AuthPasswordKey, CryptoHelper.Encrypt(pwdAuthPassword.Password));
         }
 
         private void SetUserSettingValue(string key, string value)
@@ -154,6 +154,17 @@ namespace VeloxapEDGEWpfLib.Pages
             return currentUserSettings.FirstOrDefault(
                 setting => setting != null
                     && string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string GetPasswordForInput(string storedPassword)
+        {
+            if (string.IsNullOrWhiteSpace(storedPassword))
+                return string.Empty;
+
+            string plainPassword;
+            return CryptoHelper.TryDecrypt(storedPassword, out plainPassword)
+                ? plainPassword
+                : storedPassword;
         }
 
         private static void CommitSettingsGrid(DataGrid dataGrid)

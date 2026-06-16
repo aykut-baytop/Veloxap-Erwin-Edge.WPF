@@ -31,7 +31,15 @@ namespace VeloxapEDGEWpfLib.Services
 
         public static string GetAuthPassword()
         {
-            return GetOptionalSetting(AuthPasswordKey);
+            string configuredPassword = GetOptionalSetting(AuthPasswordKey);
+
+            if (string.IsNullOrWhiteSpace(configuredPassword))
+                return string.Empty;
+
+            string plainPassword;
+            return CryptoHelper.TryDecrypt(configuredPassword, out plainPassword)
+                ? plainPassword
+                : configuredPassword;
         }
 
         public static bool AreAuthCredentialsConfigured()

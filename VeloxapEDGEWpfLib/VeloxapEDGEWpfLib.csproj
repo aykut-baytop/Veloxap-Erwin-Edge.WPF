@@ -46,6 +46,7 @@
     <Reference Include="System.Configuration" />
     <Reference Include="System.Data" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Security" />
     <Reference Include="System.ValueTuple" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
@@ -90,6 +91,7 @@
     <Compile Include="Services\ApiTraceLogger.cs" />
     <Compile Include="Services\AuthTokenProvider.cs" />
     <Compile Include="Services\BearerTokenHandler.cs" />
+    <Compile Include="Services\CryptoHelper.cs" />
     <Compile Include="Services\ModelDiffApplyService.cs" />
     <Compile Include="Services\RuleApiSettings.cs" />
     <Compile Include="Services\RuleService.cs" />
