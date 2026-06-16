@@ -133,14 +133,14 @@ namespace VeloxapEDGEWpfLib.Pages
             var addedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             KeyValueConfigurationCollection appSettings = config.AppSettings.Settings;
 
-            foreach (KeyValuePair<string, string> defaultSetting in RuleApiSettings.GetDefaultAppSettings())
+            foreach (string key in RuleApiSettings.GetAppSettingKeys())
             {
-                string value = ReadSettingValue(appSettings, defaultSetting.Key);
+                string value = ReadSettingValue(appSettings, key);
 
                 result.Add(new AppConfigSetting(
-                    defaultSetting.Key,
-                    string.IsNullOrWhiteSpace(value) ? defaultSetting.Value : value));
-                addedKeys.Add(defaultSetting.Key);
+                    key,
+                    value ?? string.Empty));
+                addedKeys.Add(key);
             }
 
             foreach (string key in appSettings.AllKeys
