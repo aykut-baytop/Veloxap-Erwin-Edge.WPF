@@ -48,6 +48,19 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="SettingsDataGridStyle" TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="False"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="RowHeight" Value="42"/>
+            <Setter Property="ColumnHeaderHeight" Value="38"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="AlternatingRowBackground" Value="#F3F4F6"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -83,7 +96,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="App.config appSettings"
+                    <TextBlock Text="App.config Ayarları"
                                FontWeight="SemiBold"
                                FontSize="14"
                                Foreground="#374151"/>
@@ -113,31 +126,77 @@
                            FontSize="12"/>
 
                 <Grid>
-                    <DataGrid x:Name="dgSettings"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              IsReadOnly="False"
-                              HeadersVisibility="Column"
-                              GridLinesVisibility="None"
-                              RowHeight="42"
-                              ColumnHeaderHeight="38"
-                              BorderThickness="0"
-                              Background="White"
-                              AlternatingRowBackground="#F3F4F6">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Anahtar"
-                                                Binding="{Binding Key}"
-                                                IsReadOnly="True"
-                                                Width="240"
-                                                ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+                                <TextBlock Text="Kullanıcı Bilgileri"
+                                           FontWeight="SemiBold"
+                                           Foreground="#374151"
+                                           FontSize="13" Background="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}"/>
 
-                            <DataGridTextColumn Header="Değer"
-                                                Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="*"
-                                                ElementStyle="{StaticResource WrappedCellTextStyle}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                                <TextBlock x:Name="txtUserSettingCount"
+                                           Grid.Column="1"
+                                           Foreground="#6B7280"
+                                           FontSize="12"/>
+                            </Grid>
+
+                            <DataGrid x:Name="dgUserSettings"
+                                      Style="{StaticResource SettingsDataGridStyle}"
+                                      MaxHeight="132">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Anahtar"
+                                                        Binding="{Binding Key}"
+                                                        IsReadOnly="True"
+                                                        Width="240"
+                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+
+                                    <DataGridTextColumn Header="Değer"
+                                                        Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                        Width="*"
+                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <Grid Margin="0,16,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="Servis Bilgileri"
+                                           FontWeight="SemiBold"
+                                           Foreground="#374151"
+                                           FontSize="13" Background="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}"/>
+
+                                <TextBlock x:Name="txtServiceSettingCount"
+                                           Grid.Column="1"
+                                           Foreground="#6B7280"
+                                           FontSize="12"/>
+                            </Grid>
+
+                            <DataGrid x:Name="dgServiceSettings"
+                                      Style="{StaticResource SettingsDataGridStyle}"
+                                      MaxHeight="240">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Anahtar"
+                                                        Binding="{Binding Key}"
+                                                        IsReadOnly="True"
+                                                        Width="240"
+                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+
+                                    <DataGridTextColumn Header="Değer"
+                                                        Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                        Width="*"
+                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </ScrollViewer>
 
                     <Border x:Name="emptyState"
                             Background="#F9FAFB"

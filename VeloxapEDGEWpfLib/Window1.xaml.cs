@@ -66,7 +66,8 @@ namespace VeloxapEDGEWpfLib
             ruleService = new RuleService(CreateAuthorizedHttpClient(authTokenProvider, apiCookieContainer));
             isValidationActive = true;
             isValidationOk = false;
-            _ = InitializeAuthenticationAsync();
+            if (EnsureAuthCredentialsConfigured(showMessage: true))
+                _ = InitializeAuthenticationAsync();
             PopulateModels();
         }
 
@@ -77,6 +78,9 @@ namespace VeloxapEDGEWpfLib
 
             else if (sender == rbValidation)
             {
+                if (!EnsureAuthCredentialsConfigured(showMessage: true))
+                    return;
+
                 await LoadValidationRulesForSelectedModelAsync(showErrors: true);
                 MainContent.Content = new ModelValidationView(
                     currentModelInfo,
@@ -88,6 +92,9 @@ namespace VeloxapEDGEWpfLib
 
             else if (sender == rbRules)
             {
+                if (!EnsureAuthCredentialsConfigured(showMessage: true))
+                    return;
+
                 var rulesView = new ValidationRulesView(validationRules);
                 MainContent.Content = rulesView;
                 rulesView.ShowLoading();
@@ -124,6 +131,27 @@ namespace VeloxapEDGEWpfLib
         private void ShowSettingsView()
         {
             MainContent.Content = new SettingsView();
+        }
+
+        private bool EnsureAuthCredentialsConfigured(bool showMessage)
+        {
+            if (RuleApiSettings.AreAuthCredentialsConfigured())
+                return true;
+
+            ClearMenuSelection();
+            ShowSettingsView();
+
+            if (showMessage)
+            {
+                MessageBox.Show(
+                    "App.config icindeki AuthUsername ve AuthPassword bos.\n\n" +
+                    "Servisleri kullanmadan once Ayarlar ekranindan kullanici adi ve parola bilgilerini doldurun.",
+                    "Eksik Kullanici Bilgileri",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            return false;
         }
 
         private void ModelInfo_Checked(object sender, RoutedEventArgs e)
@@ -199,6 +227,9 @@ namespace VeloxapEDGEWpfLib
             }
             else if (rbRules.IsChecked == true)
             {
+                if (!EnsureAuthCredentialsConfigured(showMessage: true))
+                    return;
+
                 var rulesView = new ValidationRulesView(validationRules);
                 MainContent.Content = rulesView;
                 rulesView.ShowLoading();
@@ -218,6 +249,9 @@ namespace VeloxapEDGEWpfLib
             }
             else if (rbValidation.IsChecked == true)
             {
+                if (!EnsureAuthCredentialsConfigured(showMessage: true))
+                    return;
+
                 await LoadValidationRulesForSelectedModelAsync(showErrors: true);
                 MainContent.Content = new ModelValidationView(
                     currentModelInfo,

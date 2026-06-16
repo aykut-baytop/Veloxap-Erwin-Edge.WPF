@@ -14,7 +14,12 @@ namespace VeloxapEDGEWpfLib.Pages
     /// </summary>
     public partial class SettingsView : UserControl
     {
-        private List<AppConfigSetting> currentSettings;
+        private const string AuthUsernameKey = "AuthUsername";
+        private const string AuthPasswordKey = "AuthPassword";
+        private const string MissingAuthCredentialsMessage = "Kullanici adi ve parola bilgilerini doldurun.";
+
+        private List<AppConfigSetting> currentUserSettings;
+        private List<AppConfigSetting> currentServiceSettings;
 
         public SettingsView()
         {
@@ -37,21 +42,34 @@ namespace VeloxapEDGEWpfLib.Pages
             try
             {
                 Configuration config = OpenAssemblyConfiguration();
-                currentSettings = BuildSettingList(config);
+                List<AppConfigSetting> settings = BuildSettingList(config);
+                currentUserSettings = settings
+                    .Where(setting => IsUserSetting(setting.Key))
+                    .ToList();
+                currentServiceSettings = settings
+                    .Where(setting => !IsUserSetting(setting.Key))
+                    .ToList();
 
-                dgSettings.ItemsSource = currentSettings;
-                txtSettingCount.Text = currentSettings.Count + " ayar";
+                dgUserSettings.ItemsSource = currentUserSettings;
+                dgServiceSettings.ItemsSource = currentServiceSettings;
+                txtUserSettingCount.Text = currentUserSettings.Count + " ayar";
+                txtServiceSettingCount.Text = currentServiceSettings.Count + " ayar";
+                txtSettingCount.Text = settings.Count + " ayar";
                 txtConfigSource.Text = "";
-                emptyState.Visibility = currentSettings.Count == 0
+                emptyState.Visibility = settings.Count == 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
 
-                SetStatus(statusMessage, false);
+                SetStatusForLoadedSettings(statusMessage);
             }
             catch (Exception ex)
             {
-                currentSettings = new List<AppConfigSetting>();
-                dgSettings.ItemsSource = currentSettings;
+                currentUserSettings = new List<AppConfigSetting>();
+                currentServiceSettings = new List<AppConfigSetting>();
+                dgUserSettings.ItemsSource = currentUserSettings;
+                dgServiceSettings.ItemsSource = currentServiceSettings;
+                txtUserSettingCount.Text = "0 ayar";
+                txtServiceSettingCount.Text = "0 ayar";
                 txtSettingCount.Text = "0 ayar";
                 txtConfigSource.Text = "App.config okunamadi.";
                 emptyState.Visibility = Visibility.Visible;
@@ -63,13 +81,13 @@ namespace VeloxapEDGEWpfLib.Pages
         {
             try
             {
-                dgSettings.CommitEdit(DataGridEditingUnit.Cell, true);
-                dgSettings.CommitEdit(DataGridEditingUnit.Row, true);
+                CommitSettingsGrid(dgUserSettings);
+                CommitSettingsGrid(dgServiceSettings);
 
                 Configuration config = OpenAssemblyConfiguration();
                 KeyValueConfigurationCollection appSettings = config.AppSettings.Settings;
 
-                foreach (AppConfigSetting setting in currentSettings ?? new List<AppConfigSetting>())
+                foreach (AppConfigSetting setting in GetCurrentSettings())
                 {
                     if (setting == null || string.IsNullOrWhiteSpace(setting.Key))
                         continue;
@@ -90,6 +108,18 @@ namespace VeloxapEDGEWpfLib.Pages
             {
                 SetStatus("Ayarlar kaydedilemedi: " + ex.Message, true);
             }
+        }
+
+        private static void CommitSettingsGrid(DataGrid dataGrid)
+        {
+            dataGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+            dataGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        }
+
+        private IEnumerable<AppConfigSetting> GetCurrentSettings()
+        {
+            return (currentUserSettings ?? new List<AppConfigSetting>())
+                .Concat(currentServiceSettings ?? new List<AppConfigSetting>());
         }
 
         private static Configuration OpenAssemblyConfiguration()
@@ -143,6 +173,42 @@ namespace VeloxapEDGEWpfLib.Pages
             {
                 return null;
             }
+        }
+
+        private static bool IsUserSetting(string key)
+        {
+            return string.Equals(key, AuthUsernameKey, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(key, AuthPasswordKey, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void SetStatusForLoadedSettings(string statusMessage)
+        {
+            if (HasMissingAuthCredentials(currentUserSettings))
+            {
+                SetStatus(MissingAuthCredentialsMessage, true);
+                return;
+            }
+
+            SetStatus(statusMessage, false);
+        }
+
+        private static bool HasMissingAuthCredentials(IEnumerable<AppConfigSetting> settings)
+        {
+            bool hasUsername = false;
+            bool hasPassword = false;
+
+            foreach (AppConfigSetting setting in settings ?? Enumerable.Empty<AppConfigSetting>())
+            {
+                if (setting == null)
+                    continue;
+
+                if (string.Equals(setting.Key, AuthUsernameKey, StringComparison.OrdinalIgnoreCase))
+                    hasUsername = !string.IsNullOrWhiteSpace(setting.Value);
+                else if (string.Equals(setting.Key, AuthPasswordKey, StringComparison.OrdinalIgnoreCase))
+                    hasPassword = !string.IsNullOrWhiteSpace(setting.Value);
+            }
+
+            return !hasUsername || !hasPassword;
         }
 
         private void SetStatus(string message, bool isError)

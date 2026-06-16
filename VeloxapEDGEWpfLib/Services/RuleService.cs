@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -42,16 +41,14 @@ namespace VeloxapEDGEWpfLib.Services
 
             response.EnsureSuccessStatusCode();
 
-            var result = JsonSerializer.Deserialize<RootObject>(json);
-
-            //var rules = ParseRules(json);
+            var rules = ParseRules(json);
 
             ApiTraceLogger.Info(
                 "RULE PARSE" + Environment.NewLine +
                 "Url: " + serviceUrl + Environment.NewLine +
-                "ParsedRuleCount: " + result.Data.Policy.Rules.Count);
+                "ParsedRuleCount: " + rules.Count);
 
-            return result.Data.Policy.Rules;
+            return rules;
         }
 
         public async Task<string> GetAlterDdlAsync(
@@ -329,28 +326,60 @@ namespace VeloxapEDGEWpfLib.Services
         {
             var array = payload as object[];
             if (array != null)
-                return array;
+            {
+                if (array.OfType<Dictionary<string, object>>().Any(IsRuleDictionary))
+                    return array;
+
+                foreach (var value in array)
+                {
+                    var nestedItems = ResolveRuleItems(value).ToList();
+                    if (nestedItems.Count > 0)
+                        return nestedItems;
+                }
+
+                return Enumerable.Empty<object>();
+            }
 
             var dictionary = payload as Dictionary<string, object>;
             if (dictionary == null)
                 return Enumerable.Empty<object>();
 
-            if (GetDictionaryValue(dictionary, "ruleText", "RuleText", "rule", "Rule") != null)
+            if (IsRuleDictionary(dictionary))
                 return new[] { payload };
 
-            object wrappedValue = GetDictionaryValue(
-                dictionary,
-                "rules",
-                "data",
-                "result",
-                "items",
-                "value");
+            object wrappedValue = GetDictionaryValue(dictionary, "rules", "items", "value");
 
             array = wrappedValue as object[];
             if (array != null)
                 return array;
 
-            return ResolveRuleItems(wrappedValue);
+            var directItems = ResolveRuleItems(wrappedValue).ToList();
+            if (directItems.Count > 0)
+                return directItems;
+
+            foreach (var key in new[] { "policy", "policies", "data", "result" })
+            {
+                var nestedValue = GetDictionaryValue(dictionary, key);
+                var nestedItems = ResolveRuleItems(nestedValue).ToList();
+                if (nestedItems.Count > 0)
+                    return nestedItems;
+            }
+
+            return Enumerable.Empty<object>();
+        }
+
+        private static bool IsRuleDictionary(Dictionary<string, object> dictionary)
+        {
+            return GetDictionaryValue(
+                dictionary,
+                "ruleText",
+                "RuleText",
+                "rule",
+                "Rule",
+                "ruleId",
+                "RuleId",
+                "ruleName",
+                "RuleName") != null;
         }
 
         private static Rule ToRule(object item)
@@ -361,11 +390,43 @@ namespace VeloxapEDGEWpfLib.Services
 
             return new Rule
             {
-                RuleId = int.Parse(GetString(dictionary, "ruleId", "RuleId", "id", "Id")),
+                RuleId = GetInt(dictionary, "ruleId", "RuleId", "id", "Id"),
+                TypeId = GetInt(dictionary, "typeId", "TypeId"),
+                TechnologyId = GetInt(dictionary, "technologyId", "TechnologyId"),
+                ObjectId = GetInt(dictionary, "objectId", "ObjectId"),
                 RuleName = GetString(dictionary, "ruleName", "RuleName", "name", "Name"),
                 RuleDefinition = GetString(dictionary, "ruleDefinition", "RuleDefinition", "definition", "Definition"),
+                MessageTypesId = GetInt(dictionary, "messageTypesId", "MessageTypesId"),
+                Message = GetString(dictionary, "message", "Message"),
+                Status = GetInt(dictionary, "status", "Status"),
+                CreatedBy = GetString(dictionary, "createdBy", "CreatedBy"),
+                ModifiedBy = GetString(dictionary, "modifiedBy", "ModifiedBy"),
                 RuleText = GetString(dictionary, "ruleText", "RuleText", "rule", "Rule")
             };
+        }
+
+        private static int GetInt(Dictionary<string, object> dictionary, params string[] keys)
+        {
+            object value = GetDictionaryValue(dictionary, keys);
+            if (value == null)
+                return 0;
+
+            try
+            {
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            }
+            catch (FormatException)
+            {
+                return 0;
+            }
+            catch (InvalidCastException)
+            {
+                return 0;
+            }
+            catch (OverflowException)
+            {
+                return 0;
+            }
         }
 
         private static string GetString(Dictionary<string, object> dictionary, params string[] keys)

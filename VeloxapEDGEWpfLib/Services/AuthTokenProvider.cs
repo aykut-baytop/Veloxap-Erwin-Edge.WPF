@@ -71,6 +71,10 @@ namespace VeloxapEDGEWpfLib.Services
             string username = RuleApiSettings.GetAuthUsername();
             string password = RuleApiSettings.GetAuthPassword();
 
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+                throw new InvalidOperationException(
+                    "AuthUsername ve AuthPassword bos. Ayarlar ekranindan kullanici adi ve parola bilgilerini doldurun.");
+
             ApiTraceLogger.Info(
                 "LOGIN REQUEST" + Environment.NewLine +
                 "Url: " + loginUrl + Environment.NewLine +
