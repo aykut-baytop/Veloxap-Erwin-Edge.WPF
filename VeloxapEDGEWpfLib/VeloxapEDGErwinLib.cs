@@ -25,6 +25,42 @@ namespace VeloxapEDGErwinTools.AddIn
 
         }
 
+        public int getNumberOfModels()
+        {
+            if (oApplication == null || oApplication.PersistenceUnits == null)
+                return 0;
+
+            return oApplication.PersistenceUnits.Count;
+        }
+
+        public SCAPI.PersistenceUnit getPersistenceUnit(int modelIndex)
+        {
+            if (oApplication == null || oApplication.PersistenceUnits == null)
+                return null;
+
+            if (modelIndex < 0 || modelIndex >= oApplication.PersistenceUnits.Count)
+                return null;
+
+            return oApplication.PersistenceUnits[modelIndex];
+        }
+
+        public ModelInfo loadModelObjectForIntegrate(int modelIndex)
+        {
+            try
+            {
+                SCAPI.PersistenceUnit oPersistenceUnit = getPersistenceUnit(modelIndex);
+                if (oPersistenceUnit == null)
+                    return null;
+
+                ModelLoad mLoad = new ModelLoad(ref oApplication);
+                return mLoad.loadModel(oPersistenceUnit);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public List<(string, string,string)> getModelsNamePath()
         {
 

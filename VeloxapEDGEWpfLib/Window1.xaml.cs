@@ -25,6 +25,7 @@ namespace VeloxapEDGEWpfLib
     /// </summary>
     public partial class Window1 : Window
     {
+        private SCAPI.Application oApp;
         private VeloxapEDGErwinLib veloxapEDGErwinLib;
         private List<string> rules;
         private List<Rule> validationRules;
@@ -48,6 +49,7 @@ namespace VeloxapEDGEWpfLib
         {
             InitializeComponent();
             rbModelInfo.Checked += Menu_Checked;
+            rbCompare.Checked += Menu_Checked;
             rbValidation.Checked += Menu_Checked;
             rbRules.Checked += Menu_Checked;
             cmbMainModel.SelectionChanged += CmbMainModel_SelectionChanged;
@@ -57,6 +59,7 @@ namespace VeloxapEDGEWpfLib
 
         public void Init(ref SCAPI.Application app)
         {
+            oApp = app;
             veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref app);
             models = new List<(string value, string key1, string key2)>();
             rules = new List<string>();
@@ -75,6 +78,14 @@ namespace VeloxapEDGEWpfLib
         {
             if (sender == rbModelInfo)
                 MainContent.Content = new ModelInfoView(currentModelInfo);
+
+            else if (sender == rbCompare)
+            {
+                MainContent.Content = new ModelComparisonView(
+                    veloxapEDGErwinLib,
+                    oApp,
+                    models);
+            }
 
             else if (sender == rbValidation)
             {
@@ -124,6 +135,7 @@ namespace VeloxapEDGEWpfLib
         private void ClearMenuSelection()
         {
             rbModelInfo.IsChecked = false;
+            rbCompare.IsChecked = false;
             rbValidation.IsChecked = false;
             rbRules.IsChecked = false;
         }

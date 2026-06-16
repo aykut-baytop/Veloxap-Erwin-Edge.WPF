@@ -87,6 +87,11 @@
              Style="{StaticResource SideMenuButtonStyle}"
              IsChecked="True"/>
 
+<RadioButton x:Name="rbCompare"
+             GroupName="MainMenu"
+             Content="Model Karşılaştırma"
+             Style="{StaticResource SideMenuButtonStyle}"/>
+
 <RadioButton x:Name="rbValidation"
              GroupName="MainMenu"
              Content="Model Validasyon"

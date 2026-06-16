@@ -7,6 +7,28 @@
         private string oPropertyType;
         private string oPropertyFormatAsString;
         private string oPropertyValue;
+        private string leftValue;
+        private string rightValue;
+
+        public void setLeftValue(string value)
+        {
+            leftValue = value;
+        }
+
+        public string getLeftValue()
+        {
+            return leftValue;
+        }
+
+        public void setRightValue(string value)
+        {
+            rightValue = value;
+        }
+
+        public string getRightValue()
+        {
+            return rightValue;
+        }
 
         public void setObjectProperty(
             string oPropertyClassID,

@@ -50,7 +50,7 @@ namespace VeloxapEDGEWpfLib.Pages
                     .Where(setting => !IsUserSetting(setting.Key))
                     .ToList();
 
-                dgUserSettings.ItemsSource = currentUserSettings;
+                LoadCredentialFields();
                 dgServiceSettings.ItemsSource = currentServiceSettings;
                 txtUserSettingCount.Text = currentUserSettings.Count + " ayar";
                 txtServiceSettingCount.Text = currentServiceSettings.Count + " ayar";
@@ -66,7 +66,7 @@ namespace VeloxapEDGEWpfLib.Pages
             {
                 currentUserSettings = new List<AppConfigSetting>();
                 currentServiceSettings = new List<AppConfigSetting>();
-                dgUserSettings.ItemsSource = currentUserSettings;
+                LoadCredentialFields();
                 dgServiceSettings.ItemsSource = currentServiceSettings;
                 txtUserSettingCount.Text = "0 ayar";
                 txtServiceSettingCount.Text = "0 ayar";
@@ -81,7 +81,7 @@ namespace VeloxapEDGEWpfLib.Pages
         {
             try
             {
-                CommitSettingsGrid(dgUserSettings);
+                UpdateUserSettingsFromCredentialFields();
                 CommitSettingsGrid(dgServiceSettings);
 
                 Configuration config = OpenAssemblyConfiguration();
@@ -108,6 +108,52 @@ namespace VeloxapEDGEWpfLib.Pages
             {
                 SetStatus("Ayarlar kaydedilemedi: " + ex.Message, true);
             }
+        }
+
+        private void LoadCredentialFields()
+        {
+            txtAuthUsername.Text = GetUserSettingValue(AuthUsernameKey);
+            pwdAuthPassword.Password = GetUserSettingValue(AuthPasswordKey);
+        }
+
+        private string GetUserSettingValue(string key)
+        {
+            AppConfigSetting setting = FindUserSetting(key);
+            return setting == null
+                ? string.Empty
+                : setting.Value ?? string.Empty;
+        }
+
+        private void UpdateUserSettingsFromCredentialFields()
+        {
+            SetUserSettingValue(AuthUsernameKey, txtAuthUsername.Text);
+            SetUserSettingValue(AuthPasswordKey, pwdAuthPassword.Password);
+        }
+
+        private void SetUserSettingValue(string key, string value)
+        {
+            AppConfigSetting setting = FindUserSetting(key);
+            if (setting == null)
+            {
+                setting = new AppConfigSetting(key, string.Empty);
+
+                if (currentUserSettings == null)
+                    currentUserSettings = new List<AppConfigSetting>();
+
+                currentUserSettings.Add(setting);
+            }
+
+            setting.Value = value ?? string.Empty;
+        }
+
+        private AppConfigSetting FindUserSetting(string key)
+        {
+            if (currentUserSettings == null)
+                return null;
+
+            return currentUserSettings.FirstOrDefault(
+                setting => setting != null
+                    && string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase));
         }
 
         private static void CommitSettingsGrid(DataGrid dataGrid)
@@ -213,7 +259,21 @@ namespace VeloxapEDGEWpfLib.Pages
 
         private void SetStatus(string message, bool isError)
         {
-            txtSaveStatus.Text = message ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                txtSaveStatus.Text = string.Empty;
+                statusBorder.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            txtSaveStatus.Text = message;
+            statusBorder.Visibility = Visibility.Visible;
+            statusBorder.Background = isError
+                ? new SolidColorBrush(Color.FromRgb(254, 242, 242))
+                : new SolidColorBrush(Color.FromRgb(236, 253, 245));
+            statusBorder.BorderBrush = isError
+                ? new SolidColorBrush(Color.FromRgb(254, 202, 202))
+                : new SolidColorBrush(Color.FromRgb(167, 243, 208));
             txtSaveStatus.Foreground = isError
                 ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
                 : new SolidColorBrush(Color.FromRgb(5, 150, 105));

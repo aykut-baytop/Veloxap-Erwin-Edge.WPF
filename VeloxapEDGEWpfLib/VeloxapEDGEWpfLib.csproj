@@ -67,12 +67,16 @@
     <Compile Include="Models\ModelLoad.cs" />
     <Compile Include="Models\ModelObject.cs" />
     <Compile Include="Models\ObjectProperty.cs" />
+    <Compile Include="Models\Integrate\ModelObjectComparer.cs" />
     <Compile Include="Models\Rule.cs" />
     <Compile Include="Models\RuleDependencyExtractor.cs" />
     <Compile Include="Models\RulesResponse.cs" />
     <Compile Include="Models\ViewModels\ModelInfoViewModel.cs" />
     <Compile Include="Pages\ModelInfoView.xaml.cs">
       <DependentUpon>ModelInfoView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Pages\ModelComparisonView.xaml.cs">
+      <DependentUpon>ModelComparisonView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Pages\ModelValidationView.xaml.cs">
       <DependentUpon>ModelValidationView.xaml</DependentUpon>
@@ -86,6 +90,7 @@
     <Compile Include="Services\ApiTraceLogger.cs" />
     <Compile Include="Services\AuthTokenProvider.cs" />
     <Compile Include="Services\BearerTokenHandler.cs" />
+    <Compile Include="Services\ModelDiffApplyService.cs" />
     <Compile Include="Services\RuleApiSettings.cs" />
     <Compile Include="Services\RuleService.cs" />
     <Compile Include="VeloxapEDGErwinLib.cs" />
@@ -93,6 +98,10 @@
       <DependentUpon>Window1.xaml</DependentUpon>
     </Compile>
     <Page Include="Pages\ModelInfoView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Pages\ModelComparisonView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

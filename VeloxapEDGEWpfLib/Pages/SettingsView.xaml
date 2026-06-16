@@ -13,6 +13,61 @@
             <Setter Property="Margin" Value="0,4"/>
         </Style>
 
+        <Style x:Key="MutedTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6B7280"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <Style x:Key="SectionTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="FieldLabelTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#374151"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <Style x:Key="SettingsTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="SettingsPasswordBoxStyle" TargetType="PasswordBox">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="CountBadgeStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="#E2E8F0"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="SectionBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14"/>
+        </Style>
+
         <Style x:Key="ActionButtonStyle" TargetType="Button">
             <Setter Property="Height" Value="32"/>
             <Setter Property="MinWidth" Value="84"/>
@@ -59,156 +114,168 @@
             <Setter Property="ColumnHeaderHeight" Value="38"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="White"/>
-            <Setter Property="AlternatingRowBackground" Value="#F3F4F6"/>
+            <Setter Property="AlternatingRowBackground" Value="#F8FAFC"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#E5E7EB"/>
+            <Setter Property="VerticalGridLinesBrush" Value="#E5E7EB"/>
         </Style>
     </UserControl.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="16"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <Border Background="#F8FAFC"
+            CornerRadius="12"
+            Padding="18">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="Ayarlar"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       Foreground="#111827"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <TextBlock x:Name="txtConfigSource"
-                       Margin="0,6,0,0"
-                       Foreground="#6B7280"
-                       FontSize="13"
-                       TextWrapping="Wrap"/>
-        </StackPanel>
-
-        <Border Grid.Row="2"
-                Background="#F9FAFB"
-                BorderBrush="#E5E7EB"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="12">
-            <DockPanel>
-                <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Text="App.config Ayarları"
+                <StackPanel>
+                    <TextBlock Text="Ayarlar"
+                               FontSize="24"
                                FontWeight="SemiBold"
-                               FontSize="14"
-                               Foreground="#374151"/>
+                               Foreground="#0F172A"/>
 
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal">
-                        <TextBlock x:Name="txtSettingCount"
-                                   VerticalAlignment="Center"
-                                   Foreground="#6B7280"
-                                   FontSize="12"/>
+                    <TextBlock x:Name="txtConfigSource"
+                               Margin="0,6,0,0"
+                               Style="{StaticResource MutedTextStyle}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
 
-                        <Button Content="Yenile"
-                                Style="{StaticResource ActionButtonStyle}"
-                                Background="#4B5563"
-                                Click="BtnReload_Click"/>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock x:Name="txtSettingCount"
+                               Style="{StaticResource CountBadgeStyle}"
+                               Margin="0,0,10,0"/>
 
-                        <Button Content="Kaydet"
-                                Style="{StaticResource ActionButtonStyle}"
-                                Click="BtnSave_Click"/>
-                    </StackPanel>
-                </Grid>
+                    <Button Content="Yenile"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Background="#475569"
+                            Click="BtnReload_Click"/>
 
-                <TextBlock x:Name="txtSaveStatus"
-                           DockPanel.Dock="Bottom"
-                           Margin="0,10,0,0"
-                           Foreground="#059669"
-                           FontSize="12"/>
+                    <Button Content="Kaydet"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Click="BtnSave_Click"/>
+                </StackPanel>
+            </Grid>
 
-                <Grid>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Text="Kullanıcı Bilgileri"
-                                           FontWeight="SemiBold"
-                                           Foreground="#374151"
-                                           FontSize="13" Background="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}"/>
-
-                                <TextBlock x:Name="txtUserSettingCount"
-                                           Grid.Column="1"
-                                           Foreground="#6B7280"
-                                           FontSize="12"/>
-                            </Grid>
-
-                            <DataGrid x:Name="dgUserSettings"
-                                      Style="{StaticResource SettingsDataGridStyle}"
-                                      MaxHeight="132">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Anahtar"
-                                                        Binding="{Binding Key}"
-                                                        IsReadOnly="True"
-                                                        Width="240"
-                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
-
-                                    <DataGridTextColumn Header="Değer"
-                                                        Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        Width="*"
-                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-
-                            <Grid Margin="0,16,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Text="Servis Bilgileri"
-                                           FontWeight="SemiBold"
-                                           Foreground="#374151"
-                                           FontSize="13" Background="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}"/>
-
-                                <TextBlock x:Name="txtServiceSettingCount"
-                                           Grid.Column="1"
-                                           Foreground="#6B7280"
-                                           FontSize="12"/>
-                            </Grid>
-
-                            <DataGrid x:Name="dgServiceSettings"
-                                      Style="{StaticResource SettingsDataGridStyle}"
-                                      MaxHeight="240">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Anahtar"
-                                                        Binding="{Binding Key}"
-                                                        IsReadOnly="True"
-                                                        Width="240"
-                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
-
-                                    <DataGridTextColumn Header="Değer"
-                                                        Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        Width="*"
-                                                        ElementStyle="{StaticResource WrappedCellTextStyle}"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </StackPanel>
-                    </ScrollViewer>
-
-                    <Border x:Name="emptyState"
-                            Background="#F9FAFB"
+            <Border Grid.Row="2"
+                    Background="#FFFFFF"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="14">
+                <DockPanel>
+                    <Border x:Name="statusBorder"
+                            DockPanel.Dock="Bottom"
+                            Margin="0,12,0,0"
+                            Background="#ECFDF5"
+                            BorderBrush="#A7F3D0"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10,7"
                             Visibility="Collapsed">
-                        <TextBlock Text="App.config içinde appSettings ayarı bulunamadı."
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="#6B7280"
-                                   FontSize="13"/>
+                        <TextBlock x:Name="txtSaveStatus"
+                                   Foreground="#059669"
+                                   FontSize="12"/>
                     </Border>
-                </Grid>
-            </DockPanel>
-        </Border>
-    </Grid>
+
+                    <Grid>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <Border Style="{StaticResource SectionBorderStyle}"
+                                        Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,12">
+                                            <TextBlock x:Name="txtUserSettingCount"
+                                                       DockPanel.Dock="Right"
+                                                       Style="{StaticResource CountBadgeStyle}"/>
+
+                                            <TextBlock Text="Kullanıcı Bilgileri"
+                                                       Style="{StaticResource SectionTitleTextStyle}"/>
+                                        </DockPanel>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel>
+                                                <TextBlock Text="Kullanıcı adı"
+                                                           Style="{StaticResource FieldLabelTextStyle}"/>
+
+                                                <TextBox x:Name="txtAuthUsername"
+                                                         Style="{StaticResource SettingsTextBoxStyle}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Parola"
+                                                           Style="{StaticResource FieldLabelTextStyle}"/>
+
+                                                <PasswordBox x:Name="pwdAuthPassword"
+                                                             Style="{StaticResource SettingsPasswordBoxStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="Servis Bilgileri"
+                                               Style="{StaticResource SectionTitleTextStyle}"/>
+
+                                    <TextBlock x:Name="txtServiceSettingCount"
+                                               Grid.Column="1"
+                                               Style="{StaticResource CountBadgeStyle}"/>
+                                </Grid>
+
+                                <Border Style="{StaticResource SectionBorderStyle}"
+                                        Padding="0">
+                                    <DataGrid x:Name="dgServiceSettings"
+                                              Style="{StaticResource SettingsDataGridStyle}"
+                                              MaxHeight="260">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Anahtar"
+                                                                Binding="{Binding Key}"
+                                                                IsReadOnly="True"
+                                                                Width="240"
+                                                                ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+
+                                            <DataGridTextColumn Header="Değer"
+                                                                Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="*"
+                                                                ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <Border x:Name="emptyState"
+                                Background="#F9FAFB"
+                                Visibility="Collapsed">
+                            <TextBlock Text="App.config içinde appSettings ayarı bulunamadı."
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="#6B7280"
+                                       FontSize="13"/>
+                        </Border>
+                    </Grid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Border>
 </UserControl>
