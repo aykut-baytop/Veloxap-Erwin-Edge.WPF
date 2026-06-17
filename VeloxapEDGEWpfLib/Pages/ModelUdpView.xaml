@@ -70,6 +70,8 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="220"/>
             </Grid.ColumnDefinitions>
@@ -103,8 +105,25 @@
                 </StackPanel>
             </Button>
 
+            <Button x:Name="btnCalculateBankRelative"
+                    Grid.Column="3"
+                    Style="{StaticResource ActionButtonStyle}"
+                    Background="#2563EB"
+                    Click="BtnCalculateBankRelative_Click"
+                    ToolTip="Tablo UDP Banka_Gorece_Degeri alanlarini hesapla">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8EC;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Margin="0,0,7,0"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="Banka Gorece Hesapla"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
             <TextBox x:Name="txtSearch"
-                     Grid.Column="3"
+                     Grid.Column="5"
                      Height="34"
                      Padding="10,7"
                      VerticalContentAlignment="Center"

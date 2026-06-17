@@ -30,6 +30,16 @@ namespace VeloxapEDGEWpfLib.Services
             "varlikdegeri"
         };
 
+        private static readonly string[] BusinessProcessLevelPropertyNames =
+        {
+            "issureciseviyesi"
+        };
+
+        private static readonly string[] BankRelativeValuePropertyNames =
+        {
+            "bankagorecedegeri"
+        };
+
         private readonly SCAPI.Application application;
         private readonly SCAPI.PersistenceUnit persistenceUnit;
 
@@ -115,6 +125,80 @@ namespace VeloxapEDGEWpfLib.Services
             }
         }
 
+        public static int CountBankRelativeCalculableTables(ModelInfo modelInfo)
+        {
+            return BuildBankRelativeCalculations(modelInfo, null).Count;
+        }
+
+        public TableUdpSecurityApplyResult ApplyBankRelativeValue(ModelInfo modelInfo)
+        {
+            var result = new TableUdpSecurityApplyResult();
+            var calculations = BuildBankRelativeCalculations(modelInfo, result);
+
+            if (calculations.Count == 0)
+                return result;
+
+            if (application == null || persistenceUnit == null)
+                throw new InvalidOperationException("Banka gorece degeri guncellemesi icin erwin oturumu hazir degil.");
+
+            SCAPI.Session session = null;
+            object transaction = null;
+
+            try
+            {
+                session = application.Sessions.Add();
+                session.Open(
+                    persistenceUnit,
+                    SCAPI.SC_SessionLevel.SCD_SL_M0);
+
+                transaction = session.BeginNamedTransaction("Calculate Bank Relative UDP Values");
+
+                foreach (var calculation in calculations)
+                    ApplyBankRelativeCalculation(session, calculation, result);
+
+                session.CommitTransaction(transaction);
+                transaction = null;
+
+                return result;
+            }
+            catch
+            {
+                if (session != null && transaction != null)
+                {
+                    try
+                    {
+                        session.RollbackTransaction(transaction);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (session != null)
+                {
+                    try
+                    {
+                        session.Close();
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        application.Sessions.Remove(session);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
         private void ApplyCalculation(
             SCAPI.Session session,
             TableUdpSecurityCalculation calculation,
@@ -156,9 +240,49 @@ namespace VeloxapEDGEWpfLib.Services
             result.UpdatedTables++;
         }
 
+        private void ApplyBankRelativeCalculation(
+            SCAPI.Session session,
+            BankRelativeValueCalculation calculation,
+            TableUdpSecurityApplyResult result)
+        {
+            SCAPI.ModelObject targetObject = FindTargetTable(session, calculation);
+            if (targetObject == null)
+            {
+                result.SkippedTables++;
+                result.Messages.Add(calculation.TableName + ": tablo erwin oturumunda bulunamadi.");
+                return;
+            }
+
+            SCAPI.ModelProperty targetProperty = FindTargetProperty(
+                targetObject,
+                BankRelativeValuePropertyNames);
+
+            if (targetProperty == null)
+            {
+                result.SkippedTables++;
+                result.Messages.Add(calculation.TableName + ": Banka_Gorece_Degeri UDP bulunamadi.");
+                return;
+            }
+
+            string writtenValue;
+            if (!TrySetPropertyValue(
+                targetProperty,
+                calculation.ResultValue,
+                out writtenValue))
+            {
+                result.FailedTables++;
+                result.Messages.Add(calculation.TableName + ": Banka_Gorece_Degeri yazilamadi.");
+                return;
+            }
+
+            calculation.BankRelativeValueProperty.setoPropertyValue(writtenValue);
+            calculation.BankRelativeValueProperty.setoPropertyFormatAsString(writtenValue);
+            result.UpdatedTables++;
+        }
+
         private SCAPI.ModelObject FindTargetTable(
             SCAPI.Session session,
-            TableUdpSecurityCalculation calculation)
+            TableUdpCalculationBase calculation)
         {
             if (!string.IsNullOrWhiteSpace(calculation.TableObjectId))
             {
@@ -237,6 +361,35 @@ namespace VeloxapEDGEWpfLib.Services
                 resultValue,
                 level.ToString(CultureInfo.InvariantCulture),
                 level
+            };
+
+            foreach (object attempt in attempts)
+            {
+                try
+                {
+                    property.Value = ConvertValueForTarget(property, attempt);
+                    writtenValue = Convert.ToString(attempt, CultureInfo.InvariantCulture);
+                    return true;
+                }
+                catch
+                {
+                }
+            }
+
+            writtenValue = string.Empty;
+            return false;
+        }
+
+        private static bool TrySetPropertyValue(
+            SCAPI.ModelProperty property,
+            int resultValue,
+            out string writtenValue)
+        {
+            string textValue = resultValue.ToString(CultureInfo.InvariantCulture);
+            object[] attempts =
+            {
+                resultValue,
+                textValue
             };
 
             foreach (object attempt in attempts)
@@ -397,6 +550,73 @@ namespace VeloxapEDGEWpfLib.Services
             return calculations;
         }
 
+        private static List<BankRelativeValueCalculation> BuildBankRelativeCalculations(
+            ModelInfo modelInfo,
+            TableUdpSecurityApplyResult result)
+        {
+            var calculations = new List<BankRelativeValueCalculation>();
+
+            var objects = modelInfo == null
+                ? null
+                : modelInfo.getoModelObject();
+
+            foreach (var table in EnumerateTables(objects))
+            {
+                var properties = table.getoObjectProperty();
+                if (properties == null || properties.Count == 0)
+                    continue;
+
+                ObjectProperty assetValue = FindProperty(properties, AssetValuePropertyNames);
+                ObjectProperty businessProcessLevel = FindProperty(properties, BusinessProcessLevelPropertyNames);
+                ObjectProperty bankRelativeValue = FindProperty(properties, BankRelativeValuePropertyNames);
+
+                var missing = new List<string>();
+                int assetLevel = 0;
+                int businessLevel = 0;
+
+                if (assetValue == null)
+                    missing.Add("Varlik_Degeri");
+
+                if (businessProcessLevel == null)
+                    missing.Add("Is_Sureci_Seviyesi");
+
+                if (bankRelativeValue == null)
+                    missing.Add("Banka_Gorece_Degeri");
+
+                if (assetValue != null && !TryResolveLeadingInteger(assetValue, out assetLevel))
+                    missing.Add("Varlik_Degeri sayi ile baslamiyor");
+
+                if (businessProcessLevel != null && !TryResolveParenthesizedInteger(businessProcessLevel, out businessLevel))
+                    missing.Add("Is_Sureci_Seviyesi parantez ici sayi");
+
+                if (missing.Count > 0)
+                {
+                    if (result != null)
+                    {
+                        result.SkippedTables++;
+                        result.Messages.Add(
+                            Safe(table.getoName(), "(adsiz tablo)") +
+                            ": eksik/hatali alanlar - " +
+                            string.Join(", ", missing));
+                    }
+
+                    continue;
+                }
+
+                calculations.Add(new BankRelativeValueCalculation
+                {
+                    TableObjectId = table.getoObjectId(),
+                    TableName = Safe(table.getoName(), "(adsiz tablo)"),
+                    AssetLevel = assetLevel,
+                    BusinessProcessLevel = businessLevel,
+                    ResultValue = assetLevel * businessLevel,
+                    BankRelativeValueProperty = bankRelativeValue
+                });
+            }
+
+            return calculations;
+        }
+
         private static IEnumerable<ModelObject> EnumerateTables(IEnumerable<ModelObject> objects)
         {
             if (objects == null)
@@ -451,6 +671,77 @@ namespace VeloxapEDGEWpfLib.Services
 
             level = 0;
             return false;
+        }
+
+        private static bool TryResolveLeadingInteger(ObjectProperty property, out int level)
+        {
+            if (TryResolveLeadingIntegerText(property.getoPropertyFormatAsString(), out level))
+                return true;
+
+            if (TryResolveLeadingIntegerText(property.getoPropertyValue(), out level))
+                return true;
+
+            level = 0;
+            return false;
+        }
+
+        private static bool TryResolveLeadingIntegerText(string value, out int level)
+        {
+            level = 0;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string trimmed = value.Trim();
+            int index = 0;
+
+            while (index < trimmed.Length && char.IsDigit(trimmed[index]))
+                index++;
+
+            if (index == 0)
+                return false;
+
+            return int.TryParse(
+                trimmed.Substring(0, index),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out level);
+        }
+
+        private static bool TryResolveParenthesizedInteger(ObjectProperty property, out int level)
+        {
+            if (TryResolveParenthesizedIntegerText(property.getoPropertyFormatAsString(), out level))
+                return true;
+
+            if (TryResolveParenthesizedIntegerText(property.getoPropertyValue(), out level))
+                return true;
+
+            level = 0;
+            return false;
+        }
+
+        private static bool TryResolveParenthesizedIntegerText(string value, out int level)
+        {
+            level = 0;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            int openIndex = value.LastIndexOf('(');
+            int closeIndex = value.LastIndexOf(')');
+
+            if (openIndex < 0 || closeIndex <= openIndex + 1)
+                return false;
+
+            string numberText = value.Substring(
+                openIndex + 1,
+                closeIndex - openIndex - 1).Trim();
+
+            return int.TryParse(
+                numberText,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out level);
         }
 
         private static bool TryResolveLevelText(string value, out int level)
@@ -652,11 +943,15 @@ namespace VeloxapEDGEWpfLib.Services
         }
     }
 
-    internal sealed class TableUdpSecurityCalculation
+    internal abstract class TableUdpCalculationBase
     {
         public string TableObjectId { get; set; }
 
         public string TableName { get; set; }
+    }
+
+    internal sealed class TableUdpSecurityCalculation : TableUdpCalculationBase
+    {
 
         public int AvailabilityLevel { get; set; }
 
@@ -671,5 +966,16 @@ namespace VeloxapEDGEWpfLib.Services
         public string ResultValue { get; set; }
 
         public ObjectProperty AssetValueProperty { get; set; }
+    }
+
+    internal sealed class BankRelativeValueCalculation : TableUdpCalculationBase
+    {
+        public int AssetLevel { get; set; }
+
+        public int BusinessProcessLevel { get; set; }
+
+        public int ResultValue { get; set; }
+
+        public ObjectProperty BankRelativeValueProperty { get; set; }
     }
 }

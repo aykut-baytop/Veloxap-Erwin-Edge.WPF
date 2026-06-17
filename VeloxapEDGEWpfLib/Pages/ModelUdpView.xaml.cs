@@ -132,6 +132,82 @@ namespace VeloxapEDGEWpfLib.Pages
             }
         }
 
+        private void BtnCalculateBankRelative_Click(object sender, RoutedEventArgs e)
+        {
+            const string title = "Banka Gorece Degeri Hesaplama";
+
+            if (modelInfo == null || application == null || persistenceUnit == null)
+            {
+                MessageBox.Show(
+                    "Banka gorece degeri hesaplama icin secili erwin modeli hazir degil.",
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var service = new TableUdpSecurityService(
+                application,
+                persistenceUnit);
+
+            int calculableTableCount = TableUdpSecurityService.CountBankRelativeCalculableTables(modelInfo);
+            if (calculableTableCount == 0)
+            {
+                TableUdpSecurityApplyResult emptyResult = service.ApplyBankRelativeValue(modelInfo);
+                SetStatus("Hesaplanabilir Banka_Gorece_Degeri UDP kaydi bulunamadi.", true);
+                MessageBox.Show(
+                    BuildApplyResultMessage(emptyResult),
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            MessageBoxResult confirmation = MessageBox.Show(
+                BuildBankRelativeConfirmationMessage(calculableTableCount),
+                title,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+
+            SetBusy(true);
+            SetStatus("Banka gorece degerleri hesaplaniyor...", false);
+
+            try
+            {
+                TableUdpSecurityApplyResult result = service.ApplyBankRelativeValue(modelInfo);
+
+                allRows.Clear();
+                allRows.AddRange(BuildRows(modelInfo));
+                txtUdpCount.Text = allRows.Count.ToString();
+                ApplyFilter();
+
+                bool hasError = result.FailedTables > 0 || result.SkippedTables > 0;
+                SetStatus(result.ToSummary(), hasError);
+
+                MessageBox.Show(
+                    BuildApplyResultMessage(result),
+                    title,
+                    MessageBoxButton.OK,
+                    hasError ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Banka gorece degeri hesaplama hatasi: " + ex.Message, true);
+                MessageBox.Show(
+                    "Banka gorece degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+        }
+
         private void ApplyFilter()
         {
             string filter = txtSearch == null
@@ -177,14 +253,17 @@ namespace VeloxapEDGEWpfLib.Pages
 
         private void UpdateCalculateButton()
         {
-            if (btnCalculateSecurity == null)
-                return;
-
-            btnCalculateSecurity.IsEnabled =
+            bool isEnabled =
                 !isBusy &&
                 modelInfo != null &&
                 application != null &&
                 persistenceUnit != null;
+
+            if (btnCalculateSecurity != null)
+                btnCalculateSecurity.IsEnabled = isEnabled;
+
+            if (btnCalculateBankRelative != null)
+                btnCalculateBankRelative.IsEnabled = isEnabled;
         }
 
         private void SetStatus(string message, bool isError)
@@ -332,6 +411,16 @@ namespace VeloxapEDGEWpfLib.Pages
                    string.Join(
                        Environment.NewLine,
                        result.Messages.Take(8));
+        }
+
+        private static string BuildBankRelativeConfirmationMessage(int calculableTableCount)
+        {
+            return calculableTableCount + " tablo icin Banka_Gorece_Degeri UDP alani guncellenecek.\n\n" +
+                   "Formul:\n" +
+                   "Varlik_Degeri sayi ile baslamalidir.\n" +
+                   "Is_Sureci_Seviyesi degerinde parantez icindeki sayi okunur. Ornek: Diger (1)\n" +
+                   "Banka_Gorece_Degeri = Varlik_Degeri basindaki sayi x Is_Sureci_Seviyesi parantez ici sayi\n\n" +
+                   "Devam edilsin mi?";
         }
 
         public sealed class UdpRow
