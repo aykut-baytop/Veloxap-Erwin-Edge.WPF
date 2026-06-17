@@ -13,6 +13,7 @@ namespace VeloxapEDGEWpfLib.Services
         private const string RulesByModelUrlKey = "ValidationRulesByModelUrl";
         private const string AlterDdlUrlKey = "AlterDdlUrl";
         private const string ApprovalStartByCatalogUrlKey = "ApprovalStartByCatalogUrl";
+        private const string EnableModelComparisonKey = "EnableModelComparison";
 
         public static string GetApiBaseUrl()
         {
@@ -73,8 +74,19 @@ namespace VeloxapEDGEWpfLib.Services
                 AuthPasswordKey,
                 RulesByModelUrlKey,
                 AlterDdlUrlKey,
-                ApprovalStartByCatalogUrlKey
+                ApprovalStartByCatalogUrlKey,
+                EnableModelComparisonKey
             };
+        }
+
+        public static bool IsModelComparisonEnabled()
+        {
+            string configured = GetOptionalSetting(EnableModelComparisonKey);
+            bool parsed;
+            if (bool.TryParse(configured, out parsed))
+                return parsed;
+
+            return false;
         }
 
         private static string GetServiceUrl(string key)

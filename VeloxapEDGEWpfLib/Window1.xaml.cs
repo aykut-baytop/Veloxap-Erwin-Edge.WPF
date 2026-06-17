@@ -49,7 +49,15 @@ namespace VeloxapEDGEWpfLib
         {
             InitializeComponent();
             rbModelInfo.Checked += Menu_Checked;
-            rbCompare.Checked += Menu_Checked;
+            if (RuleApiSettings.IsModelComparisonEnabled())
+            {
+                rbCompare.Checked += Menu_Checked;
+                rbCompare.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                rbCompare.Visibility = Visibility.Collapsed;
+            }
             rbTableUdps.Checked += Menu_Checked;
             rbValidation.Checked += Menu_Checked;
             rbRules.Checked += Menu_Checked;

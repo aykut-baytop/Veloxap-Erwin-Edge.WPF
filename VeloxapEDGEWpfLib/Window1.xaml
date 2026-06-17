@@ -87,24 +87,22 @@
              Style="{StaticResource SideMenuButtonStyle}"
              IsChecked="True"/>
 
-<RadioButton x:Name="rbCompare"
+                <RadioButton x:Name="rbCompare"
              GroupName="MainMenu"
              Content="Model Karşılaştırma"
              Style="{StaticResource SideMenuButtonStyle}"/>
-
-<RadioButton x:Name="rbTableUdps"
+                <RadioButton x:Name="rbRules"
              GroupName="MainMenu"
-             Content="Tablo UDP'leri"
+             Content="Validasyon Kuralları"
              Style="{StaticResource SideMenuButtonStyle}"/>
 
-<RadioButton x:Name="rbValidation"
+                <RadioButton x:Name="rbValidation"
              GroupName="MainMenu"
              Content="Model Validasyon"
              Style="{StaticResource SideMenuButtonStyle}"/>
-
-<RadioButton x:Name="rbRules"
+                <RadioButton x:Name="rbTableUdps"
              GroupName="MainMenu"
-             Content="Validasyon Kuralları"
+             Content="Tablo UDP'leri"
              Style="{StaticResource SideMenuButtonStyle}"/>
             </StackPanel>
         </Border>
