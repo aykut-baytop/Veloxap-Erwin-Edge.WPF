@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using VeloxapEDGEWpfLib.Models;
 using VeloxapEDGEWpfLib.Models.Integrate;
 
@@ -24,42 +25,44 @@ namespace VeloxapEDGEWpfLib.Services
             this.targetPersistenceUnit = targetPersistenceUnit;
         }
 
-        public void ApplyLeftToRight(ModelDiffResult diff)
+        public ModelDiffApplyResult ApplyLeftToRight(ModelDiffResult diff)
         {
             if (diff == null)
-                return;
+                return new ModelDiffApplyResult();
 
-            ApplyObjects(
+            return ApplyObjects(
                 diff.OnlyInLeft,
                 ApplyDirection.LeftToRight);
         }
 
-        public void ApplyRightToLeft(ModelDiffResult diff)
+        public ModelDiffApplyResult ApplyRightToLeft(ModelDiffResult diff)
         {
             if (diff == null)
-                return;
+                return new ModelDiffApplyResult();
 
-            ApplyObjects(
+            return ApplyObjects(
                 diff.OnlyInRight,
                 ApplyDirection.RightToLeft);
         }
 
-        public void Apply(
+        public ModelDiffApplyResult Apply(
             ModelDiffResult diff,
             ApplyDirection direction)
         {
             if (direction == ApplyDirection.LeftToRight)
-                ApplyLeftToRight(diff);
-            else
-                ApplyRightToLeft(diff);
+                return ApplyLeftToRight(diff);
+
+            return ApplyRightToLeft(diff);
         }
 
-        private void ApplyObjects(
+        private ModelDiffApplyResult ApplyObjects(
             List<ModelObject> objects,
             ApplyDirection direction)
         {
+            var result = new ModelDiffApplyResult();
+
             if (objects == null || objects.Count == 0)
-                return;
+                return result;
 
             if (application == null || targetPersistenceUnit == null)
                 throw new InvalidOperationException("Aktarim icin erwin oturumu hazir degil.");
@@ -83,10 +86,16 @@ namespace VeloxapEDGEWpfLib.Services
                         session,
                         obj,
                         null,
-                        direction);
+                        direction,
+                        result);
                 }
 
                 session.CommitTransaction(transaction);
+                transaction = null;
+
+                SaveTargetPersistenceUnit();
+
+                return result;
             }
             catch
             {
@@ -130,7 +139,8 @@ namespace VeloxapEDGEWpfLib.Services
             SCAPI.Session session,
             ModelObject source,
             SCAPI.ModelObject parentEntity,
-            ApplyDirection direction)
+            ApplyDirection direction,
+            ModelDiffApplyResult result)
         {
             if (source == null)
                 return;
@@ -142,7 +152,8 @@ namespace VeloxapEDGEWpfLib.Services
                 ApplyEntity(
                     session,
                     source,
-                    direction);
+                    direction,
+                    result);
 
                 return;
             }
@@ -153,14 +164,16 @@ namespace VeloxapEDGEWpfLib.Services
                     session,
                     source,
                     parentEntity,
-                    direction);
+                    direction,
+                    result);
             }
         }
 
         private void ApplyEntity(
             SCAPI.Session session,
             ModelObject sourceEntity,
-            ApplyDirection direction)
+            ApplyDirection direction,
+            ModelDiffApplyResult result)
         {
             SCAPI.ModelObject targetEntity =
                 FindEntityByCompareName(
@@ -177,7 +190,8 @@ namespace VeloxapEDGEWpfLib.Services
                 targetEntity =
                     CreateEntity(
                         session,
-                        newEntityName);
+                        newEntityName,
+                        result);
             }
 
             if (targetEntity == null)
@@ -186,7 +200,8 @@ namespace VeloxapEDGEWpfLib.Services
             ApplyProperties(
                 targetEntity,
                 sourceEntity.getoObjectProperty(),
-                direction);
+                direction,
+                result);
 
             var children = sourceEntity.getoModelObject();
             if (children == null)
@@ -198,7 +213,8 @@ namespace VeloxapEDGEWpfLib.Services
                     session,
                     child,
                     targetEntity,
-                    direction);
+                    direction,
+                    result);
             }
         }
 
@@ -206,7 +222,8 @@ namespace VeloxapEDGEWpfLib.Services
             SCAPI.Session session,
             ModelObject sourceAttribute,
             SCAPI.ModelObject parentEntity,
-            ApplyDirection direction)
+            ApplyDirection direction,
+            ModelDiffApplyResult result)
         {
             if (parentEntity == null)
                 return;
@@ -223,7 +240,8 @@ namespace VeloxapEDGEWpfLib.Services
                     CreateAttribute(
                         session,
                         parentEntity,
-                        sourceAttribute.getoName());
+                        sourceAttribute.getoName(),
+                        result);
             }
 
             if (targetAttribute == null)
@@ -232,23 +250,22 @@ namespace VeloxapEDGEWpfLib.Services
             ApplyProperties(
                 targetAttribute,
                 sourceAttribute.getoObjectProperty(),
-                direction);
+                direction,
+                result);
         }
 
         private SCAPI.ModelObject CreateEntity(
             SCAPI.Session session,
-            string name)
+            string name,
+            ModelDiffApplyResult result)
         {
             SCAPI.ModelObjects entities =
-                session.ModelObjects.Collect(
-                    session.ModelObjects.Root,
-                    "Entity",
-                    1);
+                session.ModelObjects.Collect(session.ModelObjects.Root.ObjectId);
 
-            SCAPI.ModelObject entity = entities.Add("Entity");
+            SCAPI.ModelObject entity = entities.Add("Entity", Type.Missing);
 
-            TrySetPropertyByName(entity, "Name", name);
-            TrySetPropertyByName(entity, "Physical_Name", name);
+            TrySetNameProperties(entity, name);
+            result.CreatedObjects++;
 
             return entity;
         }
@@ -256,18 +273,16 @@ namespace VeloxapEDGEWpfLib.Services
         private SCAPI.ModelObject CreateAttribute(
             SCAPI.Session session,
             SCAPI.ModelObject entity,
-            string name)
+            string name,
+            ModelDiffApplyResult result)
         {
             SCAPI.ModelObjects attributes =
-                session.ModelObjects.Collect(
-                    entity,
-                    "Attribute",
-                    1);
+                session.ModelObjects.Collect(entity.ObjectId);
 
-            SCAPI.ModelObject attribute = attributes.Add("Attribute");
+            SCAPI.ModelObject attribute = attributes.Add("Attribute", Type.Missing);
 
-            TrySetPropertyByName(attribute, "Name", name);
-            TrySetPropertyByName(attribute, "Physical_Name", name);
+            TrySetNameProperties(attribute, name);
+            result.CreatedObjects++;
 
             return attribute;
         }
@@ -275,7 +290,8 @@ namespace VeloxapEDGEWpfLib.Services
         private void ApplyProperties(
             SCAPI.ModelObject targetObject,
             List<ObjectProperty> properties,
-            ApplyDirection direction)
+            ApplyDirection direction,
+            ModelDiffApplyResult result)
         {
             if (properties == null)
                 return;
@@ -290,10 +306,14 @@ namespace VeloxapEDGEWpfLib.Services
                 if (valueToApply == null || valueToApply == "<NOT FOUND>")
                     continue;
 
-                TrySetProperty(
+                bool isSet = TrySetProperty(
                     targetObject,
                     property,
-                    valueToApply);
+                    valueToApply,
+                    result);
+
+                if (isSet)
+                    result.UpdatedProperties++;
             }
         }
 
@@ -307,10 +327,11 @@ namespace VeloxapEDGEWpfLib.Services
             return property.getRightValue();
         }
 
-        private void TrySetProperty(
+        private bool TrySetProperty(
             SCAPI.ModelObject targetObject,
             ObjectProperty sourceProperty,
-            string value)
+            string value,
+            ModelDiffApplyResult result)
         {
             try
             {
@@ -320,12 +341,29 @@ namespace VeloxapEDGEWpfLib.Services
                         sourceProperty);
 
                 if (targetProperty == null)
-                    return;
+                {
+                    result.SkippedProperties++;
+                    result.Messages.Add(
+                        "Property bulunamadı: " +
+                        sourceProperty.getoPropertyClassName());
+                    return false;
+                }
 
-                targetProperty.Value = value;
+                targetProperty.Value = ConvertValueForTarget(
+                    targetProperty,
+                    value);
+
+                return true;
             }
-            catch
+            catch (Exception ex)
             {
+                result.FailedOperations++;
+                result.Messages.Add(
+                    sourceProperty.getoPropertyClassName() +
+                    " set edilemedi: " +
+                    ex.Message);
+
+                return false;
             }
         }
 
@@ -338,6 +376,9 @@ namespace VeloxapEDGEWpfLib.Services
 
             string sourceClassName =
                 sourceProperty.getoPropertyClassName();
+
+            string normalizedSourceName =
+                NormalizePropertyName(sourceClassName);
 
             foreach (SCAPI.ModelProperty property in targetObject.Properties)
             {
@@ -368,6 +409,15 @@ namespace VeloxapEDGEWpfLib.Services
                 {
                     return property;
                 }
+
+                if (!string.IsNullOrEmpty(normalizedSourceName) &&
+                    string.Equals(
+                        NormalizePropertyName(targetClassName),
+                        normalizedSourceName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return property;
+                }
             }
 
             try
@@ -388,10 +438,28 @@ namespace VeloxapEDGEWpfLib.Services
             {
             }
 
+            try
+            {
+                if (!string.IsNullOrEmpty(normalizedSourceName))
+                    return targetObject.Properties[normalizedSourceName];
+            }
+            catch
+            {
+            }
+
             return null;
         }
 
-        private void TrySetPropertyByName(
+        private void TrySetNameProperties(
+            SCAPI.ModelObject obj,
+            string name)
+        {
+            TrySetPropertyByName(obj, "Name", name);
+            TrySetPropertyByName(obj, "Physical_Name", name);
+            TrySetPropertyByName(obj, "User_Formatted_Physical_Name", name);
+        }
+
+        private bool TrySetPropertyByName(
             SCAPI.ModelObject obj,
             string propertyName,
             object value)
@@ -399,10 +467,31 @@ namespace VeloxapEDGEWpfLib.Services
             try
             {
                 obj.Properties[propertyName].Value = value;
+                return true;
             }
             catch
             {
             }
+
+            try
+            {
+                foreach (SCAPI.ModelProperty prop in obj.Properties)
+                {
+                    if (string.Equals(
+                        prop.ClassName,
+                        propertyName,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        prop.Value = value;
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
         }
 
         private SCAPI.ModelObject FindEntityByCompareName(
@@ -517,6 +606,149 @@ namespace VeloxapEDGEWpfLib.Services
                 return "I" + rest;
 
             return "D" + rest;
+        }
+
+        private void SaveTargetPersistenceUnit()
+        {
+            string locator = GetPersistenceUnitLocator();
+
+            if (string.IsNullOrWhiteSpace(locator))
+            {
+                targetPersistenceUnit.Save(Type.Missing, Type.Missing);
+                return;
+            }
+
+            string disposition = locator.StartsWith(
+                "mart://",
+                StringComparison.OrdinalIgnoreCase)
+                ? "OVM=Yes;OVS=Yes"
+                : "OVF=Yes";
+
+            targetPersistenceUnit.Save(locator, disposition);
+        }
+
+        private string GetPersistenceUnitLocator()
+        {
+            try
+            {
+                SCAPI.PropertyBag bag =
+                    targetPersistenceUnit.PropertyBag["Locator;Hidden_Model"];
+
+                object value = bag.Value["Locator"];
+                return value == null ? null : value.ToString();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string NormalizePropertyName(string propertyName)
+        {
+            if (string.IsNullOrWhiteSpace(propertyName))
+                return string.Empty;
+
+            string trimmedName = propertyName.Trim();
+            int dotIndex = trimmedName.LastIndexOf('.');
+
+            if (dotIndex >= 0 && dotIndex < trimmedName.Length - 1)
+                return trimmedName.Substring(dotIndex + 1);
+
+            return trimmedName;
+        }
+
+        private static object ConvertValueForTarget(
+            SCAPI.ModelProperty targetProperty,
+            string value)
+        {
+            if (value == null)
+                return null;
+
+            try
+            {
+                bool isScalar =
+                    (targetProperty.Flags & SCAPI.SC_ModelPropertyFlags.SCD_MPF_SCALAR) != 0;
+
+                SCAPI.SC_ValueTypes valueType = isScalar
+                    ? targetProperty.DataType
+                    : targetProperty.DataType[0];
+
+                switch (valueType)
+                {
+                    case SCAPI.SC_ValueTypes.SCVT_I1:
+                    case SCAPI.SC_ValueTypes.SCVT_I2:
+                    case SCAPI.SC_ValueTypes.SCVT_I4:
+                    case SCAPI.SC_ValueTypes.SCVT_INT:
+                        return int.Parse(value);
+
+                    case SCAPI.SC_ValueTypes.SCVT_UI1:
+                    case SCAPI.SC_ValueTypes.SCVT_UI2:
+                    case SCAPI.SC_ValueTypes.SCVT_UI4:
+                    case SCAPI.SC_ValueTypes.SCVT_UINT:
+                        return uint.Parse(value);
+
+                    case SCAPI.SC_ValueTypes.SCVT_I8:
+                        return long.Parse(value);
+
+                    case SCAPI.SC_ValueTypes.SCVT_UI8:
+                        return ulong.Parse(value);
+
+                    case SCAPI.SC_ValueTypes.SCVT_R4:
+                    case SCAPI.SC_ValueTypes.SCVT_R8:
+                    case SCAPI.SC_ValueTypes.SCVT_CURRENCY:
+                        return double.Parse(value);
+
+                    case SCAPI.SC_ValueTypes.SCVT_BOOLEAN:
+                        return bool.Parse(value);
+
+                    case SCAPI.SC_ValueTypes.SCVT_DATE:
+                        return DateTime.Parse(value);
+                }
+            }
+            catch
+            {
+            }
+
+            return value;
+        }
+    }
+
+    internal sealed class ModelDiffApplyResult
+    {
+        public ModelDiffApplyResult()
+        {
+            Messages = new List<string>();
+        }
+
+        public int CreatedObjects { get; set; }
+
+        public int UpdatedProperties { get; set; }
+
+        public int SkippedProperties { get; set; }
+
+        public int FailedOperations { get; set; }
+
+        public List<string> Messages { get; private set; }
+
+        public int AppliedChanges
+        {
+            get
+            {
+                return CreatedObjects + UpdatedProperties;
+            }
+        }
+
+        public string ToSummary()
+        {
+            var parts = new[]
+            {
+                CreatedObjects + " nesne oluşturuldu",
+                UpdatedProperties + " property güncellendi",
+                SkippedProperties + " property atlandı",
+                FailedOperations + " hata"
+            };
+
+            return string.Join(", ", parts.Where(x => !string.IsNullOrWhiteSpace(x)));
         }
     }
 }

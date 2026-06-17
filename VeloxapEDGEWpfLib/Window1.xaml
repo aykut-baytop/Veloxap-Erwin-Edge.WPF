@@ -92,6 +92,11 @@
              Content="Model Karşılaştırma"
              Style="{StaticResource SideMenuButtonStyle}"/>
 
+<RadioButton x:Name="rbTableUdps"
+             GroupName="MainMenu"
+             Content="Tablo UDP'leri"
+             Style="{StaticResource SideMenuButtonStyle}"/>
+
 <RadioButton x:Name="rbValidation"
              GroupName="MainMenu"
              Content="Model Validasyon"

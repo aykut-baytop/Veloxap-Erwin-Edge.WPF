@@ -50,6 +50,7 @@ namespace VeloxapEDGEWpfLib
             InitializeComponent();
             rbModelInfo.Checked += Menu_Checked;
             rbCompare.Checked += Menu_Checked;
+            rbTableUdps.Checked += Menu_Checked;
             rbValidation.Checked += Menu_Checked;
             rbRules.Checked += Menu_Checked;
             cmbMainModel.SelectionChanged += CmbMainModel_SelectionChanged;
@@ -85,6 +86,11 @@ namespace VeloxapEDGEWpfLib
                     veloxapEDGErwinLib,
                     oApp,
                     models);
+            }
+
+            else if (sender == rbTableUdps)
+            {
+                MainContent.Content = new ModelUdpView(currentModelInfo);
             }
 
             else if (sender == rbValidation)
@@ -136,6 +142,7 @@ namespace VeloxapEDGEWpfLib
         {
             rbModelInfo.IsChecked = false;
             rbCompare.IsChecked = false;
+            rbTableUdps.IsChecked = false;
             rbValidation.IsChecked = false;
             rbRules.IsChecked = false;
         }
@@ -236,6 +243,10 @@ namespace VeloxapEDGEWpfLib
             if (rbModelInfo.IsChecked == true)
             {
                 MainContent.Content = new ModelInfoView(currentModelInfo);
+            }
+            else if (rbTableUdps.IsChecked == true)
+            {
+                MainContent.Content = new ModelUdpView(currentModelInfo);
             }
             else if (rbRules.IsChecked == true)
             {

@@ -79,6 +79,9 @@
     <Compile Include="Pages\ModelComparisonView.xaml.cs">
       <DependentUpon>ModelComparisonView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Pages\ModelUdpView.xaml.cs">
+      <DependentUpon>ModelUdpView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Pages\ModelValidationView.xaml.cs">
       <DependentUpon>ModelValidationView.xaml</DependentUpon>
     </Compile>
@@ -104,6 +107,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Pages\ModelComparisonView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Pages\ModelUdpView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -177,13 +177,27 @@ namespace VeloxapEDGEWpfLib.Pages
                     application,
                     targetPersistenceUnit);
 
-                applyService.Apply(diff, direction);
+                ModelDiffApplyResult applyResult = applyService.Apply(diff, direction);
+
+                if (applyResult.AppliedChanges == 0)
+                {
+                    string detail = BuildApplyResultMessage(applyResult);
+                    SetStatus("Aktarımda uygulanabilir değişiklik bulunamadı. " + applyResult.ToSummary(), true);
+
+                    MessageBox.Show(
+                        "Aktarım komutu çalıştı ancak modele uygulanmış bir değişiklik tespit edilemedi.\n\n" + detail,
+                        "Model Aktarımı",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
 
                 SetStatus("Aktarım tamamlandı. Farklar yenileniyor...", false);
                 CompareModels(false);
 
                 MessageBox.Show(
-                    "Aktarım tamamlandı.",
+                    "Aktarım tamamlandı.\n\n" + applyResult.ToSummary(),
                     "Model Aktarımı",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -495,6 +509,22 @@ namespace VeloxapEDGEWpfLib.Pages
             return string.IsNullOrWhiteSpace(value)
                 ? fallback
                 : value;
+        }
+
+        private static string BuildApplyResultMessage(ModelDiffApplyResult result)
+        {
+            if (result == null)
+                return string.Empty;
+
+            string message = result.ToSummary();
+
+            if (result.Messages == null || result.Messages.Count == 0)
+                return message;
+
+            return message + Environment.NewLine + Environment.NewLine +
+                   string.Join(
+                       Environment.NewLine,
+                       result.Messages.Take(8));
         }
 
         public sealed class DiffTreeItem
