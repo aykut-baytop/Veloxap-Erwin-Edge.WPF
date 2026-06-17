@@ -52,21 +52,7 @@
                                FontSize="12"/>
                 </Grid>
 
-                <TextBox x:Name="txtTrace"
-                         DockPanel.Dock="Top"
-                         Height="78"
-                         Margin="0,0,0,12"
-                         Padding="8"
-                         FontFamily="Consolas"
-                         FontSize="11"
-                         TextWrapping="Wrap"
-                         IsReadOnly="True"
-                         BorderThickness="1"
-                         BorderBrush="#E5E7EB"
-                         Background="White"
-                         Foreground="#374151"
-                         VerticalScrollBarVisibility="Auto"
-                         Visibility="Collapsed"/>
+                
 
                 <Grid>
                     <DataGrid x:Name="dgValidationRules"

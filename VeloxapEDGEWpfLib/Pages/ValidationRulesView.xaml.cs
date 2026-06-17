@@ -54,11 +54,8 @@ namespace VeloxapEDGEWpfLib.Pages
 
         internal void ShowTrace(string message)
         {
-            txtTrace.Text = message ?? string.Empty;
-            txtTrace.Visibility = string.IsNullOrWhiteSpace(message)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
         }
+        
 
         private static ValidationRuleListItem BuildRuleItem(int sequence, Rule rule)
         {
