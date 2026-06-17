@@ -72,6 +72,8 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="8"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="220"/>
             </Grid.ColumnDefinitions>
@@ -122,8 +124,25 @@
                 </StackPanel>
             </Button>
 
+            <Button x:Name="btnCalculateSecurityClass"
+                    Grid.Column="5"
+                    Style="{StaticResource ActionButtonStyle}"
+                    Background="#B45309"
+                    Click="BtnCalculateSecurityClass_Click"
+                    ToolTip="Tablo UDP Guvenlik_Sinifi_Degeri alanlarini hesapla">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE72E;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Margin="0,0,7,0"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="Guvenlik Sinifi Hesapla"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
             <TextBox x:Name="txtSearch"
-                     Grid.Column="5"
+                     Grid.Column="7"
                      Height="34"
                      Padding="10,7"
                      VerticalContentAlignment="Center"
@@ -132,7 +151,7 @@
                      Background="White"
                      Foreground="#111827"
                      TextChanged="TxtSearch_TextChanged"
-                     ToolTip="Tablo, UDP veya deger ara"/>
+                     ToolTip="Tablo, kolon, UDP veya deger ara"/>
         </Grid>
 
         <Border Grid.Row="2"
@@ -212,19 +231,27 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Tablo"
                                             Binding="{Binding TableName}"
-                                            Width="1.2*"/>
+                                            Width="1.1*"/>
+
+                        <DataGridTextColumn Header="Nesne"
+                                            Binding="{Binding ObjectType}"
+                                            Width="80"/>
+
+                        <DataGridTextColumn Header="Kolon"
+                                            Binding="{Binding ColumnName}"
+                                            Width="1.0*"/>
 
                         <DataGridTextColumn Header="UDP"
                                             Binding="{Binding UdpName}"
-                                            Width="1.3*"/>
+                                            Width="1.2*"/>
 
                         <DataGridTextColumn Header="Deger"
                                             Binding="{Binding Value}"
-                                            Width="1.1*"/>
+                                            Width="1.0*"/>
 
                         <DataGridTextColumn Header="As String"
                                             Binding="{Binding AsString}"
-                                            Width="1.1*"/>
+                                            Width="1.0*"/>
 
                         <DataGridTextColumn Header="Tip"
                                             Binding="{Binding DataType}"

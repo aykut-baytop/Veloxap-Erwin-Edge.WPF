@@ -208,6 +208,82 @@ namespace VeloxapEDGEWpfLib.Pages
             }
         }
 
+        private void BtnCalculateSecurityClass_Click(object sender, RoutedEventArgs e)
+        {
+            const string title = "Guvenlik Sinifi Degeri Hesaplama";
+
+            if (modelInfo == null || application == null || persistenceUnit == null)
+            {
+                MessageBox.Show(
+                    "Guvenlik sinifi degeri hesaplama icin secili erwin modeli hazir degil.",
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var service = new TableUdpSecurityService(
+                application,
+                persistenceUnit);
+
+            int calculableTableCount = TableUdpSecurityService.CountSecurityClassCalculableTables(modelInfo);
+            if (calculableTableCount == 0)
+            {
+                TableUdpSecurityApplyResult emptyResult = service.ApplySecurityClassValue(modelInfo);
+                SetStatus("Hesaplanabilir Guvenlik_Sinifi_Degeri UDP kaydi bulunamadi.", true);
+                MessageBox.Show(
+                    BuildApplyResultMessage(emptyResult),
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            MessageBoxResult confirmation = MessageBox.Show(
+                BuildSecurityClassConfirmationMessage(calculableTableCount),
+                title,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+
+            SetBusy(true);
+            SetStatus("Guvenlik sinifi degerleri hesaplaniyor...", false);
+
+            try
+            {
+                TableUdpSecurityApplyResult result = service.ApplySecurityClassValue(modelInfo);
+
+                allRows.Clear();
+                allRows.AddRange(BuildRows(modelInfo));
+                txtUdpCount.Text = allRows.Count.ToString();
+                ApplyFilter();
+
+                bool hasError = result.FailedTables > 0 || result.SkippedTables > 0;
+                SetStatus(result.ToSummary(), hasError);
+
+                MessageBox.Show(
+                    BuildApplyResultMessage(result),
+                    title,
+                    MessageBoxButton.OK,
+                    hasError ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Guvenlik sinifi degeri hesaplama hatasi: " + ex.Message, true);
+                MessageBox.Show(
+                    "Guvenlik sinifi degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
+                    title,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+        }
+
         private void ApplyFilter()
         {
             string filter = txtSearch == null
@@ -220,6 +296,8 @@ namespace VeloxapEDGEWpfLib.Pages
             if (!string.IsNullOrWhiteSpace(filter))
             {
                 rows = rows.Where(row => Contains(row.TableName, filter) ||
+                                         Contains(row.ObjectType, filter) ||
+                                         Contains(row.ColumnName, filter) ||
                                          Contains(row.UdpName, filter) ||
                                          Contains(row.Value, filter) ||
                                          Contains(row.AsString, filter));
@@ -264,6 +342,9 @@ namespace VeloxapEDGEWpfLib.Pages
 
             if (btnCalculateBankRelative != null)
                 btnCalculateBankRelative.IsEnabled = isEnabled;
+
+            if (btnCalculateSecurityClass != null)
+                btnCalculateSecurityClass.IsEnabled = isEnabled;
         }
 
         private void SetStatus(string message, bool isError)
@@ -290,24 +371,51 @@ namespace VeloxapEDGEWpfLib.Pages
                 string tableName = Safe(table.getoName(), "(adsiz tablo)");
                 var properties = table.getoObjectProperty();
 
-                if (properties == null)
-                    continue;
-
-                foreach (var property in properties.Where(IsUdpProperty))
+                if (properties != null)
                 {
-                    rows.Add(new UdpRow
+                    foreach (var property in properties.Where(IsUdpProperty))
                     {
-                        TableName = tableName,
-                        UdpName = Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
-                        Value = Safe(property.getoPropertyValue(), string.Empty),
-                        AsString = Safe(property.getoPropertyFormatAsString(), string.Empty),
-                        DataType = Safe(property.getoPropertyType(), string.Empty)
-                    });
+                        rows.Add(new UdpRow
+                        {
+                            TableName = tableName,
+                            ObjectType = "Tablo",
+                            ColumnName = string.Empty,
+                            UdpName = Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
+                            Value = Safe(property.getoPropertyValue(), string.Empty),
+                            AsString = Safe(property.getoPropertyFormatAsString(), string.Empty),
+                            DataType = Safe(property.getoPropertyType(), string.Empty)
+                        });
+                    }
+                }
+
+                foreach (var column in EnumerateColumns(table))
+                {
+                    string columnName = Safe(column.getoName(), "(adsiz kolon)");
+                    var columnProperties = column.getoObjectProperty();
+
+                    if (columnProperties == null)
+                        continue;
+
+                    foreach (var property in columnProperties.Where(IsUdpProperty))
+                    {
+                        rows.Add(new UdpRow
+                        {
+                            TableName = tableName,
+                            ObjectType = "Kolon",
+                            ColumnName = columnName,
+                            UdpName = Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
+                            Value = Safe(property.getoPropertyValue(), string.Empty),
+                            AsString = Safe(property.getoPropertyFormatAsString(), string.Empty),
+                            DataType = Safe(property.getoPropertyType(), string.Empty)
+                        });
+                    }
                 }
             }
 
             return rows
                 .OrderBy(row => row.TableName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.ObjectType, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.ColumnName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(row => row.UdpName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
@@ -334,6 +442,28 @@ namespace VeloxapEDGEWpfLib.Pages
             }
         }
 
+        private static IEnumerable<ModelObject> EnumerateColumns(ModelObject table)
+        {
+            if (table == null)
+                yield break;
+
+            var children = table.getoModelObject();
+            if (children == null)
+                yield break;
+
+            foreach (var child in children)
+            {
+                if (child == null)
+                    continue;
+
+                if (string.Equals(child.getoClassName(), "Attribute", StringComparison.OrdinalIgnoreCase))
+                    yield return child;
+
+                foreach (var nestedChild in EnumerateColumns(child))
+                    yield return nestedChild;
+            }
+        }
+
         private static int CountTables(ModelInfo modelInfo)
         {
             var objects = modelInfo == null
@@ -354,7 +484,35 @@ namespace VeloxapEDGEWpfLib.Pages
 
             return propertyName.Contains(".") ||
                    propertyName.IndexOf("UDP", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   propertyName.IndexOf("User Defined", StringComparison.OrdinalIgnoreCase) >= 0;
+                   propertyName.IndexOf("User Defined", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   IsKnownSecurityUdp(propertyName);
+        }
+
+        private static bool IsKnownSecurityUdp(string propertyName)
+        {
+            if (string.IsNullOrWhiteSpace(propertyName))
+                return false;
+
+            string normalizedName = propertyName
+                .Replace("_", string.Empty)
+                .Replace(" ", string.Empty)
+                .ToLowerInvariant();
+
+            string[] knownNames =
+            {
+                "erisebilirlik",
+                "erisilebilirlik",
+                "butunluk",
+                "gizlilikseviyesi",
+                "varlikdegeri",
+                "issureciseviyesi",
+                "bankagorecedegeri",
+                "kisiselverimi",
+                "hassasverimi",
+                "guvenliksinifidegeri"
+            };
+
+            return knownNames.Any(name => normalizedName.EndsWith(name));
         }
 
         private static bool Contains(string value, string filter)
@@ -388,7 +546,6 @@ namespace VeloxapEDGEWpfLib.Pages
             return calculableTableCount + " tablo icin Varlik_Degeri UDP alani guncellenecek.\n\n" +
                    "Formul:\n" +
                    "Erisebilirlik, Butunluk ve Gizlilik_Seviyesi listelerindeki secimler 1-4 arasinda seviyeye cevrilir.\n" +
-                   "Listenin en alt itemi seviye 1 kabul edilir; yukariya dogru +1 ilerler.\n" +
                    "Sonuc = Yuvarla((Erisebilirlik + Butunluk + Gizlilik_Seviyesi) / 3)\n\n" +
                    "4-\u00c7ok Gizli/Y\u00fcksek\n" +
                    "3-Gizli/Orta\n" +
@@ -418,14 +575,28 @@ namespace VeloxapEDGEWpfLib.Pages
             return calculableTableCount + " tablo icin Banka_Gorece_Degeri UDP alani guncellenecek.\n\n" +
                    "Formul:\n" +
                    "Varlik_Degeri sayi ile baslamalidir.\n" +
-                   "Is_Sureci_Seviyesi degerinde parantez icindeki sayi okunur. Ornek: Diger (1)\n" +
+                   "Is_Sureci_Seviyesi degerinde parantez icindeki sayi okunur.\n" +
                    "Banka_Gorece_Degeri = Varlik_Degeri basindaki sayi x Is_Sureci_Seviyesi parantez ici sayi\n\n" +
+                   "Devam edilsin mi?";
+        }
+
+        private static string BuildSecurityClassConfirmationMessage(int calculableTableCount)
+        {
+            return calculableTableCount + " tablo icin Guvenlik_Sinifi_Degeri UDP alani guncellenecek.\n\n" +
+                   "Formul:\n" +
+                   "Banka_Gorece_Degeri alanindaki sayi baslangic degeri olarak alinir.\n" +
+                   "Tablonun tum kolonlarinda Kisisel_Veri_Mi ve Hassas_Veri_Mi UDP alanlari taranir.\n" +
+                   "Bu alanlarda True gorulen her deger icin sonuc 2 ile carpilir.\n\n" +
                    "Devam edilsin mi?";
         }
 
         public sealed class UdpRow
         {
             public string TableName { get; set; }
+
+            public string ObjectType { get; set; }
+
+            public string ColumnName { get; set; }
 
             public string UdpName { get; set; }
 

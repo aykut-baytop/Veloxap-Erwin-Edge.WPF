@@ -40,6 +40,21 @@ namespace VeloxapEDGEWpfLib.Services
             "bankagorecedegeri"
         };
 
+        private static readonly string[] PersonalDataPropertyNames =
+        {
+            "kisiselverimi"
+        };
+
+        private static readonly string[] SensitiveDataPropertyNames =
+        {
+            "hassasverimi"
+        };
+
+        private static readonly string[] SecurityClassValuePropertyNames =
+        {
+            "guvenliksinifidegeri"
+        };
+
         private readonly SCAPI.Application application;
         private readonly SCAPI.PersistenceUnit persistenceUnit;
 
@@ -199,6 +214,80 @@ namespace VeloxapEDGEWpfLib.Services
             }
         }
 
+        public static int CountSecurityClassCalculableTables(ModelInfo modelInfo)
+        {
+            return BuildSecurityClassCalculations(modelInfo, null).Count;
+        }
+
+        public TableUdpSecurityApplyResult ApplySecurityClassValue(ModelInfo modelInfo)
+        {
+            var result = new TableUdpSecurityApplyResult();
+            var calculations = BuildSecurityClassCalculations(modelInfo, result);
+
+            if (calculations.Count == 0)
+                return result;
+
+            if (application == null || persistenceUnit == null)
+                throw new InvalidOperationException("Guvenlik sinifi degeri guncellemesi icin erwin oturumu hazir degil.");
+
+            SCAPI.Session session = null;
+            object transaction = null;
+
+            try
+            {
+                session = application.Sessions.Add();
+                session.Open(
+                    persistenceUnit,
+                    SCAPI.SC_SessionLevel.SCD_SL_M0);
+
+                transaction = session.BeginNamedTransaction("Calculate Security Class UDP Values");
+
+                foreach (var calculation in calculations)
+                    ApplySecurityClassCalculation(session, calculation, result);
+
+                session.CommitTransaction(transaction);
+                transaction = null;
+
+                return result;
+            }
+            catch
+            {
+                if (session != null && transaction != null)
+                {
+                    try
+                    {
+                        session.RollbackTransaction(transaction);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (session != null)
+                {
+                    try
+                    {
+                        session.Close();
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        application.Sessions.Remove(session);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
         private void ApplyCalculation(
             SCAPI.Session session,
             TableUdpSecurityCalculation calculation,
@@ -277,6 +366,46 @@ namespace VeloxapEDGEWpfLib.Services
 
             calculation.BankRelativeValueProperty.setoPropertyValue(writtenValue);
             calculation.BankRelativeValueProperty.setoPropertyFormatAsString(writtenValue);
+            result.UpdatedTables++;
+        }
+
+        private void ApplySecurityClassCalculation(
+            SCAPI.Session session,
+            SecurityClassValueCalculation calculation,
+            TableUdpSecurityApplyResult result)
+        {
+            SCAPI.ModelObject targetObject = FindTargetTable(session, calculation);
+            if (targetObject == null)
+            {
+                result.SkippedTables++;
+                result.Messages.Add(calculation.TableName + ": tablo erwin oturumunda bulunamadi.");
+                return;
+            }
+
+            SCAPI.ModelProperty targetProperty = FindTargetProperty(
+                targetObject,
+                SecurityClassValuePropertyNames);
+
+            if (targetProperty == null)
+            {
+                result.SkippedTables++;
+                result.Messages.Add(calculation.TableName + ": Guvenlik_Sinifi_Degeri UDP bulunamadi.");
+                return;
+            }
+
+            string writtenValue;
+            if (!TrySetPropertyValue(
+                targetProperty,
+                calculation.ResultValue,
+                out writtenValue))
+            {
+                result.FailedTables++;
+                result.Messages.Add(calculation.TableName + ": Guvenlik_Sinifi_Degeri yazilamadi.");
+                return;
+            }
+
+            calculation.SecurityClassValueProperty.setoPropertyValue(writtenValue);
+            calculation.SecurityClassValueProperty.setoPropertyFormatAsString(writtenValue);
             result.UpdatedTables++;
         }
 
@@ -383,6 +512,35 @@ namespace VeloxapEDGEWpfLib.Services
         private static bool TrySetPropertyValue(
             SCAPI.ModelProperty property,
             int resultValue,
+            out string writtenValue)
+        {
+            string textValue = resultValue.ToString(CultureInfo.InvariantCulture);
+            object[] attempts =
+            {
+                resultValue,
+                textValue
+            };
+
+            foreach (object attempt in attempts)
+            {
+                try
+                {
+                    property.Value = ConvertValueForTarget(property, attempt);
+                    writtenValue = Convert.ToString(attempt, CultureInfo.InvariantCulture);
+                    return true;
+                }
+                catch
+                {
+                }
+            }
+
+            writtenValue = string.Empty;
+            return false;
+        }
+
+        private static bool TrySetPropertyValue(
+            SCAPI.ModelProperty property,
+            long resultValue,
             out string writtenValue)
         {
             string textValue = resultValue.ToString(CultureInfo.InvariantCulture);
@@ -617,6 +775,86 @@ namespace VeloxapEDGEWpfLib.Services
             return calculations;
         }
 
+        private static List<SecurityClassValueCalculation> BuildSecurityClassCalculations(
+            ModelInfo modelInfo,
+            TableUdpSecurityApplyResult result)
+        {
+            var calculations = new List<SecurityClassValueCalculation>();
+
+            var objects = modelInfo == null
+                ? null
+                : modelInfo.getoModelObject();
+
+            foreach (var table in EnumerateTables(objects))
+            {
+                var properties = table.getoObjectProperty();
+                if (properties == null || properties.Count == 0)
+                    continue;
+
+                ObjectProperty bankRelativeValue = FindProperty(properties, BankRelativeValuePropertyNames);
+                ObjectProperty securityClassValue = FindProperty(properties, SecurityClassValuePropertyNames);
+
+                var missing = new List<string>();
+                int bankValue = 0;
+
+                if (bankRelativeValue == null)
+                    missing.Add("Banka_Gorece_Degeri");
+
+                if (securityClassValue == null)
+                    missing.Add("Guvenlik_Sinifi_Degeri");
+
+                if (bankRelativeValue != null && !TryResolveLeadingInteger(bankRelativeValue, out bankValue))
+                    missing.Add("Banka_Gorece_Degeri sayisi");
+
+                if (missing.Count > 0)
+                {
+                    if (result != null)
+                    {
+                        result.SkippedTables++;
+                        result.Messages.Add(
+                            Safe(table.getoName(), "(adsiz tablo)") +
+                            ": eksik/hatali alanlar - " +
+                            string.Join(", ", missing));
+                    }
+
+                    continue;
+                }
+
+                int trueCount = 0;
+                foreach (var column in EnumerateColumns(table))
+                {
+                    var columnProperties = column.getoObjectProperty();
+                    if (columnProperties == null || columnProperties.Count == 0)
+                        continue;
+
+                    ObjectProperty personalData = FindProperty(columnProperties, PersonalDataPropertyNames);
+                    ObjectProperty sensitiveData = FindProperty(columnProperties, SensitiveDataPropertyNames);
+
+                    if (IsTrueValue(personalData))
+                        trueCount++;
+
+                    if (IsTrueValue(sensitiveData))
+                        trueCount++;
+                }
+
+                long securityValue = bankValue;
+                for (int i = 0; i < trueCount; i++)
+                    securityValue *= 2;
+
+                calculations.Add(new SecurityClassValueCalculation
+                {
+                    TableObjectId = table.getoObjectId(),
+                    TableName = Safe(table.getoName(), "(adsiz tablo)"),
+                    BankRelativeValue = bankValue,
+                    TrueFlagCount = trueCount,
+                    ResultValue = securityValue,
+                    SecurityClassValueProperty = securityClassValue
+                });
+            }
+
+            return calculations;
+        }
+
         private static IEnumerable<ModelObject> EnumerateTables(IEnumerable<ModelObject> objects)
         {
             if (objects == null)
@@ -636,6 +874,28 @@ namespace VeloxapEDGEWpfLib.Services
 
                 foreach (var child in EnumerateTables(children))
                     yield return child;
+            }
+        }
+
+        private static IEnumerable<ModelObject> EnumerateColumns(ModelObject table)
+        {
+            if (table == null)
+                yield break;
+
+            var children = table.getoModelObject();
+            if (children == null)
+                yield break;
+
+            foreach (var child in children)
+            {
+                if (child == null)
+                    continue;
+
+                if (string.Equals(child.getoClassName(), "Attribute", StringComparison.OrdinalIgnoreCase))
+                    yield return child;
+
+                foreach (var nestedChild in EnumerateColumns(child))
+                    yield return nestedChild;
             }
         }
 
@@ -742,6 +1002,27 @@ namespace VeloxapEDGEWpfLib.Services
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
                 out level);
+        }
+
+        private static bool IsTrueValue(ObjectProperty property)
+        {
+            if (property == null)
+                return false;
+
+            return IsTrueText(property.getoPropertyFormatAsString()) ||
+                   IsTrueText(property.getoPropertyValue());
+        }
+
+        private static bool IsTrueText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string normalized = NormalizeValue(value);
+
+            return string.Equals(normalized, "true", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "1", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "evet", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryResolveLevelText(string value, out int level)
@@ -977,5 +1258,16 @@ namespace VeloxapEDGEWpfLib.Services
         public int ResultValue { get; set; }
 
         public ObjectProperty BankRelativeValueProperty { get; set; }
+    }
+
+    internal sealed class SecurityClassValueCalculation : TableUdpCalculationBase
+    {
+        public int BankRelativeValue { get; set; }
+
+        public int TrueFlagCount { get; set; }
+
+        public long ResultValue { get; set; }
+
+        public ObjectProperty SecurityClassValueProperty { get; set; }
     }
 }
