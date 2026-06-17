@@ -64,8 +64,8 @@ namespace VeloxapEDGEWpfLib.Pages
             if (modelInfo == null || application == null || persistenceUnit == null)
             {
                 MessageBox.Show(
-                    "Varlik degeri hesaplama icin secili erwin modeli hazir degil.",
-                    "Varlik Degeri Hesaplama",
+                    "Veri degeri hesaplama icin secili erwin modeli hazir degil.",
+                    "Veri Degeri Hesaplama",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -74,10 +74,10 @@ namespace VeloxapEDGEWpfLib.Pages
             int calculableTableCount = TableUdpSecurityService.CountCalculableTables(modelInfo);
             if (calculableTableCount == 0)
             {
-                SetStatus("Hesaplanabilir Varlik_Degeri UDP kaydi bulunamadi.", true);
+                SetStatus("Hesaplanabilir Veri_Degeri UDP kaydi bulunamadi.", true);
                 MessageBox.Show(
-                    "Erisebilirlik, Butunluk, Gizlilik_Seviyesi ve Varlik_Degeri UDP alanlari tam olan tablo bulunamadi.",
-                    "Varlik Degeri Hesaplama",
+                    "Erisebilirlik, Butunluk, Gizlilik_Seviyesi ve Veri_Degeri UDP alanlari tam olan tablo bulunamadi.",
+                    "Veri Degeri Hesaplama",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -85,7 +85,7 @@ namespace VeloxapEDGEWpfLib.Pages
 
             MessageBoxResult confirmation = MessageBox.Show(
                 BuildCalculationConfirmationMessage(calculableTableCount),
-                "Varlik Degeri Hesaplama",
+                "Veri Degeri Hesaplama",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -93,7 +93,7 @@ namespace VeloxapEDGEWpfLib.Pages
                 return;
 
             SetBusy(true);
-            SetStatus("Varlik degerleri hesaplaniyor...", false);
+            SetStatus("Veri degerleri hesaplaniyor...", false);
 
             try
             {
@@ -113,16 +113,16 @@ namespace VeloxapEDGEWpfLib.Pages
 
                 MessageBox.Show(
                     BuildApplyResultMessage(result),
-                    "Varlik Degeri Hesaplama",
+                    "Veri Degeri Hesaplama",
                     MessageBoxButton.OK,
                     hasError ? MessageBoxImage.Warning : MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                SetStatus("Varlik degeri hesaplama hatasi: " + ex.Message, true);
+                SetStatus("Veri degeri hesaplama hatasi: " + ex.Message, true);
                 MessageBox.Show(
-                    "Varlik degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
-                    "Varlik Degeri Hesaplama",
+                    "Veri degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
+                    "Veri Degeri Hesaplama",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
@@ -504,6 +504,7 @@ namespace VeloxapEDGEWpfLib.Pages
                 "erisilebilirlik",
                 "butunluk",
                 "gizlilikseviyesi",
+                "veridegeri",
                 "varlikdegeri",
                 "issureciseviyesi",
                 "bankagorecedegeri",
@@ -543,7 +544,7 @@ namespace VeloxapEDGEWpfLib.Pages
 
         private static string BuildCalculationConfirmationMessage(int calculableTableCount)
         {
-            return calculableTableCount + " tablo icin Varlik_Degeri UDP alani guncellenecek.\n\n" +
+            return calculableTableCount + " tablo icin Veri_Degeri UDP alani guncellenecek.\n\n" +
                    "Formul:\n" +
                    "Erisebilirlik, Butunluk ve Gizlilik_Seviyesi listelerindeki secimler 1-4 arasinda seviyeye cevrilir.\n" +
                    "Sonuc = Yuvarla((Erisebilirlik + Butunluk + Gizlilik_Seviyesi) / 3)\n\n" +
@@ -574,9 +575,9 @@ namespace VeloxapEDGEWpfLib.Pages
         {
             return calculableTableCount + " tablo icin Banka_Gorece_Degeri UDP alani guncellenecek.\n\n" +
                    "Formul:\n" +
-                   "Varlik_Degeri sayi ile baslamalidir.\n" +
+                   "Veri_Degeri sayi ile baslamalidir.\n" +
                    "Is_Sureci_Seviyesi degerinde parantez icindeki sayi okunur.\n" +
-                   "Banka_Gorece_Degeri = Varlik_Degeri basindaki sayi x Is_Sureci_Seviyesi parantez ici sayi\n\n" +
+                   "Banka_Gorece_Degeri = Veri_Degeri basindaki sayi x Is_Sureci_Seviyesi parantez ici sayi\n\n" +
                    "Devam edilsin mi?";
         }
 

@@ -27,6 +27,7 @@ namespace VeloxapEDGEWpfLib.Services
 
         private static readonly string[] AssetValuePropertyNames =
         {
+            "veridegeri",
             "varlikdegeri"
         };
 
@@ -80,7 +81,7 @@ namespace VeloxapEDGEWpfLib.Services
                 return result;
 
             if (application == null || persistenceUnit == null)
-                throw new InvalidOperationException("Varlik degeri guncellemesi icin erwin oturumu hazir degil.");
+                throw new InvalidOperationException("Veri degeri guncellemesi icin erwin oturumu hazir degil.");
 
             SCAPI.Session session = null;
             object transaction = null;
@@ -308,7 +309,7 @@ namespace VeloxapEDGEWpfLib.Services
             if (targetProperty == null)
             {
                 result.SkippedTables++;
-                result.Messages.Add(calculation.TableName + ": Varlik_Degeri UDP bulunamadi.");
+                result.Messages.Add(calculation.TableName + ": Veri_Degeri UDP bulunamadi.");
                 return;
             }
 
@@ -320,7 +321,7 @@ namespace VeloxapEDGEWpfLib.Services
                 out writtenValue))
             {
                 result.FailedTables++;
-                result.Messages.Add(calculation.TableName + ": Varlik_Degeri yazilamadi.");
+                result.Messages.Add(calculation.TableName + ": Veri_Degeri yazilamadi.");
                 return;
             }
 
@@ -660,7 +661,7 @@ namespace VeloxapEDGEWpfLib.Services
                     missing.Add("Gizlilik_Seviyesi");
 
                 if (assetValue == null)
-                    missing.Add("Varlik_Degeri");
+                    missing.Add("Veri_Degeri");
 
                 if (availability != null && !TryResolveLevel(availability, out availabilityLevel))
                     missing.Add("Erisebilirlik seviyesi");
@@ -733,7 +734,7 @@ namespace VeloxapEDGEWpfLib.Services
                 int businessLevel = 0;
 
                 if (assetValue == null)
-                    missing.Add("Varlik_Degeri");
+                    missing.Add("Veri_Degeri");
 
                 if (businessProcessLevel == null)
                     missing.Add("Is_Sureci_Seviyesi");
@@ -742,7 +743,7 @@ namespace VeloxapEDGEWpfLib.Services
                     missing.Add("Banka_Gorece_Degeri");
 
                 if (assetValue != null && !TryResolveLeadingInteger(assetValue, out assetLevel))
-                    missing.Add("Varlik_Degeri sayi ile baslamiyor");
+                    missing.Add("Veri_Degeri sayi ile baslamiyor");
 
                 if (businessProcessLevel != null && !TryResolveParenthesizedInteger(businessProcessLevel, out businessLevel))
                     missing.Add("Is_Sureci_Seviyesi parantez ici sayi");

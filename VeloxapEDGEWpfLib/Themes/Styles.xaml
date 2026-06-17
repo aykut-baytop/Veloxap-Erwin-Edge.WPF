@@ -2,6 +2,9 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <!-- Shared brushes -->
+    <SolidColorBrush x:Key="LeftMenuBackgroundBrush" Color="#111827" />
+
     <Style x:Key="SideMenuButtonStyle" TargetType="RadioButton">
         <Setter Property="Foreground" Value="#D1D5DB"/>
         <Setter Property="Background" Value="Transparent"/>

@@ -95,14 +95,14 @@
                     Grid.Column="1"
                     Style="{StaticResource ActionButtonStyle}"
                     Click="BtnCalculateSecurity_Click"
-                    ToolTip="Tablo UDP Varlik_Degeri alanlarini hesapla">
+                    ToolTip="Tablo UDP Veri_Degeri alanlarini hesapla">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE9D2;"
                                FontFamily="Segoe MDL2 Assets"
                                FontSize="13"
                                Margin="0,0,7,0"
                                VerticalAlignment="Center"/>
-                    <TextBlock Text="Varlik Degeri Hesapla"
+                    <TextBlock Text="Veri Degeri Hesapla"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
