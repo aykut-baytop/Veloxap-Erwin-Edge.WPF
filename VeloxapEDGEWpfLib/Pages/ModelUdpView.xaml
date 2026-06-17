@@ -19,6 +19,42 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Margin" Value="0,2,0,0"/>
         </Style>
+
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="164"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="#0F766E"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.78"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Background" Value="#D1D5DB"/>
+                                <Setter Property="Foreground" Value="#6B7280"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid Background="White">
@@ -33,6 +69,8 @@
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="220"/>
             </Grid.ColumnDefinitions>
 
@@ -49,8 +87,24 @@
                            TextTrimming="CharacterEllipsis"/>
             </StackPanel>
 
+            <Button x:Name="btnCalculateSecurity"
+                    Grid.Column="1"
+                    Style="{StaticResource ActionButtonStyle}"
+                    Click="BtnCalculateSecurity_Click"
+                    ToolTip="Tablo UDP Varlik_Degeri alanlarini hesapla">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE9D2;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Margin="0,0,7,0"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="Varlik Degeri Hesapla"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
             <TextBox x:Name="txtSearch"
-                     Grid.Column="1"
+                     Grid.Column="3"
                      Height="34"
                      Padding="10,7"
                      VerticalContentAlignment="Center"

@@ -90,7 +90,10 @@ namespace VeloxapEDGEWpfLib
 
             else if (sender == rbTableUdps)
             {
-                MainContent.Content = new ModelUdpView(currentModelInfo);
+                MainContent.Content = new ModelUdpView(
+                    currentModelInfo,
+                    oApp,
+                    GetCurrentPersistenceUnit());
             }
 
             else if (sender == rbValidation)
@@ -246,7 +249,10 @@ namespace VeloxapEDGEWpfLib
             }
             else if (rbTableUdps.IsChecked == true)
             {
-                MainContent.Content = new ModelUdpView(currentModelInfo);
+                MainContent.Content = new ModelUdpView(
+                    currentModelInfo,
+                    oApp,
+                    GetCurrentPersistenceUnit());
             }
             else if (rbRules.IsChecked == true)
             {
@@ -391,6 +397,18 @@ namespace VeloxapEDGEWpfLib
                     GetApiCookieContainer()));
 
             return ruleService;
+        }
+
+        private SCAPI.PersistenceUnit GetCurrentPersistenceUnit()
+        {
+            int selectedIndex = cmbMainModel == null
+                ? -1
+                : cmbMainModel.SelectedIndex;
+
+            if (veloxapEDGErwinLib == null || selectedIndex < 0)
+                return null;
+
+            return veloxapEDGErwinLib.getPersistenceUnit(selectedIndex);
         }
 
         private AuthTokenProvider GetAuthTokenProvider()

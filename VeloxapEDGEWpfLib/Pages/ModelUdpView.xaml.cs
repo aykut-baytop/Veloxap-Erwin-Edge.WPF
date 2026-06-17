@@ -4,22 +4,40 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using VeloxapEDGEWpfLib.Models;
+using VeloxapEDGEWpfLib.Services;
 
 namespace VeloxapEDGEWpfLib.Pages
 {
     public partial class ModelUdpView : UserControl
     {
+        private readonly ModelInfo modelInfo;
+        private readonly SCAPI.Application application;
+        private readonly SCAPI.PersistenceUnit persistenceUnit;
         private readonly List<UdpRow> allRows;
         private readonly ObservableCollection<UdpRow> visibleRows;
+        private bool isBusy;
 
         public ModelUdpView()
-            : this(null)
+            : this(null, null, null)
         {
         }
 
         internal ModelUdpView(ModelInfo modelInfo)
+            : this(modelInfo, null, null)
         {
+        }
+
+        internal ModelUdpView(
+            ModelInfo modelInfo,
+            SCAPI.Application application,
+            SCAPI.PersistenceUnit persistenceUnit)
+        {
+            this.modelInfo = modelInfo;
+            this.application = application;
+            this.persistenceUnit = persistenceUnit;
             allRows = new List<UdpRow>();
             visibleRows = new ObservableCollection<UdpRow>();
 
@@ -33,11 +51,85 @@ namespace VeloxapEDGEWpfLib.Pages
             txtUdpCount.Text = allRows.Count.ToString();
 
             ApplyFilter();
+            UpdateCalculateButton();
         }
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
             ApplyFilter();
+        }
+
+        private void BtnCalculateSecurity_Click(object sender, RoutedEventArgs e)
+        {
+            if (modelInfo == null || application == null || persistenceUnit == null)
+            {
+                MessageBox.Show(
+                    "Varlik degeri hesaplama icin secili erwin modeli hazir degil.",
+                    "Varlik Degeri Hesaplama",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            int calculableTableCount = TableUdpSecurityService.CountCalculableTables(modelInfo);
+            if (calculableTableCount == 0)
+            {
+                SetStatus("Hesaplanabilir Varlik_Degeri UDP kaydi bulunamadi.", true);
+                MessageBox.Show(
+                    "Erisebilirlik, Butunluk, Gizlilik_Seviyesi ve Varlik_Degeri UDP alanlari tam olan tablo bulunamadi.",
+                    "Varlik Degeri Hesaplama",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            MessageBoxResult confirmation = MessageBox.Show(
+                BuildCalculationConfirmationMessage(calculableTableCount),
+                "Varlik Degeri Hesaplama",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+
+            SetBusy(true);
+            SetStatus("Varlik degerleri hesaplaniyor...", false);
+
+            try
+            {
+                var service = new TableUdpSecurityService(
+                    application,
+                    persistenceUnit);
+
+                TableUdpSecurityApplyResult result = service.Apply(modelInfo);
+
+                allRows.Clear();
+                allRows.AddRange(BuildRows(modelInfo));
+                txtUdpCount.Text = allRows.Count.ToString();
+                ApplyFilter();
+
+                bool hasError = result.FailedTables > 0;
+                SetStatus(result.ToSummary(), hasError);
+
+                MessageBox.Show(
+                    BuildApplyResultMessage(result),
+                    "Varlik Degeri Hesaplama",
+                    MessageBoxButton.OK,
+                    hasError ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Varlik degeri hesaplama hatasi: " + ex.Message, true);
+                MessageBox.Show(
+                    "Varlik degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
+                    "Varlik Degeri Hesaplama",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                SetBusy(false);
+            }
         }
 
         private void ApplyFilter()
@@ -74,6 +166,33 @@ namespace VeloxapEDGEWpfLib.Pages
             txtStatus.Text = allRows.Count == 0
                 ? "UDP bulunamadi."
                 : visibleRows.Count + " UDP listeleniyor.";
+        }
+
+        private void SetBusy(bool value)
+        {
+            isBusy = value;
+            Mouse.OverrideCursor = isBusy ? Cursors.Wait : null;
+            UpdateCalculateButton();
+        }
+
+        private void UpdateCalculateButton()
+        {
+            if (btnCalculateSecurity == null)
+                return;
+
+            btnCalculateSecurity.IsEnabled =
+                !isBusy &&
+                modelInfo != null &&
+                application != null &&
+                persistenceUnit != null;
+        }
+
+        private void SetStatus(string message, bool isError)
+        {
+            txtStatus.Text = message;
+            txtStatus.Foreground = isError
+                ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
+                : new SolidColorBrush(Color.FromRgb(55, 65, 81));
         }
 
         private static List<UdpRow> BuildRows(ModelInfo modelInfo)
@@ -183,6 +302,36 @@ namespace VeloxapEDGEWpfLib.Pages
             return string.IsNullOrWhiteSpace(value)
                 ? fallback
                 : value;
+        }
+
+        private static string BuildCalculationConfirmationMessage(int calculableTableCount)
+        {
+            return calculableTableCount + " tablo icin Varlik_Degeri UDP alani guncellenecek.\n\n" +
+                   "Formul:\n" +
+                   "Erisebilirlik, Butunluk ve Gizlilik_Seviyesi listelerindeki secimler 1-4 arasinda seviyeye cevrilir.\n" +
+                   "Listenin en alt itemi seviye 1 kabul edilir; yukariya dogru +1 ilerler.\n" +
+                   "Sonuc = Yuvarla((Erisebilirlik + Butunluk + Gizlilik_Seviyesi) / 3)\n\n" +
+                   "4-\u00c7ok Gizli/Y\u00fcksek\n" +
+                   "3-Gizli/Orta\n" +
+                   "2-Hizmete \u00d6zel/D\u00fc\u015f\u00fck\n" +
+                   "1-Kamuya A\u00e7\u0131k/Bilgi\n\n" +
+                   "Devam edilsin mi?";
+        }
+
+        private static string BuildApplyResultMessage(TableUdpSecurityApplyResult result)
+        {
+            if (result == null)
+                return string.Empty;
+
+            string message = result.ToSummary();
+
+            if (result.Messages == null || result.Messages.Count == 0)
+                return message;
+
+            return message + Environment.NewLine + Environment.NewLine +
+                   string.Join(
+                       Environment.NewLine,
+                       result.Messages.Take(8));
         }
 
         public sealed class UdpRow

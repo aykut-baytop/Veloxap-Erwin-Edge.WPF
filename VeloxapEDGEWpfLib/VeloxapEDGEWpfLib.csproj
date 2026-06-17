@@ -98,6 +98,7 @@
     <Compile Include="Services\ModelDiffApplyService.cs" />
     <Compile Include="Services\RuleApiSettings.cs" />
     <Compile Include="Services\RuleService.cs" />
+    <Compile Include="Services\TableUdpSecurityService.cs" />
     <Compile Include="VeloxapEDGErwinLib.cs" />
     <Compile Include="Window1.xaml.cs">
       <DependentUpon>Window1.xaml</DependentUpon>
