@@ -49,40 +49,49 @@ namespace VeloxapEDGEWpfLib.ViewModels
             if (modelInfo == null)
                 return;
 
-            ModelItems.Add(new ModelDisplayItem
+            var rootItem = new ModelDisplayItem
             {
                 Name = BuildDisplayName("Model", modelInfo.getoName(), 0),
                 ObjectProperties = modelInfo.getoObjectProperty() ?? new List<ObjectProperty>()
-            });
+            };
 
             var modelObjects = modelInfo.getoModelObject();
             if (modelObjects != null)
             {
                 foreach (var modelObject in modelObjects)
-                    AddModelObject(modelObject, 0);
+                    rootItem.Children.Add(BuildModelDisplayItem(modelObject, 1));
             }
+
+            ModelItems.Add(rootItem);
 
             if (ModelItems.Count > 0)
                 SelectedModelItem = ModelItems[0];
         }
 
-        private void AddModelObject(ModelObject modelObject, int level)
+        private static ModelDisplayItem BuildModelDisplayItem(ModelObject modelObject, int level)
         {
             if (modelObject == null)
-                return;
+                return null;
 
-            ModelItems.Add(new ModelDisplayItem
+            var node = new ModelDisplayItem
             {
                 Name = BuildDisplayName(modelObject.getoClassName(), modelObject.getoName(), level),
                 ObjectProperties = modelObject.getoObjectProperty() ?? new List<ObjectProperty>()
-            });
+            };
 
             var childObjects = modelObject.getoModelObject();
-            if (childObjects == null)
-                return;
+            if (childObjects != null)
+            {
+                foreach (var childObject in childObjects)
+                {
+                    var childNode = BuildModelDisplayItem(childObject, level + 1);
+                    if (childNode != null)
+                        node.Children.Add(childNode);
+                }
+            }
 
-            foreach (var childObject in childObjects)
-                AddModelObject(childObject, level + 1);
+            node.IsExpanded = node.Children.Count <= 1;
+            return node;
         }
 
         private void LoadProperties(IEnumerable<ObjectProperty> objectProperties)
@@ -116,16 +125,20 @@ namespace VeloxapEDGEWpfLib.ViewModels
             return $"{prefix}({safeClassName}) {safeName}";
         }
 
-        private void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
         public sealed class ModelDisplayItem
         {
             public string Name { get; set; }
 
             internal List<ObjectProperty> ObjectProperties { get; set; } = new List<ObjectProperty>();
+
+            public ObservableCollection<ModelDisplayItem> Children { get; } = new ObservableCollection<ModelDisplayItem>();
+
+            public bool IsExpanded { get; set; }
+        }
+
+        private void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         public sealed class PropertyDisplayItem

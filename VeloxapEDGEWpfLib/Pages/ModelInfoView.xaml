@@ -3,8 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewModels="clr-namespace:VeloxapEDGEWpfLib.ViewModels"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <Style x:Key="ModelTreeViewItemStyle" TargetType="TreeViewItem">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+        </Style>
+    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -47,11 +54,17 @@
                                Foreground="#374151"
                                Margin="0,0,0,12"/>
 
-                    <ListBox ItemsSource="{Binding ModelItems}"
-         SelectedItem="{Binding SelectedModelItem, Mode=TwoWay}"
-         DisplayMemberPath="Name"
-         BorderThickness="0"
-         Background="Transparent"/>
+                    <TreeView ItemsSource="{Binding ModelItems}"
+                              ItemContainerStyle="{StaticResource ModelTreeViewItemStyle}"
+                              SelectedItemChanged="ModelTreeView_SelectedItemChanged"
+                              BorderThickness="0"
+                              Background="Transparent">
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <TextBlock Text="{Binding Name}"/>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
                 </DockPanel>
             </Border>
 
