@@ -6,7 +6,12 @@
         xmlns:local="clr-namespace:VeloxapEDGEWpfLib"
         xmlns:pages="clr-namespace:VeloxapEDGEWpfLib.Pages"
         mc:Ignorable="d"
-        Title="Veloxap Erwin Add-In" Height="450" Width="800">
+        Title="Veloxap Erwin Add-In"
+        Height="700"
+        Width="1100"
+        MinHeight="600"
+        MinWidth="950"
+        WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -51,11 +56,25 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+
+            <DataTemplate x:Key="MainModelComboBoxItemTemplate">
+                <TextBlock Text="{Binding Name}"
+                           TextWrapping="Wrap"
+                           TextTrimming="None"
+                           LineHeight="18"
+                           ToolTip="{Binding Name}"/>
+            </DataTemplate>
+
+            <Style x:Key="MainModelComboBoxItemStyle" TargetType="ComboBoxItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Padding" Value="8,7"/>
+                <Setter Property="ToolTip" Value="{Binding Name}"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
     <Grid Background="{StaticResource LeftMenuBackgroundBrush}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="300"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -78,8 +97,14 @@
            Margin="8,0,8,6"/>
 
                 <ComboBox x:Name="cmbMainModel"
-          Margin="8,0,8,20"
-          Height="36"/>
+                          Margin="8,0,8,20"
+                          MinHeight="42"
+                          MaxDropDownHeight="360"
+                          HorizontalContentAlignment="Stretch"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          ItemTemplate="{StaticResource MainModelComboBoxItemTemplate}"
+                          ItemContainerStyle="{StaticResource MainModelComboBoxItemStyle}"
+                          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
 
                 <RadioButton x:Name="rbModelInfo"
              GroupName="MainMenu"

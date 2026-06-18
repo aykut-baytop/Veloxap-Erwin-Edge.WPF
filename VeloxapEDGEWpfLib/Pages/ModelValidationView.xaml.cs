@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using VeloxapEDGEWpfLib.Models;
 using VeloxapEDGEWpfLib.Services;
 
@@ -142,6 +143,13 @@ namespace VeloxapEDGEWpfLib.Pages
                 return;
             }
 
+            string description = PromptForValidationDescription();
+            if (description == null)
+            {
+                SetStatus("Onaya gonderme iptal edildi.");
+                return;
+            }
+
             try
             {
                 isSendingApproval = true;
@@ -154,7 +162,7 @@ namespace VeloxapEDGEWpfLib.Pages
                     cLongId,
                     versionId,
                     targetVersionId,
-                    string.Empty,
+                    description,
                     currentAlterDdl ?? string.Empty);
 
                 SetStatus(
@@ -174,6 +182,123 @@ namespace VeloxapEDGEWpfLib.Pages
                 isSendingApproval = false;
                 btnSendApproval.IsEnabled = isValidationOk;
             }
+        }
+
+        private string PromptForValidationDescription()
+        {
+            var owner = Window.GetWindow(this);
+            var dialog = new Window
+            {
+                Title = "Validasyon Aciklamasi",
+                Width = 460,
+                Height = 290,
+                MinWidth = 380,
+                MinHeight = 250,
+                WindowStartupLocation = owner == null
+                    ? WindowStartupLocation.CenterScreen
+                    : WindowStartupLocation.CenterOwner,
+                Owner = owner,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false
+            };
+
+            var root = new Grid
+            {
+                Margin = new Thickness(16)
+            };
+
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var label = new TextBlock
+            {
+                Text = "Onaya gonderilecek validasyon aciklamasini girin.",
+                Margin = new Thickness(0, 0, 0, 8),
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            var descriptionBox = new TextBox
+            {
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                MinHeight = 100
+            };
+
+            var validationMessage = new TextBlock
+            {
+                Text = "Lutfen daha uzun bir aciklama girin.",
+                Foreground = System.Windows.Media.Brushes.Firebrick,
+                Margin = new Thickness(0, 8, 0, 0),
+                TextWrapping = TextWrapping.Wrap,
+                Visibility = Visibility.Collapsed
+            };
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 14, 0, 0)
+            };
+
+            var cancelButton = new Button
+            {
+                Content = "Iptal",
+                Width = 86,
+                Height = 30,
+                Margin = new Thickness(0, 0, 8, 0),
+                IsCancel = true
+            };
+
+            var okButton = new Button
+            {
+                Content = "Tamam",
+                Width = 86,
+                Height = 30,
+                IsDefault = true,
+                IsEnabled = false
+            };
+
+            descriptionBox.TextChanged += (sender, args) =>
+            {
+                okButton.IsEnabled = !string.IsNullOrWhiteSpace(descriptionBox.Text);
+                validationMessage.Visibility = Visibility.Collapsed;
+            };
+
+            okButton.Click += (sender, args) =>
+            {
+                if (string.IsNullOrWhiteSpace(descriptionBox.Text) || descriptionBox.Text.Trim().Length <= 5)
+                {
+                    validationMessage.Visibility = Visibility.Visible;
+                    descriptionBox.Focus();
+                    descriptionBox.SelectAll();
+                    return;
+                }
+
+                dialog.DialogResult = true;
+            };
+
+            buttons.Children.Add(cancelButton);
+            buttons.Children.Add(okButton);
+
+            Grid.SetRow(label, 0);
+            Grid.SetRow(descriptionBox, 1);
+            Grid.SetRow(validationMessage, 2);
+            Grid.SetRow(buttons, 3);
+
+            root.Children.Add(label);
+            root.Children.Add(descriptionBox);
+            root.Children.Add(validationMessage);
+            root.Children.Add(buttons);
+
+            dialog.Content = root;
+            dialog.Loaded += (sender, args) => Keyboard.Focus(descriptionBox);
+
+            return dialog.ShowDialog() == true
+                ? descriptionBox.Text.Trim()
+                : null;
         }
 
         private void RunValidation()

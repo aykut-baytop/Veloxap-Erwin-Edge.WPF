@@ -213,7 +213,6 @@ namespace VeloxapEDGEWpfLib
                 .Select(model => new ModelSelection(model.value, model.key1, model.key2))
                 .ToList();
 
-            cmbMainModel.DisplayMemberPath = nameof(ModelSelection.Name);
             cmbMainModel.ItemsSource = modelItems;
 
             if (modelItems.Count > 0)
