@@ -16,6 +16,7 @@ namespace VeloxapEDGEWpfLib.Pages
     {
         private readonly ModelInfo modelInfo;
         private readonly List<string> validationRules;
+        private readonly List<Rule> validationRuleItems;
         private readonly RuleService ruleService;
         private readonly string catalogName;
         private readonly string catalogLongId;
@@ -31,12 +32,12 @@ namespace VeloxapEDGEWpfLib.Pages
         }
 
         internal ModelValidationView(ModelInfo modelInfo, IEnumerable<string> validationRules)
-            : this(modelInfo, validationRules, null, null, null)
+            : this(modelInfo, validationRules, null, null, null, null, false)
         {
         }
 
         internal ModelValidationView(ModelInfo modelInfo, IEnumerable<string> validationRules, RuleService ruleService)
-            : this(modelInfo, validationRules, ruleService, null, null)
+            : this(modelInfo, validationRules, ruleService, null, null, null, false)
         {
         }
 
@@ -46,18 +47,44 @@ namespace VeloxapEDGEWpfLib.Pages
             RuleService ruleService,
             string catalogName,
             string catalogLongId)
+            : this(modelInfo, validationRules, ruleService, catalogName, catalogLongId, null, false)
+        {
+        }
+
+        internal ModelValidationView(
+            ModelInfo modelInfo,
+            IEnumerable<string> validationRules,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId,
+            IEnumerable<Rule> validationRuleItems,
+            bool showRulesTab)
         {
             InitializeComponent();
 
             this.modelInfo = modelInfo;
             this.validationRules = validationRules?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
                 ?? new List<string>();
+            this.validationRuleItems = validationRuleItems?.Where(rule => rule != null).ToList()
+                ?? new List<Rule>();
             this.ruleService = ruleService;
             this.catalogName = catalogName;
             this.catalogLongId = catalogLongId;
 
+            LoadValidationRulesTab();
+            if (showRulesTab)
+                validationTabs.SelectedItem = tabValidationRules;
+
             LoadVersionSelectors();
             ResetValidationState("Validasyon bekleniyor.");
+        }
+
+        private void LoadValidationRulesTab()
+        {
+            if (validationRulesView == null)
+                return;
+
+            validationRulesView.LoadRules(validationRuleItems);
         }
 
         private void LoadVersionSelectors()
@@ -339,8 +366,12 @@ namespace VeloxapEDGEWpfLib.Pages
 
         private IEnumerable<string> GetValidationRules()
         {
-            // TODO: ValidationRulesView veya kalıcı kural kaynağı hazır olduğunda kuralları buradan döndür.
-            return validationRules;
+            if (validationRules.Count > 0)
+                return validationRules;
+
+            return validationRuleItems
+                .Select(rule => rule.RuleText)
+                .Where(ruleText => !string.IsNullOrWhiteSpace(ruleText));
         }
 
         private static string FormatValidationResults(IReadOnlyCollection<CrossValidationIssue> issues)

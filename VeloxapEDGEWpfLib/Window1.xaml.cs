@@ -60,7 +60,8 @@ namespace VeloxapEDGEWpfLib
             }
             rbTableUdps.Checked += Menu_Checked;
             rbValidation.Checked += Menu_Checked;
-            rbRules.Checked += Menu_Checked;
+            //rbRules.Checked += Menu_Checked;
+            //rbRules.Visibility = Visibility.Collapsed;
             cmbMainModel.SelectionChanged += CmbMainModel_SelectionChanged;
 
             MainContent.Content = new ModelInfoView();
@@ -115,31 +116,26 @@ namespace VeloxapEDGEWpfLib
                     rules,
                     GetRuleService(),
                     selectedModelName,
-                    selectedModelLongId);
+                    selectedModelLongId,
+                    validationRules,
+                    false);
             }
 
-            else if (sender == rbRules)
-            {
-                if (!EnsureAuthCredentialsConfigured(showMessage: true))
-                    return;
+            //else if (sender == rbRules)
+            //{
+            //    if (!EnsureAuthCredentialsConfigured(showMessage: true))
+            //        return;
 
-                var rulesView = new ValidationRulesView(validationRules);
-                MainContent.Content = rulesView;
-                rulesView.ShowLoading();
-                rulesView.ShowTrace(BuildRuleTraceMessage("İstek hazırlanıyor.", null));
-
-                bool isLoaded = await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-                if (isLoaded)
-                {
-                    rulesView.LoadRules(validationRules);
-                    rulesView.ShowTrace(lastRuleRequestTrace);
-                }
-                else
-                {
-                    rulesView.ShowError("Modele ait kural bulunamadı veya validasyon servisine erişilemedi.");
-                    rulesView.ShowTrace(lastRuleRequestTrace);
-                }
-            }
+            //    await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+            //    MainContent.Content = new ModelValidationView(
+            //        currentModelInfo,
+            //        rules,
+            //        GetRuleService(),
+            //        selectedModelName,
+            //        selectedModelLongId,
+            //        validationRules,
+            //        true);
+            //}
 
         }
 
@@ -155,7 +151,7 @@ namespace VeloxapEDGEWpfLib
             rbCompare.IsChecked = false;
             rbTableUdps.IsChecked = false;
             rbValidation.IsChecked = false;
-            rbRules.IsChecked = false;
+            //rbRules.IsChecked = false;
         }
 
         private void ShowSettingsView()
@@ -261,28 +257,21 @@ namespace VeloxapEDGEWpfLib
                     oApp,
                     GetCurrentPersistenceUnit());
             }
-            else if (rbRules.IsChecked == true)
-            {
-                if (!EnsureAuthCredentialsConfigured(showMessage: true))
-                    return;
+            //else if (rbRules.IsChecked == true)
+            //{
+            //    if (!EnsureAuthCredentialsConfigured(showMessage: true))
+            //        return;
 
-                var rulesView = new ValidationRulesView(validationRules);
-                MainContent.Content = rulesView;
-                rulesView.ShowLoading();
-                rulesView.ShowTrace(BuildRuleTraceMessage("İstek hazırlanıyor.", null));
-
-                bool isLoaded = await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-                if (isLoaded)
-                {
-                    rulesView.LoadRules(validationRules);
-                    rulesView.ShowTrace(lastRuleRequestTrace);
-                }
-                else
-                {
-                    rulesView.ShowError("Modele ait kural bulunamadı veya validasyon servisine erişilemedi.");
-                    rulesView.ShowTrace(lastRuleRequestTrace);
-                }
-            }
+            //    await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+            //    MainContent.Content = new ModelValidationView(
+            //        currentModelInfo,
+            //        rules,
+            //        GetRuleService(),
+            //        selectedModelName,
+            //        selectedModelLongId,
+            //        validationRules,
+            //        true);
+            //}
             else if (rbValidation.IsChecked == true)
             {
                 if (!EnsureAuthCredentialsConfigured(showMessage: true))
@@ -294,7 +283,9 @@ namespace VeloxapEDGEWpfLib
                     rules,
                     GetRuleService(),
                     selectedModelName,
-                    selectedModelLongId);
+                    selectedModelLongId,
+                    validationRules,
+                    false);
             }
         }
 
@@ -561,16 +552,31 @@ namespace VeloxapEDGEWpfLib
             return beforeQuery.Substring(lastSlash + 1).Trim();
         }
 
+        private static string GetDisplayName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return string.Empty;
+
+            int parenIndex = name.IndexOf('(');
+            if (parenIndex <= 0)
+                return name.Trim();
+
+            return name.Substring(0, parenIndex).TrimEnd();
+        }
+
         private sealed class ModelSelection
         {
             public ModelSelection(string name, string objectId, string persistenceObjectId)
             {
                 Name = name;
+                DisplayName = GetDisplayName(name);
                 ObjectId = objectId;
                 PersistenceObjectId = persistenceObjectId;
             }
 
             public string Name { get; }
+
+            public string DisplayName { get; }
 
             public string ObjectId { get; }
 
