@@ -21,13 +21,13 @@
             </ResourceDictionary.MergedDictionaries>
 
             <Style x:Key="TopSettingsButtonStyle" TargetType="Button">
-                <Setter Property="Height" Value="34"/>
-                <Setter Property="Width" Value="36"/>
-                <Setter Property="MinWidth" Value="36"/>
+                <Setter Property="Height" Value="38"/>
+                <Setter Property="Width" Value="40"/>
+                <Setter Property="MinWidth" Value="40"/>
                 <Setter Property="Padding" Value="0"/>
                 <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="BorderBrush" Value="#D1D5DB"/>
-                <Setter Property="Background" Value="#F9FAFB"/>
+                <Setter Property="BorderBrush" Value="#CBD5E1"/>
+                <Setter Property="Background" Value="#F8FAFC"/>
                 <Setter Property="Foreground" Value="#111827"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Template">
@@ -70,35 +70,69 @@
                 <Setter Property="Padding" Value="8,7"/>
                 <Setter Property="ToolTip" Value="{Binding Name}"/>
             </Style>
+
+            <Style x:Key="MenuSectionLabelStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource MenuMutedForegroundBrush}"/>
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="8,0,8,7"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
-    <Grid Background="{StaticResource LeftMenuBackgroundBrush}">
+    <Grid Background="{StaticResource AppShellBackgroundBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="300"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- Sol modern menü -->
-        <Border Background="{StaticResource LeftMenuBackgroundBrush}"
-            CornerRadius="14"
-            Padding="12"
-            Margin="0,0,16,0">
+        <Border Background="{StaticResource LeftMenuGradientBrush}"
+            BorderBrush="{StaticResource LeftMenuBorderBrush}"
+            BorderThickness="0,0,1,0"
+            Padding="14"
+            Margin="0">
 
             <StackPanel>
-                <TextBlock Text="Veloxap EDGE"
-                       Foreground="White"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Margin="8,8,8,24"/>
+                <Grid Margin="6,8,6,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Width="36"
+                            Height="36"
+                            CornerRadius="8"
+                            Background="{StaticResource BrandAccentBrush}">
+                        <TextBlock Text="&#xE8B7;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="17"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Veloxap EDGE"
+                                   Foreground="White"
+                                   FontSize="19"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Erwin Add-In"
+                                   Foreground="{StaticResource MenuMutedForegroundBrush}"
+                                   FontSize="12"
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
 
                 <TextBlock Text="Ana Model"
-           Foreground="#9CA3AF"
-           FontSize="12"
-           Margin="8,0,8,6"/>
+                           Style="{StaticResource MenuSectionLabelStyle}"/>
 
                 <ComboBox x:Name="cmbMainModel"
-                          Margin="8,0,8,20"
-                          MinHeight="42"
+                          Margin="8,0,8,22"
+                          MinHeight="44"
+                          Padding="10,5"
+                          Background="#F8FAFC"
+                          BorderBrush="#CBD5E1"
+                          BorderThickness="1"
                           MaxDropDownHeight="360"
                           HorizontalContentAlignment="Stretch"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -106,37 +140,102 @@
                           ItemContainerStyle="{StaticResource MainModelComboBoxItemStyle}"
                           ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
 
+                <TextBlock Text="Navigasyon"
+                           Style="{StaticResource MenuSectionLabelStyle}"/>
+
                 <RadioButton x:Name="rbModelInfo"
              GroupName="MainMenu"
-             Content="Model Bilgileri"
              Style="{StaticResource SideMenuButtonStyle}"
-             IsChecked="True"/>
+             IsChecked="True">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE946;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Bilgileri" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
 
                 <RadioButton x:Name="rbCompare"
              GroupName="MainMenu"
-             Content="Model Karşılaştırma"
-             Style="{StaticResource SideMenuButtonStyle}"/>
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8AB;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Karşılaştırma" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
                 <RadioButton x:Name="rbRules"
              GroupName="MainMenu"
-             Content="Validasyon Kuralları"
-             Style="{StaticResource SideMenuButtonStyle}"/>
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE9D2;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Validasyon Kuralları" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
 
                 <RadioButton x:Name="rbValidation"
              GroupName="MainMenu"
-             Content="Model Validasyon"
-             Style="{StaticResource SideMenuButtonStyle}"/>
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE73E;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Validasyon" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
                 <RadioButton x:Name="rbTableUdps"
              GroupName="MainMenu"
-             Content="Tablo UDP'leri"
-             Style="{StaticResource SideMenuButtonStyle}"/>
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE80A;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Tablo UDP'leri" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
             </StackPanel>
         </Border>
 
+        <Grid Grid.Column="0"
+              Width="230"
+              Height="42"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Bottom"
+              Margin="34,0,0,24"
+              IsHitTestVisible="False"
+              Panel.ZIndex="3">
+            <Path Data="M 8,24 C 48,6 88,8 122,22 C 158,38 188,36 222,14"
+                  Stroke="{StaticResource ShellBridgeStrokeBrush}"
+                  StrokeThickness="1.7"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round"
+                  Opacity="0.5"/>
+            <Path Data="M 8,29 C 54,15 88,16 122,27 C 158,39 188,37 222,20 L 222,31 C 184,42 154,42 120,32 C 83,20 48,21 8,35 Z"
+                  Fill="{StaticResource ShellBridgeFillBrush}"
+                  Opacity="0.08"/>
+            <Ellipse Width="6"
+                     Height="6"
+                     Fill="White"
+                     HorizontalAlignment="Left"
+                     VerticalAlignment="Center"
+                     Margin="5,0,0,0"
+                     Opacity="0.78"/>
+            <Ellipse Width="6"
+                     Height="6"
+                     Fill="{StaticResource LeftMenuBackgroundBrush}"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Center"
+                     Margin="0,0,5,0"
+                     Opacity="0.65"/>
+        </Grid>
+
         <!-- İçerik alanı -->
         <Border Grid.Column="1"
-            Background="White"
-            CornerRadius="14"
-            Padding="20">
+            Background="{StaticResource ContentPanelBackgroundBrush}"
+            BorderBrush="{StaticResource ContentPanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="20"
+            Margin="18">
+            <Border.Effect>
+                <DropShadowEffect Color="#94A3B8"
+                                  BlurRadius="18"
+                                  ShadowDepth="2"
+                                  Opacity="0.18"/>
+            </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
