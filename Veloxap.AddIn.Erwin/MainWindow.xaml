@@ -1,0 +1,289 @@
+﻿<Window x:Class="Veloxap.AddIn.Erwin.Window1"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Veloxap.AddIn.Erwin"
+        xmlns:pages="clr-namespace:Veloxap.AddIn.Erwin.Pages"
+        mc:Ignorable="d"
+        Title="Veloxap Erwin Add-In"
+        Height="700"
+        Width="1100"
+        MinHeight="600"
+        MinWidth="950"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+
+                <ResourceDictionary Source="Themes/Styles.xaml"/>
+
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="TopSettingsButtonStyle" TargetType="Button">
+                <Setter Property="Height" Value="38"/>
+                <Setter Property="Width" Value="40"/>
+                <Setter Property="MinWidth" Value="40"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="#CBD5E1"/>
+                <Setter Property="Background" Value="#F8FAFC"/>
+                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Root"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"/>
+                            </Border>
+
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Root" Property="Background" Value="#EFF6FF"/>
+                                    <Setter TargetName="Root" Property="BorderBrush" Value="#93C5FD"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Root" Property="Background" Value="#DBEAFE"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <DataTemplate x:Key="MainModelComboBoxItemTemplate">
+                <TextBlock Text="{Binding DisplayName}"
+                           TextWrapping="Wrap"
+                           TextTrimming="None"
+                           LineHeight="18"
+                           ToolTip="{Binding Name}"/>
+            </DataTemplate>
+
+            <Style x:Key="MainModelComboBoxItemStyle" TargetType="ComboBoxItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Padding" Value="8,7"/>
+                <Setter Property="ToolTip" Value="{Binding Name}"/>
+            </Style>
+
+            <Style x:Key="MenuSectionLabelStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource MenuMutedForegroundBrush}"/>
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Margin" Value="8,0,8,7"/>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Background="{StaticResource AppShellBackgroundBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="225"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sol modern menü -->
+        <Border Background="{StaticResource LeftMenuGradientBrush}"
+            BorderBrush="{StaticResource LeftMenuBorderBrush}"
+            BorderThickness="0,0,1,0"
+            Padding="14">
+
+            <StackPanel>
+                <Grid Margin="6,8,6,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="58"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Width="50"
+                            Height="36"
+                            CornerRadius="8"
+                            Background="White">
+                        <Viewbox Width="40"
+                                 Height="18"
+                                 Stretch="Uniform"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center">
+                            <Canvas Width="410"
+                                    Height="165">
+                                <Canvas.Resources>
+                                    <LinearGradientBrush x:Key="VeloxapLogoBrush"
+                                                         StartPoint="0,0.5"
+                                                         EndPoint="1,0.5">
+                                        <GradientStop Color="#164A83" Offset="0"/>
+                                        <GradientStop Color="#2AA7DC" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Canvas.Resources>
+
+                                <Path Data="M 18,18 L 82,143 C 89,156 111,156 118,143 L 178,18"
+                                      Stroke="{StaticResource VeloxapLogoBrush}"
+                                      StrokeThickness="34"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                                <Path Data="M 184,144 L 245,28"
+                                      Stroke="{StaticResource VeloxapLogoBrush}"
+                                      StrokeThickness="34"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                                <Path Data="M 247,28 C 265,-2 305,7 315,42 L 392,144"
+                                      Stroke="{StaticResource VeloxapLogoBrush}"
+                                      StrokeThickness="34"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Veloxap"
+                                   Foreground="White"
+                                   FontSize="19"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Erwin Add-In v1"
+                                   Foreground="{StaticResource MenuMutedForegroundBrush}"
+                                   FontSize="12"
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="Ana Model"
+                           Style="{StaticResource MenuSectionLabelStyle}"/>
+
+                <ComboBox x:Name="cmbMainModel"
+                          Margin="8,0,8,22"
+                          MinHeight="44"
+                          Padding="10,5"
+                          Background="#F8FAFC"
+                          BorderBrush="#CBD5E1"
+                          BorderThickness="1"
+                          MaxDropDownHeight="360"
+                          HorizontalContentAlignment="Stretch"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          ItemTemplate="{StaticResource MainModelComboBoxItemTemplate}"
+                          ItemContainerStyle="{StaticResource MainModelComboBoxItemStyle}"
+                          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
+
+                <TextBlock Text="Navigasyon"
+                           Style="{StaticResource MenuSectionLabelStyle}"/>
+
+                <RadioButton x:Name="rbModelInfo"
+             GroupName="MainMenu"
+             Style="{StaticResource SideMenuButtonStyle}"
+             IsChecked="True">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE946;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Bilgileri" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="rbCompare"
+             GroupName="MainMenu"
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8AB;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Karsilastirma" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton x:Name="rbValidation"
+             GroupName="MainMenu"
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE73E;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Validasyon" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton x:Name="rbTableUdps"
+             GroupName="MainMenu"
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE80A;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Tablo UDP'leri" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Column="0"
+              Width="230"
+              Height="42"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Bottom"
+              Margin="0,0,0,10"
+              IsHitTestVisible="False"
+              Panel.ZIndex="3" Grid.ColumnSpan="2">
+            <Path Data="M 8,24 C 48,6 88,8 122,22 C 158,38 188,36 222,14"
+                  Stroke="{StaticResource ShellBridgeStrokeBrush}"
+                  StrokeThickness="1.7"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round"
+                  Opacity="0.5"/>
+            <Path Data="M 8,29 C 54,15 88,16 122,27 C 158,39 188,37 222,20 L 222,31 C 184,42 154,42 120,32 C 83,20 48,21 8,35 Z"
+                  Fill="{StaticResource ShellBridgeFillBrush}"
+                  Opacity="0.08"/>
+            <Ellipse Width="6"
+                     Height="6"
+                     Fill="White"
+                     HorizontalAlignment="Left"
+                     VerticalAlignment="Center"
+                     Margin="5,0,0,0"
+                     Opacity="0.78"/>
+            <Ellipse Width="6"
+                     Height="6"
+                     Fill="{StaticResource LeftMenuBackgroundBrush}"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Center"
+                     Margin="0,0,5,0"
+                     Opacity="0.65"/>
+        </Grid>
+
+        <!-- Içerik alani -->
+        <Border Grid.Column="1"
+            Background="{StaticResource ContentPanelBackgroundBrush}"
+            BorderBrush="{StaticResource ContentPanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="20"
+            Margin="18,18,18,18">
+            <Border.Effect>
+                <DropShadowEffect Color="#94A3B8"
+                                  BlurRadius="18"
+                                  ShadowDepth="2"
+                                  Opacity="0.18"/>
+            </Border.Effect>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Button x:Name="btnSettings"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource TopSettingsButtonStyle}"
+                        Click="BtnSettings_Click"
+                        ToolTip="Ayarlar"
+                        AutomationProperties.Name="Ayarlar">
+                    <TextBlock Text="&#xE713;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="16"
+                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Button>
+
+                <!--<pages:ModelInfoView/>-->
+                <ContentControl x:Name="MainContent" Grid.Row="2"/>
+                <!--<ContentControl Content="{Binding SelectedPage}"/>-->
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

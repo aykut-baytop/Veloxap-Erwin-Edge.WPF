@@ -1,0 +1,116 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Shared brushes -->
+    <SolidColorBrush x:Key="AppShellBackgroundBrush" Color="#EEF2F7" />
+    <SolidColorBrush x:Key="LeftMenuBackgroundBrush" Color="#101827" />
+    <SolidColorBrush x:Key="LeftMenuBorderBrush" Color="#253147" />
+    <SolidColorBrush x:Key="MenuMutedForegroundBrush" Color="#9CA3AF" />
+    <SolidColorBrush x:Key="MenuForegroundBrush" Color="#DDE6F3" />
+    <SolidColorBrush x:Key="MenuHoverBackgroundBrush" Color="#1B2638" />
+    <SolidColorBrush x:Key="MenuSelectedBackgroundBrush" Color="#2563EB" />
+    <SolidColorBrush x:Key="MenuSelectedBorderBrush" Color="#60A5FA" />
+    <SolidColorBrush x:Key="ContentPanelBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ContentPanelBorderBrush" Color="#E5E7EB" />
+
+    <LinearGradientBrush x:Key="LeftMenuGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#152033" Offset="0"/>
+        <GradientStop Color="#101827" Offset="0.52"/>
+        <GradientStop Color="#0B1120" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="BrandAccentBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#38BDF8" Offset="0"/>
+        <GradientStop Color="#2563EB" Offset="0.55"/>
+        <GradientStop Color="#7C3AED" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="ShellBridgeStrokeBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FFFFFF" Offset="0"/>
+        <GradientStop Color="#EAF2FF" Offset="0.38"/>
+        <GradientStop Color="#152033" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="ShellBridgeFillBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FFFFFF" Offset="0"/>
+        <GradientStop Color="#FFFFFF" Offset="0.2"/>
+        <GradientStop Color="#DCEBFF" Offset="0.48"/>
+        <GradientStop Color="#152033" Offset="1"/>
+    </LinearGradientBrush>
+
+    <Style x:Key="SideMenuButtonStyle" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource MenuForegroundBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="12,11"/>
+        <Setter Property="Margin" Value="0,3"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid>
+                        <Border x:Name="SelectionBar"
+                                Width="3"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,8"
+                                CornerRadius="2"
+                                Background="Transparent"/>
+                        <Border x:Name="Root"
+                                Margin="7,0,0,0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{StaticResource MenuHoverBackgroundBrush}"/>
+                            <Setter TargetName="Root" Property="BorderBrush" Value="#334155"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{StaticResource MenuSelectedBackgroundBrush}"/>
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource MenuSelectedBorderBrush}"/>
+                            <Setter TargetName="SelectionBar" Property="Background" Value="{StaticResource MenuSelectedBorderBrush}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SideMenuIconStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="Width" Value="24"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+    </Style>
+
+    <Style x:Key="SideMenuTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+    </Style>
+
+</ResourceDictionary>
