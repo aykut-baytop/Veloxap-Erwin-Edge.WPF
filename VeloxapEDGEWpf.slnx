@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="VeloxapEDGEWpfLib/VeloxapEDGEWpfLib.csproj" Id="29622238-9c29-4f4f-9807-09a418b6708f" />
+  <Project Path="VeloxappErwinAddIn.Proxy/VeloxapErwinAddIn.Proxy.csproj" Id="f31312d3-a8f7-4e66-b728-589e140d7e87" />
 </Solution>

@@ -58,7 +58,7 @@ namespace VeloxapEDGEWpfLib.Models
                 // Model genel bilgileri
                 mModel.setoName(oPersistenceUnit.Name);
                 mModel.setoObjectId(oSession.ModelObjects.Root.ObjectId);
-                mModel.setoLocation(oPersistenceUnit.PropertyBag["Locator"].Value["Locator"]);
+                mModel.setoLocation(Convert.ToString(oPersistenceUnit.PropertyBag["Locator"].Value["Locator"]));
 
 
                 // Model Object Property

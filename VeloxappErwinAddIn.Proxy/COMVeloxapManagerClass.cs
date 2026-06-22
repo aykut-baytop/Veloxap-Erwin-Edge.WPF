@@ -1,18 +1,15 @@
 ﻿using Microsoft.Win32;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using VeloxapEDGEWpfLib;
+using System.Windows;
 
-namespace VeloxapEDGEWpf
+namespace VeloxapErwinAddIn.Proxy
 {
     [ComVisible(true)]
-    [Guid("8F3E7C2A-9B8C-4B0C-9D31-222222222533")]
-    [ProgId("VeloxapEDGWPF.AddIn")]
+    [Guid("8F3E7C2A-9B8C-4B0C-9D31-222222222543")]
+    [ProgId("VeloxapErwinAddIn.Proxy")]
     [ClassInterface(ClassInterfaceType.None)]
     public class COMVeloxapManagerClass : IErwinAddIn
     {
@@ -20,6 +17,21 @@ namespace VeloxapEDGEWpf
 
         public void Run()
         {
+            var updateResult = VeloxapLibUpdateManager.StartUpdateIfRequired();
+            if (updateResult.UpdateRequired)
+            {
+                MessageBox.Show(
+                    updateResult.Message,
+                    "Veloxap ErwinTools Update",
+                    MessageBoxButton.OK,
+                    updateResult.Started ? MessageBoxImage.Information : MessageBoxImage.Warning);
+
+                if (updateResult.Started)
+                    VeloxapLibUpdateManager.RequestHostApplicationClose();
+
+                return;
+            }
+
             if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
             {
                 RunWindow();
@@ -45,14 +57,14 @@ namespace VeloxapEDGEWpf
             uiThread.Join();
 
             if (startupError != null)
-                throw new InvalidOperationException("Veloxap EDGE WPF add-in failed to start.", startupError);
+                throw new InvalidOperationException("Veloxap ErwinTools AddIn failed to start.", startupError);
         }
 
         private static void RunWindow()
         {
-            SCAPI.Application app = new SCAPI.Application();
+            var app = new SCAPI.Application();
 
-            Window1 mainForm = new Window1();
+            var mainForm = new Window1();
             mainForm.Init(ref app);
             mainForm.ShowDialog();
         }
@@ -65,7 +77,7 @@ namespace VeloxapEDGEWpf
 
             using (var key = Registry.ClassesRoot.OpenSubKey(clsid, true))
             {
-                key?.SetValue("", "Veloxap ErwinTools AddIn");
+                key?.SetValue("", "Veloxap ErwinTools AddIn Proxy");
             }
         }
 
@@ -79,7 +91,7 @@ namespace VeloxapEDGEWpf
     }
 
     [ComVisible(true)]
-    [Guid("E2B2A1C6-1B2C-4F21-9B71-111111111331")]
+    [Guid("E2B2A1C6-1B2C-4F21-9B71-111111122331")]
     [InterfaceType(ComInterfaceType.InterfaceIsIDispatch)]
     public interface IErwinAddIn
     {

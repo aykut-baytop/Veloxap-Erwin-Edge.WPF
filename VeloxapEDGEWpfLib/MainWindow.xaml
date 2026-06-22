@@ -148,10 +148,10 @@
                                    Foreground="White"
                                    FontSize="19"
                                    FontWeight="SemiBold"/>
-                        <TextBlock Text="Erwin Add-In"
+                        <TextBlock
                                    Foreground="{StaticResource MenuMutedForegroundBrush}"
                                    FontSize="12"
-                                   Margin="0,2,0,0"/>
+                                   Margin="0,2,0,0" Text="Erwin Add-In V8"/>
                     </StackPanel>
                 </Grid>
 

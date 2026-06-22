@@ -90,11 +90,11 @@ namespace VeloxapEDGErwinTools.AddIn
 
                 try
                 {
-                    sLocation = oBag.Value["Locator"]; //Get the location
+                    sLocation = Convert.ToString(oBag.Value["Locator"]); //Get the location
                     if (sLocation.Length > 0)
                         sTitle = sTitle + " (" + sLocation + ")";
 
-                    if (oBag.Value["Hidden_Model"])
+                    if (Convert.ToBoolean(oBag.Value["Hidden_Model"]))
                         sTitle = sTitle + " [Hidden]"; //Check if the persistence unit is hidden
 
                     oBag.ClearAll();
