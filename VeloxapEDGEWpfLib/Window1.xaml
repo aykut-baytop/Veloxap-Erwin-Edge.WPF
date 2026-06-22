@@ -94,20 +94,53 @@
             <StackPanel>
                 <Grid Margin="6,8,6,24">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="58"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Width="36"
+                    <Border Width="50"
                             Height="36"
                             CornerRadius="8"
-                            Background="{StaticResource BrandAccentBrush}">
-                        <TextBlock Text="&#xE8B7;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="17"
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
+                            Background="White">
+                        <Viewbox Width="40"
+                                 Height="18"
+                                 Stretch="Uniform"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center">
+                            <Canvas Width="410"
+                                    Height="165">
+                                <Canvas.Resources>
+                                    <LinearGradientBrush x:Key="VeloxapLogoBrush"
+                                                         StartPoint="0,0.5"
+                                                         EndPoint="1,0.5">
+                                        <GradientStop Color="#164A83" Offset="0"/>
+                                        <GradientStop Color="#2AA7DC" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Canvas.Resources>
+
+                                <Path Data="M 18,18 L 82,143 C 89,156 111,156 118,143 L 178,18"
+                                      Stroke="{StaticResource VeloxapLogoBrush}"
+                                      StrokeThickness="34"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                                <Path Data="M 184,144 L 245,28"
+                                      Stroke="{StaticResource VeloxapLogoBrush}"
+                                      StrokeThickness="34"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                                <Path Data="M 247,28 C 265,-2 305,7 315,42 L 392,144"
+                                      Stroke="{StaticResource VeloxapLogoBrush}"
+                                      StrokeThickness="34"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Fill="Transparent"/>
+                            </Canvas>
+                        </Viewbox>
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
