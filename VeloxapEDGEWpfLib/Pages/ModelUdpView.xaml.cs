@@ -143,15 +143,6 @@ namespace VeloxapEDGEWpfLib.Pages
                 return;
             }
 
-            MessageBoxResult confirmation = MessageBox.Show(
-                BuildCalculationConfirmationMessage(calculableTableCount),
-                "Veri Degeri Hesaplama",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirmation != MessageBoxResult.Yes)
-                return;
-
             SetBusy(true);
             SetStatus("Veri degerleri hesaplaniyor...", false);
 
@@ -223,15 +214,6 @@ namespace VeloxapEDGEWpfLib.Pages
                 return;
             }
 
-            MessageBoxResult confirmation = MessageBox.Show(
-                BuildBankRelativeConfirmationMessage(calculableTableCount),
-                title,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirmation != MessageBoxResult.Yes)
-                return;
-
             SetBusy(true);
             SetStatus("Banka gorece degerleri hesaplaniyor...", false);
 
@@ -298,15 +280,6 @@ namespace VeloxapEDGEWpfLib.Pages
                     MessageBoxImage.Warning);
                 return;
             }
-
-            MessageBoxResult confirmation = MessageBox.Show(
-                BuildSecurityClassConfirmationMessage(calculableTableCount),
-                title,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirmation != MessageBoxResult.Yes)
-                return;
 
             SetBusy(true);
             SetStatus("Guvenlik sinifi degerleri hesaplaniyor...", false);
@@ -686,19 +659,6 @@ namespace VeloxapEDGEWpfLib.Pages
                 : value;
         }
 
-        private static string BuildCalculationConfirmationMessage(int calculableTableCount)
-        {
-            return calculableTableCount + " tablo icin Veri_Degeri UDP alani guncellenecek.\n\n" +
-                   "Formul:\n" +
-                   "Erisebilirlik, Butunluk ve Gizlilik_Seviyesi listelerindeki secimler 1-4 arasinda seviyeye cevrilir.\n" +
-                   "Sonuc = Yuvarla((Erisebilirlik + Butunluk + Gizlilik_Seviyesi) / 3)\n\n" +
-                   "4-\u00c7ok Gizli/Y\u00fcksek\n" +
-                   "3-Gizli/Orta\n" +
-                   "2-Hizmete \u00d6zel/D\u00fc\u015f\u00fck\n" +
-                   "1-Kamuya A\u00e7\u0131k/Bilgi\n\n" +
-                   "Devam edilsin mi?";
-        }
-
         private static string BuildApplyResultMessage(TableUdpSecurityApplyResult result)
         {
             if (result == null)
@@ -713,26 +673,6 @@ namespace VeloxapEDGEWpfLib.Pages
                    string.Join(
                        Environment.NewLine,
                        result.Messages.Take(8));
-        }
-
-        private static string BuildBankRelativeConfirmationMessage(int calculableTableCount)
-        {
-            return calculableTableCount + " tablo icin Banka_Gorece_Degeri UDP alani guncellenecek.\n\n" +
-                   "Formul:\n" +
-                   "Veri_Degeri sayi ile baslamalidir.\n" +
-                   "Is_Sureci_Seviyesi degerinde parantez icindeki sayi okunur.\n" +
-                   "Banka_Gorece_Degeri = Veri_Degeri basindaki sayi x Is_Sureci_Seviyesi parantez ici sayi\n\n" +
-                   "Devam edilsin mi?";
-        }
-
-        private static string BuildSecurityClassConfirmationMessage(int calculableTableCount)
-        {
-            return calculableTableCount + " tablo icin Guvenlik_Sinifi_Degeri UDP alani guncellenecek.\n\n" +
-                   "Formul:\n" +
-                   "Banka_Gorece_Degeri alanindaki sayi baslangic degeri olarak alinir.\n" +
-                   "Tablonun tum kolonlarinda Kisisel_Veri_Mi ve Hassas_Veri_Mi UDP alanlari taranir.\n" +
-                   "Bu alanlarda True gorulen her deger icin sonuc 2 ile carpilir.\n\n" +
-                   "Devam edilsin mi?";
         }
 
         public sealed class UdpRow

@@ -81,6 +81,7 @@
                         <TextBlock Text="Kaynak Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbSourceVersion"
                                   Height="34"
+                                  IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
                                   SelectionChanged="VersionSelection_Changed"/>
                     </StackPanel>

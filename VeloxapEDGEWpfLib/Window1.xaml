@@ -111,7 +111,7 @@
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Veloxap EDGE"
+                        <TextBlock Text="Veloxap"
                                    Foreground="White"
                                    FontSize="19"
                                    FontWeight="SemiBold"/>
@@ -184,7 +184,7 @@
               Height="42"
               HorizontalAlignment="Left"
               VerticalAlignment="Bottom"
-              Margin="34,0,0,24"
+              Margin="0,0,0,10"
               IsHitTestVisible="False"
               Panel.ZIndex="3" Grid.ColumnSpan="2">
             <Path Data="M 8,24 C 48,6 88,8 122,22 C 158,38 188,36 222,14"
