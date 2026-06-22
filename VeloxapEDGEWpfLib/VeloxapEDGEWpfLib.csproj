@@ -100,8 +100,8 @@
     <Compile Include="Services\RuleService.cs" />
     <Compile Include="Services\TableUdpSecurityService.cs" />
     <Compile Include="VeloxapEDGErwinLib.cs" />
-    <Compile Include="Window1.xaml.cs">
-      <DependentUpon>Window1.xaml</DependentUpon>
+    <Compile Include="MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
     <Page Include="Pages\ModelInfoView.xaml">
       <SubType>Designer</SubType>
@@ -130,16 +130,16 @@
     <Page Include="Themes\Styles.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="UserControl1.xaml">
+    <Page Include="UserControl.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
     <Compile Include="COMVeloxapManagerClass.cs" />
-    <Compile Include="UserControl1.xaml.cs">
-      <DependentUpon>UserControl1.xaml</DependentUpon>
+    <Compile Include="UserControl.xaml.cs">
+      <DependentUpon>UserControl.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="Window1.xaml">
+    <Page Include="MainWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
