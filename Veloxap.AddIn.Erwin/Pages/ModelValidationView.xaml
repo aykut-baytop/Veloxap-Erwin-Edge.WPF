@@ -103,7 +103,7 @@
                             Click="BtnRunValidation_Click"/>
 
                     <Button x:Name="btnSendApproval"
-                            Content="Onaya GÃ¶nder"
+                            Content="Onaya Gonder"
                             Style="{StaticResource ActionButtonStyle}"
                             Background="#059669"
                             Click="BtnSendApproval_Click"
@@ -155,7 +155,7 @@
                          Padding="10"/>
             </TabItem>
 
-            <TabItem Header="Validasyon SonuÃ§larÄ±">
+            <TabItem Header="Validasyon Sonuclari">
                 <TextBox x:Name="txtValidationResults"
                          FontFamily="Consolas"
                          FontSize="12"

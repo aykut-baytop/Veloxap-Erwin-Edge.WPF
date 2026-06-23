@@ -22,12 +22,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="Validasyon KurallarÄ±"
+            <TextBlock Text="Validasyon Kurallari"
                        FontSize="22"
                        FontWeight="SemiBold"
                        Foreground="#111827"/>
 
-            <TextBlock Text="TanÄ±mlÄ± kurallar"
+            <TextBlock Text="Tanimli kurallar"
                        Margin="0,6,0,0"
                        Foreground="#6B7280"
                        FontSize="13"/>
@@ -71,12 +71,12 @@
                                                 Binding="{Binding Id}"
                                                 Width="70"/>
 
-                            <DataGridTextColumn Header="Kural AdÄ±"
+                            <DataGridTextColumn Header="Kural Adi"
                                                 Binding="{Binding RuleName}"
                                                 Width="170"
                                                 ElementStyle="{StaticResource WrappedCellTextStyle}"/>
 
-                            <DataGridTextColumn Header="Kural TanÄ±mÄ±"
+                            <DataGridTextColumn Header="Kural Tanimi"
                                                 Binding="{Binding RuleDefinition}"
                                                 Width="2*"
                                                 ElementStyle="{StaticResource WrappedCellTextStyle}"/>
@@ -92,7 +92,7 @@
                             Background="#F9FAFB"
                             Visibility="Collapsed">
                         <TextBlock x:Name="emptyStateText"
-                                   Text="TanÄ±mlÄ± validasyon kuralÄ± bulunamadÄ±."
+                                   Text="Tanimli validasyon kurali bulunamadi."
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Foreground="#6B7280"

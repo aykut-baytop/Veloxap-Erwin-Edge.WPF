@@ -23,7 +23,7 @@ namespace Veloxap.AddIn.Erwin.Services
         public async Task<List<Rule>> GetRulesAsync(string serviceUrl)
         {
             if (string.IsNullOrWhiteSpace(serviceUrl))
-                throw new ArgumentException("Kural servis URL'i boÅŸ olamaz.", nameof(serviceUrl));
+                throw new ArgumentException("Kural servis URL'i bos olamaz.", nameof(serviceUrl));
 
             ApiTraceLogger.Info(
                 "RULE REQUEST" + Environment.NewLine +

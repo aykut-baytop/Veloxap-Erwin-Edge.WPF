@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 public static class RulePropertyExtractor
 {
-    // Şunları yakalar:
+    // Sunlari yakalar:
     // SELF.Name
     // PARENT(Entity).Name
     // ROOT(Model).Model.Logical.MODEL_LEVEL_KVKK

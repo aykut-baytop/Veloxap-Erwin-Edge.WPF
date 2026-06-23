@@ -38,7 +38,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         internal void ShowLoading()
         {
             dgValidationRules.ItemsSource = null;
-            txtRuleCount.Text = "YÃ¼kleniyor...";
+            txtRuleCount.Text = "Yukleniyor...";
             emptyState.Visibility = Visibility.Collapsed;
         }
 
@@ -48,7 +48,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             txtRuleCount.Text = "Hata";
             emptyState.Visibility = Visibility.Visible;
             emptyStateText.Text = string.IsNullOrWhiteSpace(message)
-                ? "Validasyon kurallarÄ± yÃ¼klenemedi."
+                ? "Validasyon kurallari yuklenemedi."
                 : message;
         }
 
@@ -68,11 +68,11 @@ namespace Veloxap.AddIn.Erwin.Pages
             string checkExpression;
 
             string fallbackName = "Kural " + sequence;
-            string fallbackDefinition = "Kural formatÄ± tanÄ±mlÄ± validasyon diline gÃ¶re listeleniyor.";
+            string fallbackDefinition = "Kural formati tanimli validasyon diline gore listeleniyor.";
 
             if (TryParseRuleParts(ruleText, out triggerNodeType, out whenExpression, out checkExpression))
             {
-                fallbackName = triggerNodeType + " KuralÄ±";
+                fallbackName = triggerNodeType + " Kurali";
                 fallbackDefinition = BuildRuleDefinition(triggerNodeType, whenExpression, checkExpression);
             }
 
@@ -140,7 +140,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             return triggerNodeType
                 + " nesnesinde "
                 + whenExpression
-                + " koÅŸulu saÄŸlandÄ±ÄŸÄ±nda "
+                + " kosulu saglandiginda "
                 + checkExpression
                 + " kontrol edilir.";
         }

@@ -134,7 +134,7 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel>
-                <TextBlock Text="Model KarÅŸÄ±laÅŸtÄ±rma"
+                <TextBlock Text="Model Karsilastirma"
                            FontSize="22"
                            FontWeight="SemiBold"
                            Foreground="#111827"/>
@@ -156,7 +156,7 @@
                                FontSize="13"
                                Margin="0,0,7,0"
                                VerticalAlignment="Center"/>
-                    <TextBlock Text="KarÅŸÄ±laÅŸtÄ±r"
+                    <TextBlock Text="Karsilastir"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -188,7 +188,7 @@
 
                 <StackPanel Grid.Column="1"
                             Margin="18,0,0,0">
-                    <TextBlock Text="SaÄŸ Model"
+                    <TextBlock Text="Sag Model"
                                Style="{StaticResource MutedTextStyle}"/>
                     <TextBlock x:Name="txtRightModelName"
                                Margin="0,4,0,0"
@@ -214,7 +214,7 @@
                     <TextBlock Text="Durum"
                                Style="{StaticResource MutedTextStyle}"/>
                     <TextBlock x:Name="txtStatus"
-                               Text="HazÄ±r"
+                               Text="Hazir"
                                Margin="0,4,0,0"
                                Foreground="#374151"
                                TextWrapping="Wrap"/>
@@ -259,7 +259,7 @@
                                 </Border>
                             </StackPanel>
                             <TextBlock x:Name="txtRightToLeftSubtitle"
-                                       Text="DEV tarafÄ±na uygulanacak farklar"
+                                       Text="DEV tarafina uygulanacak farklar"
                                        Style="{StaticResource MutedTextStyle}"
                                        Margin="0,3,0,0"/>
                         </StackPanel>
@@ -338,7 +338,7 @@
                                 </Border>
                             </StackPanel>
                             <TextBlock x:Name="txtLeftToRightSubtitle"
-                                       Text="INT tarafÄ±na uygulanacak farklar"
+                                       Text="INT tarafina uygulanacak farklar"
                                        Style="{StaticResource MutedTextStyle}"
                                        Margin="0,3,0,0"/>
                         </StackPanel>

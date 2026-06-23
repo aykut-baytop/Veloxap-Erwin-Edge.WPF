@@ -344,7 +344,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 {
                     result.SkippedProperties++;
                     result.Messages.Add(
-                        "Property bulunamadÄ±: " +
+                        "Property bulunamadi: " +
                         sourceProperty.getoPropertyClassName());
                     return false;
                 }
@@ -742,9 +742,9 @@ namespace Veloxap.AddIn.Erwin.Services
         {
             var parts = new[]
             {
-                CreatedObjects + " nesne oluÅŸturuldu",
-                UpdatedProperties + " property gÃ¼ncellendi",
-                SkippedProperties + " property atlandÄ±",
+                CreatedObjects + " nesne olusturuldu",
+                UpdatedProperties + " property guncellendi",
+                SkippedProperties + " property atlandi",
                 FailedOperations + " hata"
             };
 

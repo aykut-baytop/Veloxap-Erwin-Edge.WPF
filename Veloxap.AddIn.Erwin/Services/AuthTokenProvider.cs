@@ -104,7 +104,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 string token = ExtractToken(responseJson);
 
                 if (string.IsNullOrWhiteSpace(token))
-                    throw new InvalidOperationException("Login cevabÄ±nda token bulunamadÄ±.");
+                    throw new InvalidOperationException("Login cevabinda token bulunamadi.");
 
                 token = NormalizeToken(token);
 

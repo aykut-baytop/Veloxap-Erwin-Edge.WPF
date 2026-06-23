@@ -85,7 +85,7 @@
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
 
-        <!-- Sol modern menü -->
+        <!-- Sol modern menu -->
         <Border Background="{StaticResource LeftMenuGradientBrush}"
             BorderBrush="{StaticResource LeftMenuBorderBrush}"
             BorderThickness="0,0,1,0"
@@ -245,7 +245,7 @@
                      Opacity="0.65"/>
         </Grid>
 
-        <!-- Içerik alani -->
+        <!-- Icerik alani -->
         <Border Grid.Column="1"
             Background="{StaticResource ContentPanelBackgroundBrush}"
             BorderBrush="{StaticResource ContentPanelBorderBrush}"

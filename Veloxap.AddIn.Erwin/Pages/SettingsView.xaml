@@ -267,7 +267,7 @@
                         <Border x:Name="emptyState"
                                 Background="#F9FAFB"
                                 Visibility="Collapsed">
-                            <TextBlock Text="App.config içinde appSettings ayari bulunamadi."
+                            <TextBlock Text="App.config icinde appSettings ayari bulunamadi."
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        Foreground="#6B7280"

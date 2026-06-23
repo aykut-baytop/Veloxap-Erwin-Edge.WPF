@@ -563,7 +563,7 @@ namespace Veloxap.AddIn.Erwin.Models
             var scopeExpr = Expect(ExprTokenType.Identifier, "EXISTS sonrasi scope bekleniyordu.").Value;
             Expect(ExprTokenType.LParen, "EXISTS sonrasi '(' bekleniyordu.");
             var inner = ParseOr();
-            Expect(ExprTokenType.RParen, "EXISTS iç ifadesi için ')' bekleniyordu.");
+            Expect(ExprTokenType.RParen, "EXISTS ic ifadesi icin ')' bekleniyordu.");
 
             return new ExistsExprNode
             {
@@ -577,9 +577,9 @@ namespace Veloxap.AddIn.Erwin.Models
             var scopeExpr = Expect(ExprTokenType.Identifier, "COUNT sonrasi scope bekleniyordu.").Value;
             Expect(ExprTokenType.LParen, "COUNT sonrasi '(' bekleniyordu.");
             var inner = ParseOr();
-            Expect(ExprTokenType.RParen, "COUNT iç ifadesi için ')' bekleniyordu.");
+            Expect(ExprTokenType.RParen, "COUNT ic ifadesi icin ')' bekleniyordu.");
 
-            var countOperator = Expect(ExprTokenType.Operator, "COUNT sonrasi sayi kiyas operatorü bekleniyordu.").Value;
+            var countOperator = Expect(ExprTokenType.Operator, "COUNT sonrasi sayi kiyas operatoru bekleniyordu.").Value;
             var countValue = ParseValueExpr();
 
             return new CountExprNode
@@ -630,7 +630,7 @@ namespace Veloxap.AddIn.Erwin.Models
                 while (Match(ExprTokenType.Comma))
                     concat.Parts.Add(ParseValueExpr());
 
-                Expect(ExprTokenType.RParen, "CONCAT için ')' bekleniyordu.");
+                Expect(ExprTokenType.RParen, "CONCAT icin ')' bekleniyordu.");
                 return concat;
             }
 

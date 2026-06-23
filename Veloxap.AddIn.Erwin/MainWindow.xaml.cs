@@ -318,7 +318,7 @@ namespace Veloxap.AddIn.Erwin
                     selectedModelName,
                     selectedModelLongId);
 
-                lastRuleRequestTrace = BuildRuleTraceMessage("Istek gönderiliyor.", serviceUrl);
+                lastRuleRequestTrace = BuildRuleTraceMessage("Istek gonderiliyor.", serviceUrl);
                 ApiTraceLogger.Info(lastRuleRequestTrace);
 
                 List<Rule> serviceRules = await GetRuleService().GetRulesAsync(serviceUrl);

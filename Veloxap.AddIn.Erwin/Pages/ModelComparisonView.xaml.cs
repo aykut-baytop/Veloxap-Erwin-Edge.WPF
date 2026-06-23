@@ -52,7 +52,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             ResolveModelSides();
             UpdateModelLabels();
             ClearDiffTrees();
-            SetStatus("HazÄ±r", false);
+            SetStatus("Hazir", false);
         }
 
         private void BtnCompare_Click(object sender, RoutedEventArgs e)
@@ -87,25 +87,25 @@ namespace Veloxap.AddIn.Erwin.Pages
                 ModelInfo rightModel = erwinLib.loadModelObjectForIntegrate(rightModelIndex);
 
                 if (leftModel == null || rightModel == null)
-                    throw new InvalidOperationException("Modeller okunamadÄ±.");
+                    throw new InvalidOperationException("Modeller okunamadi.");
 
                 diff = ModelObjectComparer.Compare(leftModel, rightModel);
                 LoadDiffTrees();
 
-                SetStatus("KarÅŸÄ±laÅŸtÄ±rma tamamlandÄ±.", false);
+                SetStatus("Karsilastirma tamamlandi.", false);
                 return true;
             }
             catch (Exception ex)
             {
                 diff = null;
                 ClearDiffTrees();
-                SetStatus("KarÅŸÄ±laÅŸtÄ±rma hatasÄ±: " + ex.Message, true);
+                SetStatus("Karsilastirma hatasi: " + ex.Message, true);
 
                 if (showMessages)
                 {
                     MessageBox.Show(
-                        "Model karÅŸÄ±laÅŸtÄ±rma iÅŸlemi tamamlanamadÄ±.\n\n" + ex.Message,
-                        "Model KarÅŸÄ±laÅŸtÄ±rma",
+                        "Model Karsilastirma islemi tamamlanamadi.\n\n" + ex.Message,
+                        "Model Karsilastirma",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                 }
@@ -123,8 +123,8 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (diff == null)
             {
                 MessageBox.Show(
-                    "Ã–nce modelleri karÅŸÄ±laÅŸtÄ±rÄ±n.",
-                    "Model AktarÄ±mÄ±",
+                    "Once modelleri karsilastirin.",
+                    "Model Aktarimi",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -136,7 +136,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             if (objects == null || objects.Count == 0)
             {
-                SetStatus("Bu yÃ¶nde aktarÄ±lacak fark yok.", false);
+                SetStatus("Bu yonde aktarilacak fark yok.", false);
                 return;
             }
 
@@ -151,7 +151,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             if (targetPersistenceUnit == null || application == null)
             {
-                SetStatus("AktarÄ±m iÃ§in erwin oturumu hazÄ±r deÄŸil.", true);
+                SetStatus("Aktarim icin erwin oturumu hazir degil.", true);
                 return;
             }
 
@@ -160,8 +160,8 @@ namespace Veloxap.AddIn.Erwin.Pages
                 : leftRole + " -> " + rightRole;
 
             MessageBoxResult confirmation = MessageBox.Show(
-                directionLabel + " aktarÄ±mÄ± baÅŸlatÄ±lsÄ±n mÄ±?",
-                "Model AktarÄ±mÄ±",
+                directionLabel + " Aktarimi baslatilsin mi?",
+                "Model Aktarimi",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -169,7 +169,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
 
             SetBusy(true);
-            SetStatus(directionLabel + " aktarÄ±mÄ± yapÄ±lÄ±yor...", false);
+            SetStatus(directionLabel + " Aktarimi yapiliyor...", false);
 
             try
             {
@@ -182,33 +182,33 @@ namespace Veloxap.AddIn.Erwin.Pages
                 if (applyResult.AppliedChanges == 0)
                 {
                     string detail = BuildApplyResultMessage(applyResult);
-                    SetStatus("AktarÄ±mda uygulanabilir deÄŸiÅŸiklik bulunamadÄ±. " + applyResult.ToSummary(), true);
+                    SetStatus("Aktarimda uygulanabilir degisiklik bulunamadi. " + applyResult.ToSummary(), true);
 
                     MessageBox.Show(
-                        "AktarÄ±m komutu Ã§alÄ±ÅŸtÄ± ancak modele uygulanmÄ±ÅŸ bir deÄŸiÅŸiklik tespit edilemedi.\n\n" + detail,
-                        "Model AktarÄ±mÄ±",
+                        "Bir degisiklik tespit edilemedi.\n\n" + detail,
+                        "Model Aktarimi",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
 
                     return;
                 }
 
-                SetStatus("AktarÄ±m tamamlandÄ±. Farklar yenileniyor...", false);
+                SetStatus("Aktarim tamamlandi. Farklar yenileniyor...", false);
                 CompareModels(false);
 
                 MessageBox.Show(
-                    "AktarÄ±m tamamlandÄ±.\n\n" + applyResult.ToSummary(),
-                    "Model AktarÄ±mÄ±",
+                    "Aktarim tamamlandi.\n\n" + applyResult.ToSummary(),
+                    "Model Aktarimi",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                SetStatus("AktarÄ±m hatasÄ±: " + ex.Message, true);
+                SetStatus("Aktarim hatasi: " + ex.Message, true);
 
                 MessageBox.Show(
-                    "AktarÄ±m tamamlanamadÄ±.\n\n" + ex.Message,
-                    "Model AktarÄ±mÄ±",
+                    "Aktarim tamamlanamadi.\n\n" + ex.Message,
+                    "Model Aktarimi",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
@@ -227,13 +227,13 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (modelCount == 2)
                 return true;
 
-            SetStatus("KarÅŸÄ±laÅŸtÄ±rma iÃ§in tam olarak 2 aÃ§Ä±k model gerekir.", true);
+            SetStatus("Karsilastirma icin tam olarak 2 acik model gerekir.", true);
 
             if (showMessages)
             {
                 MessageBox.Show(
-                    "KarÅŸÄ±laÅŸtÄ±rma iÃ§in erwin iÃ§inde tam olarak 2 model aÃ§Ä±k olmalÄ±dÄ±r.",
-                    "Model KarÅŸÄ±laÅŸtÄ±rma",
+                    "Karsilastirma icin erwin icerisinde tam olarak 2 model acik olmalidir.",
+                    "Model Karsilastirma",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -268,11 +268,11 @@ namespace Veloxap.AddIn.Erwin.Pages
             txtRightModelName.Text = rightRole + ": " + rightName;
 
             txtRightToLeftTitle.Text = rightRole + " -> " + leftRole;
-            txtRightToLeftSubtitle.Text = leftRole + " tarafÄ±na uygulanacak farklar";
+            txtRightToLeftSubtitle.Text = leftRole + " tarafina uygulanacak farklar";
             txtApplyRightToLeftButton.Text = rightRole + " -> " + leftRole + " Aktar";
 
             txtLeftToRightTitle.Text = leftRole + " -> " + rightRole;
-            txtLeftToRightSubtitle.Text = rightRole + " tarafÄ±na uygulanacak farklar";
+            txtLeftToRightSubtitle.Text = rightRole + " tarafina uygulanacak farklar";
             txtApplyLeftToRightButton.Text = leftRole + " -> " + rightRole + " Aktar";
         }
 
@@ -345,7 +345,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             string targetRole)
         {
             string className = SafeText(obj.getoClassName(), "Object");
-            string name = SafeText(obj.getoName(), "(adsÄ±z)");
+            string name = SafeText(obj.getoName(), "(adsiz)");
             int propertyCount = obj.getoObjectProperty() == null ? 0 : obj.getoObjectProperty().Count;
             int childCount = obj.getoModelObject() == null ? 0 : obj.getoModelObject().Count;
 
@@ -382,8 +382,8 @@ namespace Veloxap.AddIn.Erwin.Pages
             var item = DiffTreeItem.CreateProperty(
                 propertyName,
                 string.IsNullOrWhiteSpace(propertyType)
-                    ? "Property farkÄ±"
-                    : "Property farkÄ± / " + propertyType);
+                    ? "Property farki"
+                    : "Property farki / " + propertyType);
 
             item.Children.Add(DiffTreeItem.CreateValue(leftRole + ": " + leftValue));
             item.Children.Add(DiffTreeItem.CreateValue(rightRole + ": " + rightValue));

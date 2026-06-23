@@ -635,7 +635,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 "butunluk",
                 "gizlilikseviyesi",
                 "veridegeri",
-                "varlikdegeri",
                 "issureciseviyesi",
                 "bankagorecedegeri",
                 "kisiselverimi",

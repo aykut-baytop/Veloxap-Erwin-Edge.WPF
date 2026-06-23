@@ -147,7 +147,7 @@ namespace VeloxapEDGErwinTools.AddIn
                 //
                 /*
                  *  Filtrelerde kullanilan properitiesleri listeye ekleyerek sadece 
-                 *  onlari yükleyecegiz. 
+                 *  onlari yukleyecegiz.
                  *  
                  *  
                  *  
@@ -191,11 +191,11 @@ namespace VeloxapEDGErwinTools.AddIn
                         mModelObject.setoName(oObject.Name);
 
 
-                        // Model Object main properities (etc: D_Arac ve D_Arac özellikleri)
+                        // Model Object main properities (etc: D_Arac ve D_Arac ozellikleri)
                         List<ObjectProperty> mObjectProperty = loadObjectProperities(false, oObject.ObjectId, oSession.ModelObjects.Root.ObjectId, oPersistenceUnit);
 
 
-                        // D_Arac tablosunun sutunlari ve sutunlarin özellikleri
+                        // D_Arac tablosunun sutunlari ve sutunlarin ozellikleri
                         mModelObject.setoModelObjects(loadSubModelObject(oObject.ObjectId, oPersistenceUnit));
 
                         

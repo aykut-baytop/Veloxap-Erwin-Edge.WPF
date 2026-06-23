@@ -26,7 +26,7 @@
                        FontWeight="SemiBold"
                        Foreground="#111827"/>
 
-            <TextBlock Text="Seçili modele ait property ve deger bilgilerini görüntüleyin."
+            <TextBlock Text="Secili modele ait property ve deger bilgilerini goruntuleyin."
                        Margin="0,6,0,0"
                        Foreground="#6B7280"
                        FontSize="13"/>

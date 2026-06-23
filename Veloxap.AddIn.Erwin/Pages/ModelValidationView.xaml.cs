@@ -113,7 +113,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (sender == cmbSourceVersion)
                 SelectPreviousTargetVersion();
 
-            ResetValidationState("Versiyon seÃ§imi deÄŸiÅŸti. Validasyon tekrar Ã§alÄ±ÅŸtÄ±rÄ±lmalÄ±.");
+            ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
             await RefreshAlterDdlPreviewAsync();
         }
 
@@ -332,23 +332,23 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             if (modelInfo == null)
             {
-                ResetValidationState("SeÃ§ili model bulunamadÄ±.");
-                txtValidationResults.Text = "Validasyon Ã§alÄ±ÅŸtÄ±rmak iÃ§in Ã¶nce bir model seÃ§ilmeli.";
+                ResetValidationState("Secili model bulunamadi.");
+                txtValidationResults.Text = "Validasyon calistirmak icin once bir model secilmeli.";
                 return;
             }
 
             var rules = GetValidationRules().ToList();
             if (rules.Count == 0)
             {
-                ResetValidationState("Validasyon kuralÄ± bulunamadÄ±.");
+                ResetValidationState("Validasyon kurali bulunamadi.");
                 txtValidationResults.Text =
-                    "Kural listesi boÅŸ. ValidationRulesView veya kalÄ±cÄ± kural kaynaÄŸÄ± baÄŸlandÄ±ÄŸÄ±nda bu test Ã§alÄ±ÅŸacak.";
+                    "Kural listesi bos. ValidationRulesView veya kalici kural kaynagi baglandiginda bu test calisacak.";
                 return;
             }
 
             try
             {
-                SetStatus("Validasyon Ã§alÄ±ÅŸÄ±yor...");
+                SetStatus("Validasyon calisiyor...");
                 var issues = CrossRuleValidationEngine.Validate(modelInfo, rules, runParallel: true);
 
                 isValidationOk = issues.Count == 0;
@@ -359,7 +359,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
             catch (Exception ex)
             {
-                ResetValidationState("Validasyon sÄ±rasÄ±nda hata oluÅŸtu.");
+                ResetValidationState("Validasyon sirasinda hata olustu.");
                 txtValidationResults.Text = ex.ToString();
             }
         }
@@ -377,7 +377,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         private static string FormatValidationResults(IReadOnlyCollection<CrossValidationIssue> issues)
         {
             if (issues == null || issues.Count == 0)
-                return "Validasyon hatasÄ± bulunamadÄ±.";
+                return "Validasyon hatasi bulunamadi.";
 
             var builder = new StringBuilder();
             int index = 1;
@@ -389,7 +389,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 builder.AppendLine($"   Nesne: {issue.CheckObjectPath}");
                 builder.AppendLine($"   Property: {issue.PropertyName}");
                 builder.AppendLine($"   Beklenen: {issue.ExpectedValue}");
-                builder.AppendLine($"   GerÃ§ek: {issue.ActualValue}");
+                builder.AppendLine($"   Gercek: {issue.ActualValue}");
                 builder.AppendLine();
                 index++;
             }
@@ -400,16 +400,16 @@ namespace Veloxap.AddIn.Erwin.Pages
         private static string FormatValidationSummary(IReadOnlyCollection<CrossValidationIssue> issues)
         {
             if (issues == null || issues.Count == 0)
-                return "Validasyon baÅŸarÄ±lÄ±. Onaya gÃ¶nderilebilir.";
+                return "Validasyon basarili. Onaya gonderilebilir.";
 
             var builder = new StringBuilder();
-            builder.AppendLine($"Validasyon tamamlandÄ±. {issues.Count} hata bulundu.");
+            builder.AppendLine($"Validasyon tamamlandi. {issues.Count} hata bulundu.");
 
             foreach (var issue in issues.Take(3))
                 builder.AppendLine("- " + (issue.CheckObjectPath ?? issue.Message));
 
             if (issues.Count > 3)
-                builder.AppendLine("Detaylar Validasyon SonuÃ§larÄ± sekmesinde.");
+                builder.AppendLine("Detaylar Validasyon Sonuclari sekmesinde.");
 
             return builder.ToString();
         }
@@ -422,14 +422,14 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (sourceVersion == null || targetVersion == null)
             {
                 currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = "Kaynak ve hedef versiyon seÃ§imi bekleniyor.";
+                txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
                 return;
             }
 
             try
             {
                 currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = "Alter DDL hazÄ±rlanÄ±yor...";
+                txtAlterDdl.Text = "Alter DDL hazirlaniyor...";
                 string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
 
                 currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
@@ -444,7 +444,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             {
                 currentAlterDdl = string.Empty;
                 txtAlterDdl.Text = ex.ToString();
-                SetStatus("Alter DDL isteÄŸi sÄ±rasÄ±nda hata oluÅŸtu.");
+                SetStatus("Alter DDL istegi sirasinda hata olustu.");
             }
         }
 
@@ -673,7 +673,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             string modelLongId = ExtractQueryValue(locator, "modelLongId");
 
             string displayName = string.IsNullOrWhiteSpace(versionNo)
-                ? "GeÃ§erli Versiyon"
+                ? "Gecerli Versiyon"
                 : "Versiyon " + versionNo;
 
             if (!string.IsNullOrWhiteSpace(modelName))

@@ -27,8 +27,7 @@ namespace Veloxap.AddIn.Erwin.Services
 
         private static readonly string[] AssetValuePropertyNames =
         {
-            "veridegeri",
-            "varlikdegeri"
+            "veridegeri"
         };
 
         private static readonly string[] BusinessProcessLevelPropertyNames =
