@@ -12,7 +12,7 @@
             <Setter Property="Height" Value="34"/>
             <Setter Property="MinWidth" Value="132"/>
             <Setter Property="Padding" Value="14,0"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="#2563EB"/>
             <Setter Property="Foreground" Value="White"/>
@@ -52,21 +52,21 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="16"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="6"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="260"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="150"/>
             </Grid.ColumnDefinitions>
 
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -81,6 +81,7 @@
                         <TextBlock Text="Kaynak Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbSourceVersion"
                                   Height="34"
+                                  MinWidth="150"
                                   IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
                                   SelectionChanged="VersionSelection_Changed"/>
@@ -90,72 +91,158 @@
                         <TextBlock Text="Hedef Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbTargetVersion"
                                   Height="34"
+                                  MinWidth="150"
                                   IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
                                   SelectionChanged="VersionSelection_Changed"/>
                     </StackPanel>
                 </Grid>
-
-                <StackPanel Grid.Row="2" Orientation="Horizontal">
-                    <Button x:Name="btnRunValidation"
-                            Content="Validasyon Testi"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Click="BtnRunValidation_Click"/>
-
-                    <Button x:Name="btnSendApproval"
-                            Content="Onaya Gonder"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Background="#059669"
-                            Click="BtnSendApproval_Click"
-                            IsEnabled="False"/>
-                </StackPanel>
             </Grid>
 
-            <Border Grid.Column="2"
-                    Background="#F9FAFB"
-                    BorderBrush="#E5E7EB"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="10">
-                <DockPanel>
-                    <TextBlock Text="Durum"
-                               DockPanel.Dock="Top"
-                               FontWeight="SemiBold"
-                               Foreground="#374151"
-                               Margin="0,0,0,8"/>
-                    <TextBox x:Name="txtStatusMessage"
-                             TextWrapping="Wrap"
-                             AcceptsReturn="True"
-                             IsReadOnly="True"
-                             BorderThickness="0"
-                             Background="Transparent"
-                             Foreground="#374151"
-                             VerticalScrollBarVisibility="Auto"/>
-                </DockPanel>
-            </Border>
+            <StackPanel Grid.Column="2"
+                        VerticalAlignment="Bottom">
+                <Button x:Name="btnRunValidation"
+                        Content="Validasyon Testi"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Click="BtnRunValidation_Click"/>
+
+                <Button x:Name="btnSendApproval"
+                        Content="Onaya Gonder"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Background="#059669"
+                        Click="BtnSendApproval_Click"
+                        IsEnabled="False"/>
+            </StackPanel>
         </Grid>
 
+        <Border Grid.Row="2"
+                Background="#F9FAFB"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,1,0,1"
+                Padding="8,5">
+            <TextBlock x:Name="txtStatusMessage"
+                       FontSize="12"
+                       Foreground="#4B5563"
+                       TextWrapping="Wrap"
+                       TextTrimming="CharacterEllipsis"
+                       MaxHeight="38"/>
+        </Border>
+
         <TabControl x:Name="validationTabs"
-                    Grid.Row="2"
+                    Grid.Row="4"
                     Background="Transparent"
                     BorderBrush="#E5E7EB">
-            <TabItem Header="Alter DDL">
-                <TextBox x:Name="txtAlterDdl"
-                         FontFamily="Consolas"
-                         FontSize="12"
-                         AcceptsReturn="True"
-                         AcceptsTab="True"
-                         IsReadOnly="True"
-                         TextWrapping="NoWrap"
-                         VerticalScrollBarVisibility="Auto"
-                         HorizontalScrollBarVisibility="Auto"
-                         BorderThickness="1"
-                         BorderBrush="#E5E7EB"
-                         Background="#FAFAFA"
-                         Padding="10"/>
+            <TabItem x:Name="tabAlterDdl" Header="Alter DDL ve UDP Guncelleme">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="3*" MinWidth="220"/>
+                        <ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="2*" MinWidth="190"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border BorderBrush="#E5E7EB"
+                            BorderThickness="1"
+                            Background="#FAFAFA">
+                        <DockPanel>
+                            <TextBlock Text="DDL"
+                                       DockPanel.Dock="Top"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151"
+                                       Margin="10,8,10,4"/>
+                            <TextBox x:Name="txtAlterDdl"
+                                     FontFamily="Consolas"
+                                     FontSize="12"
+                                     AcceptsReturn="True"
+                                     AcceptsTab="True"
+                                     IsReadOnly="True"
+                                     TextWrapping="NoWrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     BorderThickness="0"
+                                     Background="#FAFAFA"
+                                     Padding="10"/>
+                        </DockPanel>
+                    </Border>
+
+                    <GridSplitter Grid.Column="1"
+                                  Width="6"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch"
+                                  Background="#E5E7EB"
+                                  ShowsPreview="True"/>
+
+                    <Border Grid.Column="2"
+                            BorderBrush="#E5E7EB"
+                            BorderThickness="1"
+                            Background="#FFFFFF">
+                        <DockPanel>
+                            <TextBlock Text="UDP Guncelleme Sonucu"
+                                       DockPanel.Dock="Top"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151"
+                                       Margin="10,8,10,4"/>
+
+                            <Border x:Name="tableUdpResultPanel"
+                                    Background="#F8FAFC"
+                                    BorderBrush="#E5E7EB"
+                                    BorderThickness="1,0,0,0"
+                                    Padding="10"
+                                    Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock x:Name="txtTableUdpResultStatus"
+                                               FontSize="12"
+                                               Foreground="#4B5563"
+                                               TextWrapping="Wrap"/>
+
+                                    <ScrollViewer Grid.Row="2"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl x:Name="tableUdpResultItems">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderBrush="#E5E7EB"
+                                                            BorderThickness="1"
+                                                            Background="White"
+                                                            Padding="8,6"
+                                                            Margin="0,0,0,8"
+                                                            ToolTip="{Binding DetailText}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontSize="12"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="#374151"
+                                                                       TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding SummaryText}"
+                                                                       Margin="0,3,0,0"
+                                                                       FontSize="12"
+                                                                       Foreground="#6B7280"
+                                                                       TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </DockPanel>
+                    </Border>
+                </Grid>
             </TabItem>
 
-            <TabItem Header="Validasyon Sonuclari">
+            <TabItem x:Name="tabValidationRules" Header="Validasyon Kurallari">
+                <pages:ValidationRulesView x:Name="validationRulesView"/>
+            </TabItem>
+
+            <TabItem x:Name="tabValidationResults" Header="Validasyon Sonuclari">
                 <TextBox x:Name="txtValidationResults"
                          FontFamily="Consolas"
                          FontSize="12"
@@ -168,11 +255,6 @@
                          BorderBrush="#E5E7EB"
                          Background="#FAFAFA"
                          Padding="10"/>
-            </TabItem>
-
-            <TabItem x:Name="tabValidationRules"
-                     Header="Validasyon Kurallari">
-                <pages:ValidationRulesView x:Name="validationRulesView"/>
             </TabItem>
         </TabControl>
     </Grid>

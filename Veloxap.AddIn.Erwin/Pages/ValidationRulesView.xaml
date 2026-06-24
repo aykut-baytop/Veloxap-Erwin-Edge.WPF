@@ -67,10 +67,6 @@
                               AlternatingRowBackground="#F3F4F6">
 
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Id"
-                                                Binding="{Binding Id}"
-                                                Width="70"/>
-
                             <DataGridTextColumn Header="Kural Adi"
                                                 Binding="{Binding RuleName}"
                                                 Width="170"

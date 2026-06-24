@@ -65,6 +65,26 @@ namespace Veloxap.AddIn.Erwin.Services
             this.persistenceUnit = persistenceUnit;
         }
 
+        public TableUdpStartupApplyResult ApplyStartupCalculations(ModelInfo modelInfo)
+        {
+            var startupResult = new TableUdpStartupApplyResult(DateTime.Now);
+
+            startupResult.AddOperation(
+                "Veri Degeri",
+                () => Apply(modelInfo));
+
+            startupResult.AddOperation(
+                "Banka Gorece Degeri",
+                () => ApplyBankRelativeValue(modelInfo));
+
+            startupResult.AddOperation(
+                "Guvenlik Sinifi Degeri",
+                () => ApplySecurityClassValue(modelInfo));
+
+            startupResult.CompletedAt = DateTime.Now;
+            return startupResult;
+        }
+
         public static int CountCalculableTables(ModelInfo modelInfo)
         {
             return BuildCalculations(modelInfo, null).Count;
@@ -1220,6 +1240,155 @@ namespace Veloxap.AddIn.Erwin.Services
             return UpdatedTables + " tablo guncellendi, " +
                    SkippedTables + " tablo atlandi, " +
                    FailedTables + " hata";
+        }
+    }
+
+    internal sealed class TableUdpStartupApplyResult
+    {
+        public TableUdpStartupApplyResult(DateTime startedAt)
+        {
+            StartedAt = startedAt;
+            Operations = new List<TableUdpStartupOperationResult>();
+        }
+
+        public DateTime StartedAt { get; private set; }
+
+        public DateTime? CompletedAt { get; set; }
+
+        public List<TableUdpStartupOperationResult> Operations { get; private set; }
+
+        public int TotalUpdatedTables
+        {
+            get { return Operations.Sum(operation => operation.UpdatedTables); }
+        }
+
+        public int TotalSkippedTables
+        {
+            get { return Operations.Sum(operation => operation.SkippedTables); }
+        }
+
+        public int TotalFailedTables
+        {
+            get { return Operations.Sum(operation => operation.FailedTables); }
+        }
+
+        public bool HasErrors
+        {
+            get
+            {
+                return Operations.Any(operation =>
+                    !operation.IsSuccess ||
+                    operation.FailedTables > 0);
+            }
+        }
+
+        public void AddOperation(
+            string name,
+            Func<TableUdpSecurityApplyResult> operation)
+        {
+            try
+            {
+                TableUdpSecurityApplyResult result = operation == null
+                    ? null
+                    : operation();
+
+                Operations.Add(TableUdpStartupOperationResult.FromResult(name, result));
+            }
+            catch (Exception ex)
+            {
+                Operations.Add(TableUdpStartupOperationResult.FromException(name, ex));
+            }
+        }
+
+        public string ToSummaryLine()
+        {
+            if (Operations.Count == 0)
+                return "Tablo UDP islemleri calismadi.";
+
+            return TotalUpdatedTables + " guncellendi, " +
+                   TotalSkippedTables + " atlandi, " +
+                   TotalFailedTables + " hata";
+        }
+    }
+
+    internal sealed class TableUdpStartupOperationResult
+    {
+        private TableUdpStartupOperationResult()
+        {
+        }
+
+        public string Name { get; private set; }
+
+        public int UpdatedTables { get; private set; }
+
+        public int SkippedTables { get; private set; }
+
+        public int FailedTables { get; private set; }
+
+        public string ErrorMessage { get; private set; }
+
+        public List<string> Messages { get; private set; }
+
+        public bool IsSuccess
+        {
+            get { return string.IsNullOrWhiteSpace(ErrorMessage); }
+        }
+
+        public string SummaryText
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                    return ErrorMessage;
+
+                return UpdatedTables + " guncellendi, " +
+                       SkippedTables + " atlandi, " +
+                       FailedTables + " hata";
+            }
+        }
+
+        public string DetailText
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                    return ErrorMessage;
+
+                if (Messages == null || Messages.Count == 0)
+                    return SummaryText;
+
+                return SummaryText + Environment.NewLine +
+                       string.Join(Environment.NewLine, Messages.Take(8));
+            }
+        }
+
+        public static TableUdpStartupOperationResult FromResult(
+            string name,
+            TableUdpSecurityApplyResult result)
+        {
+            return new TableUdpStartupOperationResult
+            {
+                Name = name ?? string.Empty,
+                UpdatedTables = result == null ? 0 : result.UpdatedTables,
+                SkippedTables = result == null ? 0 : result.SkippedTables,
+                FailedTables = result == null ? 0 : result.FailedTables,
+                Messages = result == null
+                    ? new List<string>()
+                    : new List<string>(result.Messages ?? new List<string>())
+            };
+        }
+
+        public static TableUdpStartupOperationResult FromException(
+            string name,
+            Exception ex)
+        {
+            return new TableUdpStartupOperationResult
+            {
+                Name = name ?? string.Empty,
+                ErrorMessage = ex == null ? "Bilinmeyen hata" : ex.Message,
+                FailedTables = 1,
+                Messages = new List<string>()
+            };
         }
     }
 

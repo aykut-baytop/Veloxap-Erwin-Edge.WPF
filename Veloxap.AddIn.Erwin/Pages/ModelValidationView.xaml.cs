@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Veloxap.AddIn.Erwin.Models;
 using Veloxap.AddIn.Erwin.Services;
 
@@ -21,10 +22,12 @@ namespace Veloxap.AddIn.Erwin.Pages
         private readonly string catalogName;
         private readonly string catalogLongId;
         private string currentAlterDdl;
+        private TableUdpStartupApplyResult tableUdpStartupResult;
         private bool isInitializing;
         private bool isUpdatingTargetVersion;
         private bool isValidationOk;
         private bool isSendingApproval;
+        private bool isTableUdpStartupRunning;
 
         public ModelValidationView()
             : this(null, null, null, null, null)
@@ -59,6 +62,29 @@ namespace Veloxap.AddIn.Erwin.Pages
             string catalogLongId,
             IEnumerable<Rule> validationRuleItems,
             bool showRulesTab)
+            : this(
+                modelInfo,
+                validationRules,
+                ruleService,
+                catalogName,
+                catalogLongId,
+                validationRuleItems,
+                showRulesTab,
+                null,
+                false)
+        {
+        }
+
+        internal ModelValidationView(
+            ModelInfo modelInfo,
+            IEnumerable<string> validationRules,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId,
+            IEnumerable<Rule> validationRuleItems,
+            bool showRulesTab,
+            TableUdpStartupApplyResult tableUdpStartupResult,
+            bool isTableUdpStartupRunning)
         {
             InitializeComponent();
 
@@ -70,13 +96,25 @@ namespace Veloxap.AddIn.Erwin.Pages
             this.ruleService = ruleService;
             this.catalogName = catalogName;
             this.catalogLongId = catalogLongId;
+            this.tableUdpStartupResult = tableUdpStartupResult;
+            this.isTableUdpStartupRunning = isTableUdpStartupRunning;
 
             LoadValidationRulesTab();
+            UpdateTableUdpStartupResultPanel();
             if (showRulesTab)
                 validationTabs.SelectedItem = tabValidationRules;
 
             LoadVersionSelectors();
             ResetValidationState("Validasyon bekleniyor.");
+        }
+
+        internal void SetTableUdpStartupResult(
+            TableUdpStartupApplyResult result,
+            bool isRunning)
+        {
+            tableUdpStartupResult = result;
+            isTableUdpStartupRunning = isRunning;
+            UpdateTableUdpStartupResultPanel();
         }
 
         private void LoadValidationRulesTab()
@@ -181,6 +219,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             {
                 isSendingApproval = true;
                 btnSendApproval.IsEnabled = false;
+                validationTabs.SelectedItem = tabValidationResults;
                 SetStatus("Onaya gonderiliyor...");
 
                 string response = await ruleService.StartApprovalByCatalogAsync(
@@ -355,6 +394,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 btnSendApproval.IsEnabled = isValidationOk;
 
                 txtValidationResults.Text = FormatValidationResults(issues);
+                validationTabs.SelectedItem = tabValidationResults;
                 SetStatus(FormatValidationSummary(issues));
             }
             catch (Exception ex)
@@ -620,7 +660,69 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private void SetStatus(string message)
         {
-            txtStatusMessage.Text = message ?? string.Empty;
+            string statusMessage = NormalizeStatusMessage(message);
+            txtStatusMessage.Text = statusMessage;
+            txtStatusMessage.Foreground = ResolveStatusForeground(statusMessage);
+        }
+
+        private void UpdateTableUdpStartupResultPanel()
+        {
+            if (tableUdpResultPanel == null ||
+                txtTableUdpResultStatus == null ||
+                tableUdpResultItems == null)
+            {
+                return;
+            }
+
+            if (isTableUdpStartupRunning)
+            {
+                tableUdpResultPanel.Visibility = Visibility.Visible;
+                txtTableUdpResultStatus.Text = "Acilis islemleri calisiyor...";
+                txtTableUdpResultStatus.Foreground = new SolidColorBrush(Color.FromRgb(75, 85, 99));
+                tableUdpResultItems.ItemsSource = null;
+                return;
+            }
+
+            if (tableUdpStartupResult == null)
+            {
+                tableUdpResultPanel.Visibility = Visibility.Collapsed;
+                tableUdpResultItems.ItemsSource = null;
+                return;
+            }
+
+            string summary = tableUdpStartupResult.ToSummaryLine();
+            tableUdpResultPanel.Visibility = Visibility.Visible;
+            txtTableUdpResultStatus.Text = summary;
+            txtTableUdpResultStatus.Foreground = ResolveStatusForeground(
+                tableUdpStartupResult.HasErrors ? summary + " hata" : summary + " basarili");
+            tableUdpResultItems.ItemsSource = tableUdpStartupResult.Operations;
+        }
+
+        private static string NormalizeStatusMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return string.Empty;
+
+            return Regex.Replace(message.Trim(), @"\s*\r?\n\s*", "  ");
+        }
+
+        private static Brush ResolveStatusForeground(string message)
+        {
+            if (ContainsAny(message, "hata", "bulunamadi", "okunamadi", "iptal", "bos dondu", "kullanilabilir degil"))
+                return new SolidColorBrush(Color.FromRgb(185, 28, 28));
+
+            if (ContainsAny(message, "basarili", "gonderildi", "hazirlandi", "onaya gonderilebilir"))
+                return new SolidColorBrush(Color.FromRgb(4, 120, 87));
+
+            return new SolidColorBrush(Color.FromRgb(75, 85, 99));
+        }
+
+        private static bool ContainsAny(string value, params string[] terms)
+        {
+            if (string.IsNullOrEmpty(value) || terms == null)
+                return false;
+
+            return terms.Any(term => value.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private string ResolveCatalogName()

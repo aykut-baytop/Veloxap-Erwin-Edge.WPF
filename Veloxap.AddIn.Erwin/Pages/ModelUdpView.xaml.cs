@@ -9,26 +9,19 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Veloxap.AddIn.Erwin.Models;
-using Veloxap.AddIn.Erwin.Services;
 
 namespace Veloxap.AddIn.Erwin.Pages
 {
     public partial class ModelUdpView : UserControl
     {
         private readonly ModelInfo modelInfo;
-        private readonly SCAPI.Application application;
-        private readonly SCAPI.PersistenceUnit persistenceUnit;
         private readonly List<UdpRow> allRows;
         private readonly ObservableCollection<UdpDetailRow> selectedDetails;
         private readonly DispatcherTimer searchTimer;
-        private const double ActionsPanelCollapsedWidth = 66;
-        private const double ActionsPanelExpandedWidth = 240;
-        private const double ActionButtonExpandedWidth = 216;
         private const int MinimumSearchLength = 3;
         private const int SearchDelayMilliseconds = 500;
         private int tableCount;
         private string lastAppliedFilter;
-        private bool isBusy;
         private bool isLoading;
         private bool hasStartedLoading;
 
@@ -48,8 +41,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             SCAPI.PersistenceUnit persistenceUnit)
         {
             this.modelInfo = modelInfo;
-            this.application = application;
-            this.persistenceUnit = persistenceUnit;
             allRows = new List<UdpRow>();
             selectedDetails = new ObservableCollection<UdpDetailRow>();
             searchTimer = new DispatcherTimer
@@ -59,7 +50,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             searchTimer.Tick += SearchTimer_Tick;
 
             InitializeComponent();
-            SetActionsPanelExpanded(false);
 
             treeUdp.ItemsSource = new List<UdpTreeNode>();
             gridUdpDetails.ItemsSource = selectedDetails;
@@ -72,7 +62,6 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             Loaded += ModelUdpView_Loaded;
             SetLoading(modelInfo != null);
-            UpdateCalculateButton();
         }
 
         private async void ModelUdpView_Loaded(object sender, RoutedEventArgs e)
@@ -138,244 +127,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
 
             node.EnsureChildrenLoaded();
-        }
-
-        private void ActionsPanel_MouseEnter(object sender, MouseEventArgs e)
-        {
-            SetActionsPanelExpanded(true);
-        }
-
-        private void ActionsPanel_MouseLeave(object sender, MouseEventArgs e)
-        {
-            SetActionsPanelExpanded(false);
-        }
-
-        private void SetActionsPanelExpanded(bool value)
-        {
-            if (actionsColumn != null)
-            {
-                actionsColumn.Width = new GridLength(
-                    value ? ActionsPanelExpandedWidth : ActionsPanelCollapsedWidth);
-            }
-
-            Visibility headerVisibility = value ? Visibility.Visible : Visibility.Collapsed;
-            if (txtActionsTitle != null)
-                txtActionsTitle.Visibility = headerVisibility;
-
-            if (txtActionsSubtitle != null)
-                txtActionsSubtitle.Visibility = headerVisibility;
-
-            SetActionButtonExpanded(btnCalculateSecurity, txtCalculateSecurity, value);
-            SetActionButtonExpanded(btnCalculateBankRelative, txtCalculateBankRelative, value);
-            SetActionButtonExpanded(btnCalculateSecurityClass, txtCalculateSecurityClass, value);
-        }
-
-        private static void SetActionButtonExpanded(Button button, TextBlock label, bool value)
-        {
-            if (button != null)
-            {
-                if (value)
-                    button.Width = ActionButtonExpandedWidth;
-                else
-                    button.ClearValue(FrameworkElement.WidthProperty);
-            }
-
-            if (label != null)
-            {
-                if (value)
-                    label.Visibility = Visibility.Visible;
-                else
-                    label.ClearValue(UIElement.VisibilityProperty);
-            }
-        }
-
-        private async void BtnCalculateSecurity_Click(object sender, RoutedEventArgs e)
-        {
-            if (modelInfo == null || application == null || persistenceUnit == null)
-            {
-                MessageBox.Show(
-                    "Veri degeri hesaplama icin secili erwin modeli hazir degil.",
-                    "Veri Degeri Hesaplama",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            int calculableTableCount = TableUdpSecurityService.CountCalculableTables(modelInfo);
-            if (calculableTableCount == 0)
-            {
-                SetStatus("Hesaplanabilir Veri_Degeri UDP kaydi bulunamadi.", true);
-                MessageBox.Show(
-                    "Erisilebilirlik, Butunluk, Gizlilik_Seviyesi ve Veri_Degeri UDP alanlari tam olan tablo bulunamadi.",
-                    "Veri Degeri Hesaplama",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            SetBusy(true);
-            SetStatus("Veri degerleri hesaplaniyor...", false);
-
-            try
-            {
-                var service = new TableUdpSecurityService(
-                    application,
-                    persistenceUnit);
-
-                TableUdpSecurityApplyResult result = service.Apply(modelInfo);
-
-                await ReloadRowsAsync("UDP listesi yenileniyor...", true);
-
-                bool hasError = result.FailedTables > 0;
-                SetStatus(result.ToSummary(), hasError);
-
-                MessageBox.Show(
-                    BuildApplyResultMessage(result),
-                    "Veri Degeri Hesaplama",
-                    MessageBoxButton.OK,
-                    hasError ? MessageBoxImage.Warning : MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                SetStatus("Veri degeri hesaplama hatasi: " + ex.Message, true);
-                MessageBox.Show(
-                    "Veri degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
-                    "Veri Degeri Hesaplama",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-            finally
-            {
-                SetBusy(false);
-            }
-        }
-
-        private async void BtnCalculateBankRelative_Click(object sender, RoutedEventArgs e)
-        {
-            const string title = "Banka Gorece Degeri Hesaplama";
-
-            if (modelInfo == null || application == null || persistenceUnit == null)
-            {
-                MessageBox.Show(
-                    "Banka gorece degeri hesaplama icin secili erwin modeli hazir degil.",
-                    title,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            var service = new TableUdpSecurityService(
-                application,
-                persistenceUnit);
-
-            int calculableTableCount = TableUdpSecurityService.CountBankRelativeCalculableTables(modelInfo);
-            if (calculableTableCount == 0)
-            {
-                TableUdpSecurityApplyResult emptyResult = service.ApplyBankRelativeValue(modelInfo);
-                SetStatus("Hesaplanabilir Banka_Gorece_Degeri UDP kaydi bulunamadi.", true);
-                MessageBox.Show(
-                    BuildApplyResultMessage(emptyResult),
-                    title,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            SetBusy(true);
-            SetStatus("Banka gorece degerleri hesaplaniyor...", false);
-
-            try
-            {
-                TableUdpSecurityApplyResult result = service.ApplyBankRelativeValue(modelInfo);
-
-                await ReloadRowsAsync("UDP listesi yenileniyor...", true);
-
-                bool hasError = result.FailedTables > 0 || result.SkippedTables > 0;
-                SetStatus(result.ToSummary(), hasError);
-
-                MessageBox.Show(
-                    BuildApplyResultMessage(result),
-                    title,
-                    MessageBoxButton.OK,
-                    hasError ? MessageBoxImage.Warning : MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                SetStatus("Banka gorece degeri hesaplama hatasi: " + ex.Message, true);
-                MessageBox.Show(
-                    "Banka gorece degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
-                    title,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-            finally
-            {
-                SetBusy(false);
-            }
-        }
-
-        private async void BtnCalculateSecurityClass_Click(object sender, RoutedEventArgs e)
-        {
-            const string title = "Guvenlik Sinifi Degeri Hesaplama";
-
-            if (modelInfo == null || application == null || persistenceUnit == null)
-            {
-                MessageBox.Show(
-                    "Guvenlik sinifi degeri hesaplama icin secili erwin modeli hazir degil.",
-                    title,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            var service = new TableUdpSecurityService(
-                application,
-                persistenceUnit);
-
-            int calculableTableCount = TableUdpSecurityService.CountSecurityClassCalculableTables(modelInfo);
-            if (calculableTableCount == 0)
-            {
-                TableUdpSecurityApplyResult emptyResult = service.ApplySecurityClassValue(modelInfo);
-                SetStatus("Hesaplanabilir Guvenlik_Sinifi_Degeri UDP kaydi bulunamadi.", true);
-                MessageBox.Show(
-                    BuildApplyResultMessage(emptyResult),
-                    title,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            SetBusy(true);
-            SetStatus("Guvenlik sinifi degerleri hesaplaniyor...", false);
-
-            try
-            {
-                TableUdpSecurityApplyResult result = service.ApplySecurityClassValue(modelInfo);
-
-                await ReloadRowsAsync("UDP listesi yenileniyor...", true);
-
-                bool hasError = result.FailedTables > 0 || result.SkippedTables > 0;
-                SetStatus(result.ToSummary(), hasError);
-
-                MessageBox.Show(
-                    BuildApplyResultMessage(result),
-                    title,
-                    MessageBoxButton.OK,
-                    hasError ? MessageBoxImage.Warning : MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                SetStatus("Guvenlik sinifi degeri hesaplama hatasi: " + ex.Message, true);
-                MessageBox.Show(
-                    "Guvenlik sinifi degeri hesaplama tamamlanamadi.\n\n" + ex.Message,
-                    title,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-            finally
-            {
-                SetBusy(false);
-            }
         }
 
         private void ApplyFilter()
@@ -793,13 +544,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 txtUdpCount.Text = allRows.Count.ToString();
         }
 
-        private void SetBusy(bool value)
-        {
-            isBusy = value;
-            UpdateBusyCursor();
-            UpdateCalculateButton();
-        }
-
         private void SetLoading(bool value)
         {
             isLoading = value;
@@ -808,31 +552,11 @@ namespace Veloxap.AddIn.Erwin.Pages
                 txtSearch.IsEnabled = !value;
 
             UpdateBusyCursor();
-            UpdateCalculateButton();
         }
 
         private void UpdateBusyCursor()
         {
-            Mouse.OverrideCursor = isBusy || isLoading ? Cursors.Wait : null;
-        }
-
-        private void UpdateCalculateButton()
-        {
-            bool isEnabled =
-                !isBusy &&
-                !isLoading &&
-                modelInfo != null &&
-                application != null &&
-                persistenceUnit != null;
-
-            if (btnCalculateSecurity != null)
-                btnCalculateSecurity.IsEnabled = isEnabled;
-
-            if (btnCalculateBankRelative != null)
-                btnCalculateBankRelative.IsEnabled = isEnabled;
-
-            if (btnCalculateSecurityClass != null)
-                btnCalculateSecurityClass.IsEnabled = isEnabled;
+            Mouse.OverrideCursor = isLoading ? Cursors.Wait : null;
         }
 
         private void SetStatus(string message, bool isError)
@@ -1052,22 +776,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             return string.IsNullOrWhiteSpace(value)
                 ? fallback
                 : value;
-        }
-
-        private static string BuildApplyResultMessage(TableUdpSecurityApplyResult result)
-        {
-            if (result == null)
-                return string.Empty;
-
-            string message = result.ToSummary();
-
-            if (result.Messages == null || result.Messages.Count == 0)
-                return message;
-
-            return message + Environment.NewLine + Environment.NewLine +
-                   string.Join(
-                       Environment.NewLine,
-                       result.Messages.Take(8));
         }
 
         public sealed class UdpRow
