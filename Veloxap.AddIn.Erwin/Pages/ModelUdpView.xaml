@@ -77,10 +77,15 @@
         </Style>
 
         <Style x:Key="UdpTreeItemStyle" TargetType="TreeViewItem">
-            <Setter Property="IsExpanded" Value="True"/>
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0"/>
+            <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Recycling"/>
+            <EventSetter Event="Loaded" Handler="TreeUdpItem_Loaded"/>
+            <EventSetter Event="Expanded" Handler="TreeUdpItem_Expanded"/>
         </Style>
 
         <HierarchicalDataTemplate DataType="{x:Type local:UdpTreeNode}"
@@ -136,7 +141,7 @@
                          Background="White"
                          Foreground="#111827"
                          TextChanged="TxtSearch_TextChanged"
-                         ToolTip="Tablo, kolon, UDP veya deger ara"/>
+                         ToolTip="En az 3 karakterle tablo, kolon, UDP veya deger ara"/>
             </StackPanel>
         </Grid>
 
@@ -294,6 +299,9 @@
                                   Background="Transparent"
                                   ItemContainerStyle="{StaticResource UdpTreeItemStyle}"
                                   SelectedItemChanged="TreeUdp_SelectedItemChanged"
+                                  VirtualizingStackPanel.IsVirtualizing="True"
+                                  VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                  ScrollViewer.CanContentScroll="True"
                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                     </DockPanel>
@@ -323,6 +331,8 @@
                                   GridLinesVisibility="None"
                                   RowHeight="36"
                                   ColumnHeaderHeight="38"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
                                   BorderThickness="0"
                                   Background="White"
                                   AlternatingRowBackground="#F3F4F6">
