@@ -11,7 +11,6 @@ namespace Veloxap.AddIn.Erwin.Services
     {
         private static readonly string[] AvailabilityPropertyNames =
         {
-            "erisebilirlik",
             "erisilebilirlik"
         };
 
@@ -651,7 +650,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 int confidentialityLevel = 0;
 
                 if (availability == null)
-                    missing.Add("Erisebilirlik");
+                    missing.Add("Erisilebilirlik");
 
                 if (integrity == null)
                     missing.Add("Butunluk");
@@ -663,7 +662,7 @@ namespace Veloxap.AddIn.Erwin.Services
                     missing.Add("Veri_Degeri");
 
                 if (availability != null && !TryResolveLevel(availability, out availabilityLevel))
-                    missing.Add("Erisebilirlik seviyesi");
+                    missing.Add("Erisilebilirlik seviyesi");
 
                 if (integrity != null && !TryResolveLevel(integrity, out integrityLevel))
                     missing.Add("Butunluk seviyesi");

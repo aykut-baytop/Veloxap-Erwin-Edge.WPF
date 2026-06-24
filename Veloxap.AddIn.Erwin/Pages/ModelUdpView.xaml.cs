@@ -206,7 +206,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             {
                 SetStatus("Hesaplanabilir Veri_Degeri UDP kaydi bulunamadi.", true);
                 MessageBox.Show(
-                    "Erisebilirlik, Butunluk, Gizlilik_Seviyesi ve Veri_Degeri UDP alanlari tam olan tablo bulunamadi.",
+                    "Erisilebilirlik, Butunluk, Gizlilik_Seviyesi ve Veri_Degeri UDP alanlari tam olan tablo bulunamadi.",
                     "Veri Degeri Hesaplama",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -1027,7 +1027,6 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             string[] knownNames =
             {
-                "erisebilirlik",
                 "erisilebilirlik",
                 "butunluk",
                 "gizlilikseviyesi",

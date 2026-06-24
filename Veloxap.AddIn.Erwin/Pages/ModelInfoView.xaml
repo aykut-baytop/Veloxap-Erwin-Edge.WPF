@@ -1,50 +1,110 @@
-﻿<UserControl x:Class="Veloxap.AddIn.Erwin.Pages.ModelInfoView"
+<UserControl x:Class="Veloxap.AddIn.Erwin.Pages.ModelInfoView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:viewModels="clr-namespace:Veloxap.AddIn.Erwin.ViewModels"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="540"
+             d:DesignWidth="920">
 
     <UserControl.Resources>
+        <Style x:Key="MutedTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6B7280"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
         <Style x:Key="ModelTreeViewItemStyle" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Recycling"/>
+            <EventSetter Event="Loaded" Handler="ModelTreeViewItem_Loaded"/>
+            <EventSetter Event="Expanded" Handler="ModelTreeViewItem_Expanded"/>
         </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Background="White">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="16"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="Model Bilgileri"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       Foreground="#111827"/>
-
-            <TextBlock Text="Secili modele ait property ve deger bilgilerini goruntuleyin."
-                       Margin="0,6,0,0"
-                       Foreground="#6B7280"
-                       FontSize="13"/>
-        </StackPanel>
-
-        <Grid Grid.Row="2">
+        <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="247"/>
-                <ColumnDefinition Width="4"/>
-                <ColumnDefinition/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="260"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Sol model listesi -->
+            <StackPanel>
+                <TextBlock Text="Model Bilgileri"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           Foreground="#111827"/>
+
+                <TextBlock Text="Secili modele ait property ve deger bilgilerini goruntuleyin."
+                           Margin="0,6,0,0"
+                           Foreground="#6B7280"
+                           FontSize="13"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1">
+                <TextBlock Text="Arama"
+                           Style="{StaticResource MutedTextStyle}"
+                           Margin="0,0,0,4"/>
+                <TextBox x:Name="txtSearch"
+                         Height="34"
+                         Padding="10,7"
+                         VerticalContentAlignment="Center"
+                         BorderBrush="#CBD5E1"
+                         BorderThickness="1"
+                         Background="White"
+                         Foreground="#111827"
+                         TextChanged="TxtSearch_TextChanged"
+                         ToolTip="En az 3 karakterle model, nesne, property veya deger ara"/>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2"
+                Background="#F8FAFC"
+                BorderBrush="#E5E7EB"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="Durum"
+                           Style="{StaticResource MutedTextStyle}"
+                           VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding StatusMessage}"
+                           Foreground="#374151"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
             <Border Background="#F9FAFB"
                     BorderBrush="#E5E7EB"
                     BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="12" Margin="0,0,10,0">
+                    CornerRadius="8"
+                    Padding="12">
 
                 <DockPanel>
                     <TextBlock Text="Modeller"
@@ -54,27 +114,35 @@
                                Foreground="#374151"
                                Margin="0,0,0,12"/>
 
-                    <TreeView ItemsSource="{Binding ModelItems}"
+                    <TreeView x:Name="treeModel"
+                              ItemsSource="{Binding ModelItems}"
                               ItemContainerStyle="{StaticResource ModelTreeViewItemStyle}"
                               SelectedItemChanged="ModelTreeView_SelectedItemChanged"
                               BorderThickness="0"
-                              Background="Transparent">
+                              Background="Transparent"
+                              VirtualizingStackPanel.IsVirtualizing="True"
+                              VirtualizingStackPanel.VirtualizationMode="Recycling"
+                              ScrollViewer.CanContentScroll="True"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                <TextBlock Text="{Binding Name}"/>
+                                <TextBlock Text="{Binding Name}"
+                                           MinHeight="28"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"/>
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
                     </TreeView>
                 </DockPanel>
             </Border>
 
-            <!-- Sag property tablosu -->
-            <Border
+            <Border Grid.Column="2"
                     Background="#F9FAFB"
                     BorderBrush="#E5E7EB"
                     BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="12" Margin="3,0,0,0" Grid.Column="2">
+                    CornerRadius="8"
+                    Padding="12">
 
                 <DockPanel>
                     <TextBlock Text="Property Detaylari"
@@ -87,10 +155,14 @@
                     <DataGrid ItemsSource="{Binding Properties}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
                               HeadersVisibility="Column"
                               GridLinesVisibility="None"
                               RowHeight="36"
                               ColumnHeaderHeight="38"
+                              EnableRowVirtualization="True"
+                              EnableColumnVirtualization="True"
                               BorderThickness="0"
                               Background="White"
                               AlternatingRowBackground="#F3F4F6"
