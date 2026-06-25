@@ -331,6 +331,16 @@ namespace Veloxap.AddIn.Erwin.Services
                 return;
             }
 
+            if (IsAssetValueSame(calculation.AssetValueProperty, calculation.ResultLevel, calculation.ResultValue))
+            {
+                result.UnchangedTables++;
+                result.Messages.Add(BuildNoChangeMessage(
+                    calculation.TableName,
+                    calculation.ToFormulaText()));
+                return;
+            }
+
+            string previousValue = GetPropertyDisplayValue(calculation.AssetValueProperty);
             string writtenValue;
             if (!TrySetPropertyValue(
                 targetProperty,
@@ -346,6 +356,11 @@ namespace Veloxap.AddIn.Erwin.Services
             calculation.AssetValueProperty.setoPropertyValue(writtenValue);
             calculation.AssetValueProperty.setoPropertyFormatAsString(calculation.ResultValue);
             result.UpdatedTables++;
+            result.Messages.Add(BuildUpdatedMessage(
+                calculation.TableName,
+                calculation.ToFormulaText(),
+                previousValue,
+                calculation.ResultValue));
         }
 
         private void ApplyBankRelativeCalculation(
@@ -372,6 +387,16 @@ namespace Veloxap.AddIn.Erwin.Services
                 return;
             }
 
+            if (IsIntegerValueSame(calculation.BankRelativeValueProperty, calculation.ResultValue))
+            {
+                result.UnchangedTables++;
+                result.Messages.Add(BuildNoChangeMessage(
+                    calculation.TableName,
+                    calculation.ToFormulaText()));
+                return;
+            }
+
+            string previousValue = GetPropertyDisplayValue(calculation.BankRelativeValueProperty);
             string writtenValue;
             if (!TrySetPropertyValue(
                 targetProperty,
@@ -386,6 +411,11 @@ namespace Veloxap.AddIn.Erwin.Services
             calculation.BankRelativeValueProperty.setoPropertyValue(writtenValue);
             calculation.BankRelativeValueProperty.setoPropertyFormatAsString(writtenValue);
             result.UpdatedTables++;
+            result.Messages.Add(BuildUpdatedMessage(
+                calculation.TableName,
+                calculation.ToFormulaText(),
+                previousValue,
+                writtenValue));
         }
 
         private void ApplySecurityClassCalculation(
@@ -412,6 +442,16 @@ namespace Veloxap.AddIn.Erwin.Services
                 return;
             }
 
+            if (IsLongValueSame(calculation.SecurityClassValueProperty, calculation.ResultValue))
+            {
+                result.UnchangedTables++;
+                result.Messages.Add(BuildNoChangeMessage(
+                    calculation.TableName,
+                    calculation.ToFormulaText()));
+                return;
+            }
+
+            string previousValue = GetPropertyDisplayValue(calculation.SecurityClassValueProperty);
             string writtenValue;
             if (!TrySetPropertyValue(
                 targetProperty,
@@ -426,6 +466,11 @@ namespace Veloxap.AddIn.Erwin.Services
             calculation.SecurityClassValueProperty.setoPropertyValue(writtenValue);
             calculation.SecurityClassValueProperty.setoPropertyFormatAsString(writtenValue);
             result.UpdatedTables++;
+            result.Messages.Add(BuildUpdatedMessage(
+                calculation.TableName,
+                calculation.ToFormulaText(),
+                previousValue,
+                writtenValue));
         }
 
         private SCAPI.ModelObject FindTargetTable(
@@ -584,6 +629,92 @@ namespace Veloxap.AddIn.Erwin.Services
 
             writtenValue = string.Empty;
             return false;
+        }
+
+        private static bool IsAssetValueSame(
+            ObjectProperty property,
+            int resultLevel,
+            string resultValue)
+        {
+            if (property == null)
+                return false;
+
+            int currentLevel;
+            if (TryResolveLevel(property, out currentLevel) && currentLevel == resultLevel)
+                return true;
+
+            return AreDisplayValuesSame(GetPropertyDisplayValue(property), resultValue);
+        }
+
+        private static bool IsIntegerValueSame(ObjectProperty property, int resultValue)
+        {
+            if (property == null)
+                return false;
+
+            int currentValue;
+            if (TryResolveLeadingInteger(property, out currentValue) && currentValue == resultValue)
+                return true;
+
+            return AreDisplayValuesSame(
+                GetPropertyDisplayValue(property),
+                resultValue.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static bool IsLongValueSame(ObjectProperty property, long resultValue)
+        {
+            if (property == null)
+                return false;
+
+            long currentValue;
+            if (TryResolveLeadingLong(property, out currentValue) && currentValue == resultValue)
+                return true;
+
+            return AreDisplayValuesSame(
+                GetPropertyDisplayValue(property),
+                resultValue.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static bool AreDisplayValuesSame(string left, string right)
+        {
+            return string.Equals(
+                NormalizeValue(left),
+                NormalizeValue(right),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetPropertyDisplayValue(ObjectProperty property)
+        {
+            if (property == null)
+                return string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(property.getoPropertyFormatAsString()))
+                return property.getoPropertyFormatAsString();
+
+            return property.getoPropertyValue() ?? string.Empty;
+        }
+
+        private static string BuildUpdatedMessage(
+            string tableName,
+            string formulaText,
+            string previousValue,
+            string writtenValue)
+        {
+            return Safe(tableName, "(adsiz tablo)") +
+                   ": " +
+                   formulaText +
+                   " (guncellendi: " +
+                   Safe(previousValue, "-") +
+                   " -> " +
+                   Safe(writtenValue, "-") +
+                   ")";
+        }
+
+        private static string BuildNoChangeMessage(string tableName, string formulaText)
+        {
+            return Safe(tableName, "(adsiz tablo)") +
+                   ": " +
+                   formulaText +
+                   " (degismedi)";
         }
 
         private static object ConvertValueForTarget(
@@ -987,6 +1118,41 @@ namespace Veloxap.AddIn.Erwin.Services
                 out level);
         }
 
+        private static bool TryResolveLeadingLong(ObjectProperty property, out long value)
+        {
+            if (TryResolveLeadingLongText(property.getoPropertyFormatAsString(), out value))
+                return true;
+
+            if (TryResolveLeadingLongText(property.getoPropertyValue(), out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        private static bool TryResolveLeadingLongText(string value, out long number)
+        {
+            number = 0;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string trimmed = value.Trim();
+            int index = 0;
+
+            while (index < trimmed.Length && char.IsDigit(trimmed[index]))
+                index++;
+
+            if (index == 0)
+                return false;
+
+            return long.TryParse(
+                trimmed.Substring(0, index),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out number);
+        }
+
         private static bool TryResolveParenthesizedInteger(ObjectProperty property, out int level)
         {
             if (TryResolveParenthesizedIntegerText(property.getoPropertyFormatAsString(), out level))
@@ -1229,6 +1395,8 @@ namespace Veloxap.AddIn.Erwin.Services
 
         public int UpdatedTables { get; set; }
 
+        public int UnchangedTables { get; set; }
+
         public int SkippedTables { get; set; }
 
         public int FailedTables { get; set; }
@@ -1238,6 +1406,7 @@ namespace Veloxap.AddIn.Erwin.Services
         public string ToSummary()
         {
             return UpdatedTables + " tablo guncellendi, " +
+                   UnchangedTables + " tablo degismedi, " +
                    SkippedTables + " tablo atlandi, " +
                    FailedTables + " hata";
         }
@@ -1265,6 +1434,11 @@ namespace Veloxap.AddIn.Erwin.Services
         public int TotalSkippedTables
         {
             get { return Operations.Sum(operation => operation.SkippedTables); }
+        }
+
+        public int TotalUnchangedTables
+        {
+            get { return Operations.Sum(operation => operation.UnchangedTables); }
         }
 
         public int TotalFailedTables
@@ -1306,6 +1480,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 return "Tablo UDP islemleri calismadi.";
 
             return TotalUpdatedTables + " guncellendi, " +
+                   TotalUnchangedTables + " degismedi, " +
                    TotalSkippedTables + " atlandi, " +
                    TotalFailedTables + " hata";
         }
@@ -1320,6 +1495,8 @@ namespace Veloxap.AddIn.Erwin.Services
         public string Name { get; private set; }
 
         public int UpdatedTables { get; private set; }
+
+        public int UnchangedTables { get; private set; }
 
         public int SkippedTables { get; private set; }
 
@@ -1339,9 +1516,10 @@ namespace Veloxap.AddIn.Erwin.Services
             get
             {
                 if (!string.IsNullOrWhiteSpace(ErrorMessage))
-                    return ErrorMessage;
+                return ErrorMessage;
 
                 return UpdatedTables + " guncellendi, " +
+                       UnchangedTables + " degismedi, " +
                        SkippedTables + " atlandi, " +
                        FailedTables + " hata";
             }
@@ -1370,6 +1548,7 @@ namespace Veloxap.AddIn.Erwin.Services
             {
                 Name = name ?? string.Empty,
                 UpdatedTables = result == null ? 0 : result.UpdatedTables,
+                UnchangedTables = result == null ? 0 : result.UnchangedTables,
                 SkippedTables = result == null ? 0 : result.SkippedTables,
                 FailedTables = result == null ? 0 : result.FailedTables,
                 Messages = result == null
@@ -1415,6 +1594,19 @@ namespace Veloxap.AddIn.Erwin.Services
         public string ResultValue { get; set; }
 
         public ObjectProperty AssetValueProperty { get; set; }
+
+        public string ToFormulaText()
+        {
+            return "Erisilebilirlik(" +
+                   AvailabilityLevel +
+                   ") & Butunluk(" +
+                   IntegrityLevel +
+                   ") & Gizlilik_Seviyesi(" +
+                   ConfidentialityLevel +
+                   ") = Veri_Degeri(" +
+                   (string.IsNullOrWhiteSpace(ResultValue) ? "-" : ResultValue) +
+                   ")";
+        }
     }
 
     internal sealed class BankRelativeValueCalculation : TableUdpCalculationBase
@@ -1426,6 +1618,17 @@ namespace Veloxap.AddIn.Erwin.Services
         public int ResultValue { get; set; }
 
         public ObjectProperty BankRelativeValueProperty { get; set; }
+
+        public string ToFormulaText()
+        {
+            return "Veri_Degeri(" +
+                   AssetLevel +
+                   ") & Is_Sureci_Seviyesi(" +
+                   BusinessProcessLevel +
+                   ") = Banka_Gorece_Degeri(" +
+                   ResultValue +
+                   ")";
+        }
     }
 
     internal sealed class SecurityClassValueCalculation : TableUdpCalculationBase
@@ -1437,5 +1640,16 @@ namespace Veloxap.AddIn.Erwin.Services
         public long ResultValue { get; set; }
 
         public ObjectProperty SecurityClassValueProperty { get; set; }
+
+        public string ToFormulaText()
+        {
+            return "Banka_Gorece_Degeri(" +
+                   BankRelativeValue +
+                   ") & Kisisel/Hassas Veri Sayisi(" +
+                   TrueFlagCount +
+                   ") = Guvenlik_Sinifi_Degeri(" +
+                   ResultValue +
+                   ")";
+        }
     }
 }

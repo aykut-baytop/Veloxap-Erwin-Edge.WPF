@@ -225,6 +225,18 @@
                                                                        FontSize="12"
                                                                        Foreground="#6B7280"
                                                                        TextWrapping="Wrap"/>
+                                                            <ItemsControl ItemsSource="{Binding Messages}"
+                                                                          Margin="0,6,0,0">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding}"
+                                                                                   FontSize="11"
+                                                                                   Foreground="#4B5563"
+                                                                                   TextWrapping="Wrap"
+                                                                                   Margin="0,0,0,4"/>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
                                                         </StackPanel>
                                                     </Border>
                                                 </DataTemplate>
