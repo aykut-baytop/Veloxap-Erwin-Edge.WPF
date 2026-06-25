@@ -203,7 +203,8 @@
                 </RadioButton>
                 <RadioButton x:Name="rbTableUdps"
              GroupName="MainMenu"
-             Style="{StaticResource SideMenuButtonStyle}">
+             Style="{StaticResource SideMenuButtonStyle}"
+             Visibility="Collapsed">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE80A;" Style="{StaticResource SideMenuIconStyle}"/>
                         <TextBlock Text="Tablo UDP'leri" Style="{StaticResource SideMenuTextStyle}"/>

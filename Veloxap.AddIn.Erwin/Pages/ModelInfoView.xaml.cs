@@ -10,15 +10,31 @@ namespace Veloxap.AddIn.Erwin.Pages
     public partial class ModelInfoView : UserControl
     {
         private const int SearchDelayMilliseconds = 500;
+        private readonly ModelInfo tableUdpModelInfo;
+        private readonly SCAPI.Application tableUdpApplication;
+        private readonly SCAPI.PersistenceUnit tableUdpPersistenceUnit;
         private readonly DispatcherTimer searchTimer;
 
         public ModelInfoView()
-            : this(null)
+            : this(null, null, null, false)
         {
         }
 
         internal ModelInfoView(ModelInfo modelInfo)
+            : this(modelInfo, null, null, false)
         {
+        }
+
+        internal ModelInfoView(
+            ModelInfo modelInfo,
+            SCAPI.Application application,
+            SCAPI.PersistenceUnit persistenceUnit,
+            bool showTableUdpTab)
+        {
+            tableUdpModelInfo = modelInfo;
+            tableUdpApplication = application;
+            tableUdpPersistenceUnit = persistenceUnit;
+
             searchTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(SearchDelayMilliseconds)
@@ -26,10 +42,39 @@ namespace Veloxap.AddIn.Erwin.Pages
             searchTimer.Tick += SearchTimer_Tick;
 
             InitializeComponent();
+            tabModelSections.SelectionChanged += TabModelSections_SelectionChanged;
 
             DataContext = modelInfo == null
                 ? new ModelInfoViewModel()
                 : new ModelInfoViewModel(modelInfo);
+
+            if (showTableUdpTab)
+            {
+                tabModelSections.SelectedItem = tabTableUdps;
+                EnsureTableUdpViewLoaded();
+            }
+        }
+
+        private void TabModelSections_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.OriginalSource != tabModelSections)
+                return;
+
+            EnsureTableUdpViewLoaded();
+        }
+
+        private void EnsureTableUdpViewLoaded()
+        {
+            if (tabModelSections.SelectedItem != tabTableUdps ||
+                tableUdpContent.Content != null)
+            {
+                return;
+            }
+
+            tableUdpContent.Content = new ModelUdpView(
+                tableUdpModelInfo,
+                tableUdpApplication,
+                tableUdpPersistenceUnit);
         }
 
         private void ModelTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

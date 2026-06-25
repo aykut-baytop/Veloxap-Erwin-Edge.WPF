@@ -90,7 +90,13 @@ namespace Veloxap.AddIn.Erwin
         private async void Menu_Checked(object sender, RoutedEventArgs e)
         {
             if (sender == rbModelInfo)
-                MainContent.Content = new ModelInfoView(currentModelInfo);
+            {
+                MainContent.Content = new ModelInfoView(
+                    currentModelInfo,
+                    oApp,
+                    GetCurrentPersistenceUnit(),
+                    false);
+            }
 
             else if (sender == rbCompare)
             {
@@ -102,10 +108,11 @@ namespace Veloxap.AddIn.Erwin
 
             else if (sender == rbTableUdps)
             {
-                MainContent.Content = new ModelUdpView(
+                MainContent.Content = new ModelInfoView(
                     currentModelInfo,
                     oApp,
-                    GetCurrentPersistenceUnit());
+                    GetCurrentPersistenceUnit(),
+                    true);
             }
 
             else if (sender == rbValidation)
@@ -251,20 +258,21 @@ namespace Veloxap.AddIn.Erwin
                 selectedModel.ObjectId,
                 selectedModel.PersistenceObjectId);
 
-            _ = ApplyTableUdpsOnStartupAsync(
-                currentModelInfo,
-                GetCurrentPersistenceUnit());
-
             if (rbModelInfo.IsChecked == true)
             {
-                MainContent.Content = new ModelInfoView(currentModelInfo);
+                MainContent.Content = new ModelInfoView(
+                    currentModelInfo,
+                    oApp,
+                    GetCurrentPersistenceUnit(),
+                    false);
             }
             else if (rbTableUdps.IsChecked == true)
             {
-                MainContent.Content = new ModelUdpView(
+                MainContent.Content = new ModelInfoView(
                     currentModelInfo,
                     oApp,
-                    GetCurrentPersistenceUnit());
+                    GetCurrentPersistenceUnit(),
+                    true);
             }
             //else if (rbRules.IsChecked == true)
             //{

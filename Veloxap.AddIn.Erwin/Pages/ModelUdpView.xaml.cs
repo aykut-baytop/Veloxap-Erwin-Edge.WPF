@@ -9,13 +9,17 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Veloxap.AddIn.Erwin.Models;
+using Veloxap.AddIn.Erwin.Services;
 
 namespace Veloxap.AddIn.Erwin.Pages
 {
     public partial class ModelUdpView : UserControl
     {
         private readonly ModelInfo modelInfo;
+        private readonly SCAPI.Application application;
+        private readonly SCAPI.PersistenceUnit persistenceUnit;
         private readonly List<UdpRow> allRows;
+        private readonly HashSet<string> calculatedUdpKeys;
         private readonly ObservableCollection<UdpDetailRow> selectedDetails;
         private readonly DispatcherTimer searchTimer;
         private const int MinimumSearchLength = 3;
@@ -41,7 +45,10 @@ namespace Veloxap.AddIn.Erwin.Pages
             SCAPI.PersistenceUnit persistenceUnit)
         {
             this.modelInfo = modelInfo;
+            this.application = application;
+            this.persistenceUnit = persistenceUnit;
             allRows = new List<UdpRow>();
+            calculatedUdpKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             selectedDetails = new ObservableCollection<UdpDetailRow>();
             searchTimer = new DispatcherTimer
             {
@@ -94,13 +101,18 @@ namespace Veloxap.AddIn.Erwin.Pages
             ApplyFilter();
         }
 
-        private void TreeUdp_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        private async void TreeUdp_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
             var node = e.NewValue as UdpTreeNode;
             if (node != null && node.IsPlaceholder)
                 return;
 
             ShowDetails(node);
+
+            if (node == null || node.Row == null)
+                return;
+
+            await CalculateSelectedUdpAsync(node.Row);
         }
 
         private void TreeUdpItem_Loaded(object sender, RoutedEventArgs e)
@@ -279,57 +291,28 @@ namespace Veloxap.AddIn.Erwin.Pages
             {
                 List<UdpRow> tableRows = tableGroup.ToList();
                 string nodeKey = BuildTableNodeKey(tableGroup.Key);
+                string udpNames = string.Join(
+                    ", ",
+                    tableRows
+                        .Select(row => row.UdpName)
+                        .Where(name => !string.IsNullOrWhiteSpace(name))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+
                 var tableNode = UdpTreeNode.CreateGroup(
                     tableGroup.Key + " (" + tableRows.Count + ")",
                     0,
                     "Tablo",
                     tableGroup.Key,
                     string.Empty,
+                    udpNames,
                     tableRows.Count,
                     nodeKey,
                     ShouldExpandNode(nodeKey, treeState, expandSearchResults),
                     ShouldSelectNode(nodeKey, treeState),
-                    () => BuildObjectNodes(
-                        tableGroup.Key,
-                        tableRows,
-                        treeState,
-                        expandSearchResults));
+                    () => BuildUdpLeafNodes(tableRows, treeState));
 
                 nodes.Add(tableNode);
-            }
-
-            return nodes;
-        }
-
-        private static List<UdpTreeNode> BuildObjectNodes(
-            string tableName,
-            IList<UdpRow> rows,
-            TreeState treeState,
-            bool expandSearchResults)
-        {
-            var nodes = new List<UdpTreeNode>();
-
-            if (rows == null || rows.Count == 0)
-                return nodes;
-
-            foreach (var objectGroup in rows.GroupBy(BuildObjectGroupKey)
-                                            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
-            {
-                List<UdpRow> objectRows = objectGroup.ToList();
-                string nodeKey = BuildObjectNodeKey(tableName, objectGroup.Key);
-                var objectNode = UdpTreeNode.CreateGroup(
-                    objectGroup.Key + " (" + objectRows.Count + ")",
-                    12,
-                    "Nesne",
-                    tableName,
-                    objectGroup.Key,
-                    objectRows.Count,
-                    nodeKey,
-                    ShouldExpandNode(nodeKey, treeState, expandSearchResults),
-                    ShouldSelectNode(nodeKey, treeState),
-                    () => BuildUdpLeafNodes(objectRows, treeState));
-
-                nodes.Add(objectNode);
             }
 
             return nodes;
@@ -414,14 +397,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             return "T|" + Safe(tableName, string.Empty);
         }
 
-        private static string BuildObjectNodeKey(string tableName, string objectName)
-        {
-            return "O|" +
-                   Safe(tableName, string.Empty) +
-                   "|" +
-                   Safe(objectName, string.Empty);
-        }
-
         private static string BuildUdpNodeKey(UdpRow row)
         {
             if (row == null)
@@ -430,22 +405,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             return "U|" +
                    Safe(row.TableName, string.Empty) +
                    "|" +
-                   BuildObjectGroupKey(row) +
-                   "|" +
                    Safe(row.UdpName, string.Empty);
-        }
-
-        private static string BuildObjectGroupKey(UdpRow row)
-        {
-            if (row == null)
-                return string.Empty;
-
-            if (string.Equals(row.ObjectType, "Tablo", StringComparison.OrdinalIgnoreCase))
-                return "Tablo";
-
-            return string.IsNullOrWhiteSpace(row.ColumnName)
-                ? Safe(row.ObjectType, "Nesne")
-                : row.ObjectType + ": " + row.ColumnName;
         }
 
         private void ShowDetails(UdpTreeNode node)
@@ -455,7 +415,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (node == null)
             {
                 txtDetailTitle.Text = "UDP Detaylari";
-                AddDetail("Secim", "Soldaki agactan bir tablo, nesne veya UDP secin.");
+                AddDetail("Secim", "Soldaki agactan bir tablo veya UDP secin.");
                 return;
             }
 
@@ -463,20 +423,109 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             if (node.Row == null)
             {
-                AddDetail("Tip", node.NodeType);
                 AddDetail("Tablo", node.TableName);
-                AddDetail("Nesne", node.ObjectName);
                 AddDetail("UDP Sayisi", node.Count.ToString());
+                AddDetail("UDP'ler", node.UdpNames);
                 return;
             }
 
             AddDetail("Tablo", node.Row.TableName);
-            AddDetail("Nesne", node.Row.ObjectType);
-            AddDetail("Kolon", node.Row.ColumnName);
             AddDetail("UDP", node.Row.UdpName);
             AddDetail("Deger", node.Row.Value);
-            AddDetail("As String", node.Row.AsString);
-            AddDetail("Tip", node.Row.DataType);
+        }
+
+        private async Task CalculateSelectedUdpAsync(UdpRow row)
+        {
+            if (row == null || isLoading)
+                return;
+
+            string targetUdpKey = ResolveTargetUdpKey(row.UdpName);
+            if (string.IsNullOrWhiteSpace(targetUdpKey))
+                return;
+
+            if (calculatedUdpKeys.Contains(targetUdpKey))
+                return;
+
+            Func<TableUdpSecurityService, ModelInfo, TableUdpSecurityApplyResult> operation =
+                ResolveCalculationOperation(targetUdpKey);
+
+            if (operation == null)
+                return;
+
+            if (modelInfo == null || application == null || persistenceUnit == null)
+            {
+                SetStatus("Hesaplama icin erwin oturumu hazir degil.", true);
+                return;
+            }
+
+            SetLoading(true);
+            SetStatus(row.UdpName + " hesaplaniyor...", false);
+            await Task.Yield();
+
+            try
+            {
+                var service = new TableUdpSecurityService(
+                    application,
+                    persistenceUnit);
+
+                TableUdpSecurityApplyResult result = operation(service, modelInfo);
+
+                calculatedUdpKeys.Add(targetUdpKey);
+                string summary = result == null ? string.Empty : result.ToSummary();
+
+                await ReloadRowsAsync(row.UdpName + " hesaplandi. " + summary, true);
+                SetStatus(row.UdpName + " hesaplandi. " + summary, false);
+            }
+            catch (Exception ex)
+            {
+                SetStatus(row.UdpName + " hesaplanamadi: " + ex.Message, true);
+            }
+            finally
+            {
+                SetLoading(false);
+            }
+        }
+
+        private static Func<TableUdpSecurityService, ModelInfo, TableUdpSecurityApplyResult> ResolveCalculationOperation(
+            string normalizedUdpName)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedUdpName))
+                return null;
+
+            if (string.Equals(normalizedUdpName, "veridegeri", StringComparison.OrdinalIgnoreCase))
+                return (service, currentModelInfo) => service.Apply(currentModelInfo);
+
+            if (string.Equals(normalizedUdpName, "bankagorecedegeri", StringComparison.OrdinalIgnoreCase))
+                return (service, currentModelInfo) => service.ApplyBankRelativeValue(currentModelInfo);
+
+            if (string.Equals(normalizedUdpName, "guvenliksinifidegeri", StringComparison.OrdinalIgnoreCase))
+                return (service, currentModelInfo) => service.ApplySecurityClassValue(currentModelInfo);
+
+            return null;
+        }
+
+        private static string ResolveTargetUdpKey(string propertyName)
+        {
+            string normalizedName = NormalizeUdpName(propertyName);
+
+            if (string.IsNullOrWhiteSpace(normalizedName) ||
+                normalizedName.EndsWith(
+                    "sirkapsamindakiveridegeri",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            if (normalizedName.EndsWith("veridegeri", StringComparison.OrdinalIgnoreCase))
+                return "veridegeri";
+
+            if (normalizedName.EndsWith("bankagorecedegeri", StringComparison.OrdinalIgnoreCase))
+                return "bankagorecedegeri";
+
+            if (normalizedName.EndsWith("guvenliksinifidegeri", StringComparison.OrdinalIgnoreCase))
+                return "guvenliksinifidegeri";
+
+            return string.Empty;
         }
 
         private void AddDetail(string property, string value)
@@ -580,8 +629,6 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             foreach (var table in EnumerateTables(objects))
             {
-                result.TableCount++;
-
                 string tableName = Safe(table.getoName(), "(adsiz tablo)");
                 var properties = table.getoObjectProperty();
 
@@ -594,44 +641,20 @@ namespace Veloxap.AddIn.Erwin.Pages
 
                         result.Rows.Add(CreateUdpRow(
                             tableName,
-                            "Tablo",
-                            string.Empty,
                             Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
-                            Safe(property.getoPropertyValue(), string.Empty),
-                            Safe(property.getoPropertyFormatAsString(), string.Empty),
-                            Safe(property.getoPropertyType(), string.Empty)));
-                    }
-                }
-
-                foreach (var column in EnumerateColumns(table))
-                {
-                    string columnName = Safe(column.getoName(), "(adsiz kolon)");
-                    var columnProperties = column.getoObjectProperty();
-
-                    if (columnProperties == null)
-                        continue;
-
-                    foreach (var property in columnProperties)
-                    {
-                        if (!IsUdpProperty(property))
-                            continue;
-
-                        result.Rows.Add(CreateUdpRow(
-                            tableName,
-                            "Kolon",
-                            columnName,
-                            Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
-                            Safe(property.getoPropertyValue(), string.Empty),
-                            Safe(property.getoPropertyFormatAsString(), string.Empty),
-                            Safe(property.getoPropertyType(), string.Empty)));
+                            Safe(property.getoPropertyValue(), string.Empty)));
                     }
                 }
             }
 
+            result.TableCount = result.Rows
+                .Select(row => row.TableName)
+                .Where(tableName => !string.IsNullOrWhiteSpace(tableName))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+
             result.Rows = result.Rows
                 .OrderBy(row => row.TableName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.ObjectType, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.ColumnName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(row => row.UdpName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -640,22 +663,14 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private static UdpRow CreateUdpRow(
             string tableName,
-            string objectType,
-            string columnName,
             string udpName,
-            string value,
-            string asString,
-            string dataType)
+            string value)
         {
             var row = new UdpRow
             {
                 TableName = tableName,
-                ObjectType = objectType,
-                ColumnName = columnName,
                 UdpName = udpName,
-                Value = value,
-                AsString = asString,
-                DataType = dataType
+                Value = value
             };
 
             row.SearchText = BuildSearchText(row);
@@ -672,11 +687,8 @@ namespace Veloxap.AddIn.Erwin.Pages
                 new[]
                 {
                     row.TableName,
-                    row.ObjectType,
-                    row.ColumnName,
                     row.UdpName,
-                    row.Value,
-                    row.AsString
+                    row.Value
                 }.Where(value => !string.IsNullOrWhiteSpace(value)));
         }
 
@@ -702,28 +714,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
         }
 
-        private static IEnumerable<ModelObject> EnumerateColumns(ModelObject table)
-        {
-            if (table == null)
-                yield break;
-
-            var children = table.getoModelObject();
-            if (children == null)
-                yield break;
-
-            foreach (var child in children)
-            {
-                if (child == null)
-                    continue;
-
-                if (string.Equals(child.getoClassName(), "Attribute", StringComparison.OrdinalIgnoreCase))
-                    yield return child;
-
-                foreach (var nestedChild in EnumerateColumns(child))
-                    yield return nestedChild;
-            }
-        }
-
         private static bool IsUdpProperty(ObjectProperty property)
         {
             if (property == null)
@@ -733,36 +723,22 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (string.IsNullOrWhiteSpace(propertyName))
                 return false;
 
-            return propertyName.Contains(".") ||
-                   propertyName.IndexOf("UDP", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   propertyName.IndexOf("User Defined", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   IsKnownSecurityUdp(propertyName);
+            return IsTargetTableUdp(propertyName);
         }
 
-        private static bool IsKnownSecurityUdp(string propertyName)
+        private static bool IsTargetTableUdp(string propertyName)
         {
-            if (string.IsNullOrWhiteSpace(propertyName))
-                return false;
+            return !string.IsNullOrWhiteSpace(ResolveTargetUdpKey(propertyName));
+        }
 
-            string normalizedName = propertyName
-                .Replace("_", string.Empty)
-                .Replace(" ", string.Empty)
-                .ToLowerInvariant();
-
-            string[] knownNames =
-            {
-                "erisilebilirlik",
-                "butunluk",
-                "gizlilikseviyesi",
-                "veridegeri",
-                "issureciseviyesi",
-                "bankagorecedegeri",
-                "kisiselverimi",
-                "hassasverimi",
-                "guvenliksinifidegeri"
-            };
-
-            return knownNames.Any(name => normalizedName.EndsWith(name));
+        private static string NormalizeUdpName(string propertyName)
+        {
+            return string.IsNullOrWhiteSpace(propertyName)
+                ? string.Empty
+                : propertyName
+                    .Replace("_", string.Empty)
+                    .Replace(" ", string.Empty)
+                    .ToLowerInvariant();
         }
 
         private static bool Contains(string value, string filter)
@@ -782,17 +758,9 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             public string TableName { get; set; }
 
-            public string ObjectType { get; set; }
-
-            public string ColumnName { get; set; }
-
             public string UdpName { get; set; }
 
             public string Value { get; set; }
-
-            public string AsString { get; set; }
-
-            public string DataType { get; set; }
 
             public string SearchText { get; set; }
         }
@@ -865,6 +833,8 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         public string ObjectName { get; set; }
 
+        public string UdpNames { get; set; }
+
         public int Count { get; set; }
 
         public string NodeKey { get; set; }
@@ -885,6 +855,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             string nodeType,
             string tableName,
             string objectName,
+            string udpNames,
             int count,
             string nodeKey,
             bool isExpanded,
@@ -900,6 +871,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 NodeType = nodeType,
                 TableName = tableName,
                 ObjectName = objectName,
+                UdpNames = udpNames,
                 Count = count,
                 NodeKey = nodeKey,
                 IsExpanded = isExpanded,
@@ -915,12 +887,12 @@ namespace Veloxap.AddIn.Erwin.Pages
             return new UdpTreeNode
             {
                 Title = row == null ? string.Empty : row.UdpName,
-                IndentMargin = new Thickness(24, 0, 0, 0),
+                IndentMargin = new Thickness(12, 0, 0, 0),
                 FontWeight = FontWeights.Normal,
                 Foreground = new SolidColorBrush(Color.FromRgb(55, 65, 81)),
                 NodeType = "UDP",
                 TableName = row == null ? string.Empty : row.TableName,
-                ObjectName = row == null ? string.Empty : BuildObjectName(row),
+                ObjectName = string.Empty,
                 Count = 1,
                 NodeKey = nodeKey,
                 IsSelected = isSelected,
@@ -959,14 +931,5 @@ namespace Veloxap.AddIn.Erwin.Pages
             };
         }
 
-        private static string BuildObjectName(ModelUdpView.UdpRow row)
-        {
-            if (row == null)
-                return string.Empty;
-
-            return string.IsNullOrWhiteSpace(row.ColumnName)
-                ? row.ObjectType
-                : row.ObjectType + ": " + row.ColumnName;
-        }
     }
 }

@@ -79,7 +79,7 @@
                          Background="White"
                          Foreground="#111827"
                          TextChanged="TxtSearch_TextChanged"
-                         ToolTip="En az 3 karakterle tablo, kolon, UDP veya deger ara"/>
+                         ToolTip="En az 3 karakterle tablo, UDP veya deger ara"/>
             </StackPanel>
         </Grid>
 

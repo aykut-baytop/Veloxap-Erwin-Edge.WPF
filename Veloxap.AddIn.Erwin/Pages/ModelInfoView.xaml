@@ -26,173 +26,187 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Background="White">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="14"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <TabControl x:Name="tabModelSections"
+                Background="White"
+                BorderThickness="0"
+                Padding="0">
+        <TabItem Header="Model Bilgileri" HorizontalAlignment="Left" Margin="-2,-2,0,0" Width="92">
+            <Grid Background="White"
+                  Margin="0,12,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="260"/>
-            </Grid.ColumnDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="260"/>
+                    </Grid.ColumnDefinitions>
 
-            <StackPanel>
-                <TextBlock Text="Model Bilgileri"
-                           FontSize="22"
-                           FontWeight="SemiBold"
-                           Foreground="#111827"/>
+                    <StackPanel>
+                        <TextBlock Text="Model Bilgileri"
+                                   FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Foreground="#111827"/>
 
-                <TextBlock Text="Secili modele ait property ve deger bilgilerini goruntuleyin."
-                           Margin="0,6,0,0"
-                           Foreground="#6B7280"
-                           FontSize="13"/>
-            </StackPanel>
+                        <TextBlock Text="Secili modele ait property ve deger bilgilerini goruntuleyin."
+                                   Margin="0,6,0,0"
+                                   Foreground="#6B7280"
+                                   FontSize="13"/>
+                    </StackPanel>
 
-            <StackPanel Grid.Column="1">
-                <TextBlock Text="Arama"
-                           Style="{StaticResource MutedTextStyle}"
-                           Margin="0,0,0,4"/>
-                <TextBox x:Name="txtSearch"
-                         Height="34"
-                         Padding="10,7"
-                         VerticalContentAlignment="Center"
-                         BorderBrush="#CBD5E1"
-                         BorderThickness="1"
-                         Background="White"
-                         Foreground="#111827"
-                         TextChanged="TxtSearch_TextChanged"
-                         ToolTip="En az 3 karakterle model, nesne, property veya deger ara"/>
-            </StackPanel>
-        </Grid>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Arama"
+                                   Style="{StaticResource MutedTextStyle}"
+                                   Margin="0,0,0,4"/>
+                        <TextBox x:Name="txtSearch"
+                                 Height="34"
+                                 Padding="10,7"
+                                 VerticalContentAlignment="Center"
+                                 BorderBrush="#CBD5E1"
+                                 BorderThickness="1"
+                                 Background="White"
+                                 Foreground="#111827"
+                                 TextChanged="TxtSearch_TextChanged"
+                                 ToolTip="En az 3 karakterle model, nesne, property veya deger ara"/>
+                    </StackPanel>
+                </Grid>
 
-        <Border Grid.Row="2"
-                Background="#F8FAFC"
-                BorderBrush="#E5E7EB"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="140"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <Border Grid.Row="2"
+                        Background="#F8FAFC"
+                        BorderBrush="#E5E7EB"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Durum"
-                           Style="{StaticResource MutedTextStyle}"
-                           VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1"
-                           Text="{Binding StatusMessage}"
-                           Foreground="#374151"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center"/>
+                        <TextBlock Text="Durum"
+                                   Style="{StaticResource MutedTextStyle}"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding StatusMessage}"
+                                   Foreground="#374151"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="#F9FAFB"
+                            BorderBrush="#E5E7EB"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12">
+
+                        <DockPanel>
+                            <TextBlock Text="Modeller"
+                                       DockPanel.Dock="Top"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"
+                                       Foreground="#374151"
+                                       Margin="0,0,0,12"/>
+
+                            <TreeView x:Name="treeModel"
+                                      ItemsSource="{Binding ModelItems}"
+                                      ItemContainerStyle="{StaticResource ModelTreeViewItemStyle}"
+                                      SelectedItemChanged="ModelTreeView_SelectedItemChanged"
+                                      BorderThickness="0"
+                                      Background="Transparent"
+                                      VirtualizingStackPanel.IsVirtualizing="True"
+                                      VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                      ScrollViewer.CanContentScroll="True"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                        <TextBlock Text="{Binding Name}"
+                                                   MinHeight="28"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </DockPanel>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            Background="#F9FAFB"
+                            BorderBrush="#E5E7EB"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12">
+
+                        <DockPanel>
+                            <TextBlock Text="Property Detaylari"
+                                       DockPanel.Dock="Top"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"
+                                       Foreground="#374151"
+                                       Margin="0,0,0,12"/>
+
+                            <DataGrid ItemsSource="{Binding Properties}"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      IsReadOnly="True"
+                                      HeadersVisibility="Column"
+                                      GridLinesVisibility="None"
+                                      RowHeight="36"
+                                      ColumnHeaderHeight="38"
+                                      EnableRowVirtualization="True"
+                                      EnableColumnVirtualization="True"
+                                      BorderThickness="0"
+                                      Background="White"
+                                      AlternatingRowBackground="#F3F4F6"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Property"
+                                                        Binding="{Binding Property}"
+                                                        Width="320"
+                                                        MinWidth="320"/>
+
+                                    <DataGridTextColumn Header="DT"
+                                                        Binding="{Binding DataType}"
+                                                        Width="140"
+                                                        MinWidth="140"/>
+
+                                    <DataGridTextColumn Header="Value"
+                                                        Binding="{Binding Value}"
+                                                        Width="220"
+                                                        MinWidth="220"/>
+
+                                    <DataGridTextColumn Header="as String"
+                                                        Binding="{Binding AsString}"
+                                                        Width="260"
+                                                        MinWidth="260"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                    </Border>
+                </Grid>
             </Grid>
-        </Border>
+        </TabItem>
 
-        <Grid Grid.Row="4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <Border Background="#F9FAFB"
-                    BorderBrush="#E5E7EB"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="12">
-
-                <DockPanel>
-                    <TextBlock Text="Modeller"
-                               DockPanel.Dock="Top"
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               Foreground="#374151"
-                               Margin="0,0,0,12"/>
-
-                    <TreeView x:Name="treeModel"
-                              ItemsSource="{Binding ModelItems}"
-                              ItemContainerStyle="{StaticResource ModelTreeViewItemStyle}"
-                              SelectedItemChanged="ModelTreeView_SelectedItemChanged"
-                              BorderThickness="0"
-                              Background="Transparent"
-                              VirtualizingStackPanel.IsVirtualizing="True"
-                              VirtualizingStackPanel.VirtualizationMode="Recycling"
-                              ScrollViewer.CanContentScroll="True"
-                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                              ScrollViewer.VerticalScrollBarVisibility="Auto">
-                        <TreeView.ItemTemplate>
-                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                <TextBlock Text="{Binding Name}"
-                                           MinHeight="28"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </HierarchicalDataTemplate>
-                        </TreeView.ItemTemplate>
-                    </TreeView>
-                </DockPanel>
-            </Border>
-
-            <Border Grid.Column="2"
-                    Background="#F9FAFB"
-                    BorderBrush="#E5E7EB"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="12">
-
-                <DockPanel>
-                    <TextBlock Text="Property Detaylari"
-                               DockPanel.Dock="Top"
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               Foreground="#374151"
-                               Margin="0,0,0,12"/>
-
-                    <DataGrid ItemsSource="{Binding Properties}"
-                              AutoGenerateColumns="False"
-                              CanUserAddRows="False"
-                              CanUserDeleteRows="False"
-                              IsReadOnly="True"
-                              HeadersVisibility="Column"
-                              GridLinesVisibility="None"
-                              RowHeight="36"
-                              ColumnHeaderHeight="38"
-                              EnableRowVirtualization="True"
-                              EnableColumnVirtualization="True"
-                              BorderThickness="0"
-                              Background="White"
-                              AlternatingRowBackground="#F3F4F6"
-                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              ScrollViewer.VerticalScrollBarVisibility="Auto">
-
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Property"
-                                                Binding="{Binding Property}"
-                                                Width="320"
-                                                MinWidth="320"/>
-
-                            <DataGridTextColumn Header="DT"
-                                                Binding="{Binding DataType}"
-                                                Width="140"
-                                                MinWidth="140"/>
-
-                            <DataGridTextColumn Header="Value"
-                                                Binding="{Binding Value}"
-                                                Width="220"
-                                                MinWidth="220"/>
-
-                            <DataGridTextColumn Header="as String"
-                                                Binding="{Binding AsString}"
-                                                Width="260"
-                                                MinWidth="260"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </DockPanel>
-            </Border>
-        </Grid>
-    </Grid>
+        <TabItem x:Name="tabTableUdps"
+                 Header="Tablo UDP'leri">
+            <ContentControl x:Name="tableUdpContent"
+                            Margin="0,12,0,0"/>
+        </TabItem>
+    </TabControl>
 </UserControl>
