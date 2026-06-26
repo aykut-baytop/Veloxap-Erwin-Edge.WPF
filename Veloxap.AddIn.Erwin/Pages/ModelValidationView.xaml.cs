@@ -100,7 +100,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             this.isTableUdpStartupRunning = isTableUdpStartupRunning;
 
             LoadValidationRulesTab();
-            UpdateTableUdpStartupResultPanel();
+            //UpdateTableUdpStartupResultPanel();
             if (showRulesTab)
                 validationTabs.SelectedItem = tabValidationRules;
 
@@ -114,7 +114,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             tableUdpStartupResult = result;
             isTableUdpStartupRunning = isRunning;
-            UpdateTableUdpStartupResultPanel();
+            //UpdateTableUdpStartupResultPanel();
         }
 
         private void LoadValidationRulesTab()
@@ -140,20 +140,20 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
 
             isInitializing = false;
-            _ = RefreshAlterDdlPreviewAsync();
+            //_ = RefreshAlterDdlPreviewAsync();
         }
 
-        private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (isInitializing || isUpdatingTargetVersion)
-                return;
+        //private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
+        //{
+        //    if (isInitializing || isUpdatingTargetVersion)
+        //        return;
 
-            if (sender == cmbSourceVersion)
-                SelectPreviousTargetVersion();
+        //    if (sender == cmbSourceVersion)
+        //        SelectPreviousTargetVersion();
 
-            ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
-            await RefreshAlterDdlPreviewAsync();
-        }
+        //    ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
+        //    await RefreshAlterDdlPreviewAsync();
+        //}
 
         private void BtnRunValidation_Click(object sender, RoutedEventArgs e)
         {
@@ -454,39 +454,39 @@ namespace Veloxap.AddIn.Erwin.Pages
             return builder.ToString();
         }
 
-        private async Task RefreshAlterDdlPreviewAsync()
-        {
-            var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
-            var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
+        //private async Task RefreshAlterDdlPreviewAsync()
+        //{
+        //    var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
+        //    var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
 
-            if (sourceVersion == null || targetVersion == null)
-            {
-                currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
-                return;
-            }
+        //    if (sourceVersion == null || targetVersion == null)
+        //    {
+        //        currentAlterDdl = string.Empty;
+        //        txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
+        //        return;
+        //    }
 
-            try
-            {
-                currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = "Alter DDL hazirlaniyor...";
-                string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
+        //    try
+        //    {
+        //        currentAlterDdl = string.Empty;
+        //        txtAlterDdl.Text = "Alter DDL hazirlaniyor...";
+        //        string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
 
-                currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
-                    ? string.Empty
-                    : ddl;
+        //        currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
+        //            ? string.Empty
+        //            : ddl;
 
-                txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
-                    ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
-                    : ddl;
-            }
-            catch (Exception ex)
-            {
-                currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = ex.ToString();
-                SetStatus("Alter DDL istegi sirasinda hata olustu.");
-            }
-        }
+        //        txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
+        //            ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
+        //            : ddl;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        currentAlterDdl = string.Empty;
+        //        txtAlterDdl.Text = ex.ToString();
+        //        SetStatus("Alter DDL istegi sirasinda hata olustu.");
+        //    }
+        //}
 
         private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
         {
@@ -665,38 +665,38 @@ namespace Veloxap.AddIn.Erwin.Pages
             txtStatusMessage.Foreground = ResolveStatusForeground(statusMessage);
         }
 
-        private void UpdateTableUdpStartupResultPanel()
-        {
-            if (tableUdpResultPanel == null ||
-                txtTableUdpResultStatus == null ||
-                tableUdpResultItems == null)
-            {
-                return;
-            }
+        //private void UpdateTableUdpStartupResultPanel()
+        //{
+        //    if (tableUdpResultPanel == null ||
+        //        txtTableUdpResultStatus == null ||
+        //        tableUdpResultItems == null)
+        //    {
+        //        return;
+        //    }
 
-            if (isTableUdpStartupRunning)
-            {
-                tableUdpResultPanel.Visibility = Visibility.Visible;
-                txtTableUdpResultStatus.Text = "Acilis islemleri calisiyor...";
-                txtTableUdpResultStatus.Foreground = new SolidColorBrush(Color.FromRgb(75, 85, 99));
-                tableUdpResultItems.ItemsSource = null;
-                return;
-            }
+        //    if (isTableUdpStartupRunning)
+        //    {
+        //        tableUdpResultPanel.Visibility = Visibility.Visible;
+        //        txtTableUdpResultStatus.Text = "Acilis islemleri calisiyor...";
+        //        txtTableUdpResultStatus.Foreground = new SolidColorBrush(Color.FromRgb(75, 85, 99));
+        //        tableUdpResultItems.ItemsSource = null;
+        //        return;
+        //    }
 
-            if (tableUdpStartupResult == null)
-            {
-                tableUdpResultPanel.Visibility = Visibility.Collapsed;
-                tableUdpResultItems.ItemsSource = null;
-                return;
-            }
+        //    if (tableUdpStartupResult == null)
+        //    {
+        //        tableUdpResultPanel.Visibility = Visibility.Collapsed;
+        //        tableUdpResultItems.ItemsSource = null;
+        //        return;
+        //    }
 
-            string summary = tableUdpStartupResult.ToSummaryLine();
-            tableUdpResultPanel.Visibility = Visibility.Visible;
-            txtTableUdpResultStatus.Text = summary;
-            txtTableUdpResultStatus.Foreground = ResolveStatusForeground(
-                tableUdpStartupResult.HasErrors ? summary + " hata" : summary + " basarili");
-            tableUdpResultItems.ItemsSource = tableUdpStartupResult.Operations;
-        }
+        //    string summary = tableUdpStartupResult.ToSummaryLine();
+        //    tableUdpResultPanel.Visibility = Visibility.Visible;
+        //    txtTableUdpResultStatus.Text = summary;
+        //    txtTableUdpResultStatus.Foreground = ResolveStatusForeground(
+        //        tableUdpStartupResult.HasErrors ? summary + " hata" : summary + " basarili");
+        //    tableUdpResultItems.ItemsSource = tableUdpStartupResult.Operations;
+        //}
 
         private static string NormalizeStatusMessage(string message)
         {

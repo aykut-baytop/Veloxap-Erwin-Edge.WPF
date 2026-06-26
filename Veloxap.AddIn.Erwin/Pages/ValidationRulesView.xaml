@@ -21,18 +21,6 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="Validasyon Kurallari"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       Foreground="#111827"/>
-
-            <TextBlock Text="Tanimli kurallar"
-                       Margin="0,6,0,0"
-                       Foreground="#6B7280"
-                       FontSize="13"/>
-        </StackPanel>
-
         <Border Grid.Row="2"
                 Background="#F9FAFB"
                 BorderBrush="#E5E7EB"

@@ -78,29 +78,30 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="Kaynak Versiyon" Style="{StaticResource FieldLabelStyle}"/>
+                        <TextBlock Text="Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbSourceVersion"
                                   Height="34"
                                   MinWidth="150"
                                   IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
-                                  SelectionChanged="VersionSelection_Changed"/>
+                                  />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Hedef Versiyon" Style="{StaticResource FieldLabelStyle}"/>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Visibility="Hidden" Text="Hedef Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbTargetVersion"
                                   Height="34"
-                                  MinWidth="150"
+                                  MaxWidth="0"
                                   IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
-                                  SelectionChanged="VersionSelection_Changed"/>
+                                  Visibility="Hidden"
+                                  />
                     </StackPanel>
                 </Grid>
             </Grid>
 
-            <StackPanel Grid.Column="2"
-                        VerticalAlignment="Bottom">
+            <StackPanel
+                        HorizontalAlignment="Center" Grid.ColumnSpan="3" Margin="341,0,5,0" Orientation="Horizontal">
                 <Button x:Name="btnRunValidation"
                         Content="Validasyon Testi"
                         Style="{StaticResource ActionButtonStyle}"
@@ -132,123 +133,6 @@
                     Grid.Row="4"
                     Background="Transparent"
                     BorderBrush="#E5E7EB">
-            <TabItem x:Name="tabAlterDdl" Header="Alter DDL ve UDP Guncelleme">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="3*" MinWidth="220"/>
-                        <ColumnDefinition Width="6"/>
-                        <ColumnDefinition Width="2*" MinWidth="190"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Border BorderBrush="#E5E7EB"
-                            BorderThickness="1"
-                            Background="#FAFAFA">
-                        <DockPanel>
-                            <TextBlock Text="DDL"
-                                       DockPanel.Dock="Top"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="#374151"
-                                       Margin="10,8,10,4"/>
-                            <TextBox x:Name="txtAlterDdl"
-                                     FontFamily="Consolas"
-                                     FontSize="12"
-                                     AcceptsReturn="True"
-                                     AcceptsTab="True"
-                                     IsReadOnly="True"
-                                     TextWrapping="NoWrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Auto"
-                                     BorderThickness="0"
-                                     Background="#FAFAFA"
-                                     Padding="10"/>
-                        </DockPanel>
-                    </Border>
-
-                    <GridSplitter Grid.Column="1"
-                                  Width="6"
-                                  HorizontalAlignment="Stretch"
-                                  VerticalAlignment="Stretch"
-                                  Background="#E5E7EB"
-                                  ShowsPreview="True"/>
-
-                    <Border Grid.Column="2"
-                            BorderBrush="#E5E7EB"
-                            BorderThickness="1"
-                            Background="#FFFFFF">
-                        <DockPanel>
-                            <TextBlock Text="UDP Guncelleme Sonucu"
-                                       DockPanel.Dock="Top"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="#374151"
-                                       Margin="10,8,10,4"/>
-
-                            <Border x:Name="tableUdpResultPanel"
-                                    Background="#F8FAFC"
-                                    BorderBrush="#E5E7EB"
-                                    BorderThickness="1,0,0,0"
-                                    Padding="10"
-                                    Visibility="Collapsed">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="8"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock x:Name="txtTableUdpResultStatus"
-                                               FontSize="12"
-                                               Foreground="#4B5563"
-                                               TextWrapping="Wrap"/>
-
-                                    <ScrollViewer Grid.Row="2"
-                                                  VerticalScrollBarVisibility="Auto"
-                                                  HorizontalScrollBarVisibility="Disabled">
-                                        <ItemsControl x:Name="tableUdpResultItems">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border BorderBrush="#E5E7EB"
-                                                            BorderThickness="1"
-                                                            Background="White"
-                                                            Padding="8,6"
-                                                            Margin="0,0,0,8"
-                                                            ToolTip="{Binding DetailText}">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding Name}"
-                                                                       FontSize="12"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="#374151"
-                                                                       TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding SummaryText}"
-                                                                       Margin="0,3,0,0"
-                                                                       FontSize="12"
-                                                                       Foreground="#6B7280"
-                                                                       TextWrapping="Wrap"/>
-                                                            <ItemsControl ItemsSource="{Binding Messages}"
-                                                                          Margin="0,6,0,0">
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate>
-                                                                        <TextBlock Text="{Binding}"
-                                                                                   FontSize="11"
-                                                                                   Foreground="#4B5563"
-                                                                                   TextWrapping="Wrap"
-                                                                                   Margin="0,0,0,4"/>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </ScrollViewer>
-                                </Grid>
-                            </Border>
-                        </DockPanel>
-                    </Border>
-                </Grid>
-            </TabItem>
 
             <TabItem x:Name="tabValidationRules" Header="Validasyon Kurallari">
                 <pages:ValidationRulesView x:Name="validationRulesView"/>
