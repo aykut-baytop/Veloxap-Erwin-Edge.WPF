@@ -16,11 +16,12 @@ namespace Veloxap.AddIn.Erwin.Pages
     public partial class ModelUdpView : UserControl
     {
         private readonly ModelInfo modelInfo;
-        private readonly SCAPI.Application application;
-        private readonly SCAPI.PersistenceUnit persistenceUnit;
+        private readonly RuleService catalogRuleService;
+        private readonly string catalogName;
+        private readonly string catalogLongId;
         private readonly List<UdpRow> allRows;
-        private readonly HashSet<string> calculatedUdpKeys;
         private readonly ObservableCollection<UdpDetailRow> selectedDetails;
+        private readonly ObservableCollection<ApprovalStepDisplayItem> approvalStepItems;
         private readonly DispatcherTimer searchTimer;
         private const int MinimumSearchLength = 3;
         private const int SearchDelayMilliseconds = 500;
@@ -43,13 +44,25 @@ namespace Veloxap.AddIn.Erwin.Pages
             ModelInfo modelInfo,
             SCAPI.Application application,
             SCAPI.PersistenceUnit persistenceUnit)
+            : this(modelInfo, application, persistenceUnit, null, null, null)
+        {
+        }
+
+        internal ModelUdpView(
+            ModelInfo modelInfo,
+            SCAPI.Application application,
+            SCAPI.PersistenceUnit persistenceUnit,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId)
         {
             this.modelInfo = modelInfo;
-            this.application = application;
-            this.persistenceUnit = persistenceUnit;
+            catalogRuleService = ruleService;
+            this.catalogName = catalogName;
+            this.catalogLongId = catalogLongId;
             allRows = new List<UdpRow>();
-            calculatedUdpKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             selectedDetails = new ObservableCollection<UdpDetailRow>();
+            approvalStepItems = new ObservableCollection<ApprovalStepDisplayItem>();
             searchTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(SearchDelayMilliseconds)
@@ -60,8 +73,10 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             treeUdp.ItemsSource = new List<UdpTreeNode>();
             gridUdpDetails.ItemsSource = selectedDetails;
+            approvalSteps.ItemsSource = approvalStepItems;
 
             UpdateSummaryCounts();
+            ResetApprovalHistory();
             ShowDetails(null);
             SetStatus(
                 modelInfo == null ? "UDP bulunamadi." : "UDP'ler yukleniyor...",
@@ -77,7 +92,77 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
 
             hasStartedLoading = true;
+            Task approvalTask = LoadApprovalHistoryAsync();
             await ReloadRowsAsync("UDP'ler yukleniyor...", false);
+            await approvalTask;
+        }
+
+        private async Task LoadApprovalHistoryAsync()
+        {
+            ResetApprovalHistory();
+
+            if (catalogRuleService == null)
+            {
+                SetApprovalStatus("Servis baglantisi hazir degil.", string.Empty, true);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(catalogName) || string.IsNullOrWhiteSpace(catalogLongId))
+            {
+                SetApprovalStatus("cName veya cLongId okunamadi.", string.Empty, true);
+                return;
+            }
+
+            try
+            {
+                CatalogApprovalStatus approvalStatus = await catalogRuleService.GetApprovalStatusByCatalogAsync(
+                    RuleApiSettings.GetApprovalStatusByCatalogUrl(),
+                    catalogName,
+                    catalogLongId);
+
+                approvalStepItems.Clear();
+
+                foreach (CatalogApprovalStep step in approvalStatus == null
+                    ? Enumerable.Empty<CatalogApprovalStep>()
+                    : approvalStatus.Steps)
+                {
+                    approvalStepItems.Add(new ApprovalStepDisplayItem
+                    {
+                        StepText = BuildApprovalStepText(step),
+                        DetailText = BuildApprovalStepDetailText(step)
+                    });
+                }
+
+                SetApprovalStatus(
+                    BuildApprovalStatusText(approvalStatus),
+                    approvalStatus == null ? string.Empty : approvalStatus.Message,
+                    false);
+            }
+            catch (Exception ex)
+            {
+                approvalStepItems.Clear();
+                SetApprovalStatus("Onay durumu okunamadi.", ex.Message, true);
+            }
+        }
+
+        private void ResetApprovalHistory()
+        {
+            approvalStepItems.Clear();
+            SetApprovalStatus("Kontrol ediliyor...", string.Empty, false);
+        }
+
+        private void SetApprovalStatus(string status, string message, bool isError)
+        {
+            if (txtApprovalStatus != null)
+            {
+                txtApprovalStatus.Text = string.IsNullOrWhiteSpace(status) ? "-" : status;
+                txtApprovalStatus.Foreground = isError
+                    ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
+                    : new SolidColorBrush(Color.FromRgb(17, 24, 39));
+            }
+
+            if (txtApprovalMessage != null)
+                txtApprovalMessage.Text = message ?? string.Empty;
         }
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -112,7 +197,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (node == null || node.Row == null)
                 return;
 
-            await CalculateSelectedUdpAsync(node.Row);
+            await PreviewSelectedUdpAsync(node.Row);
         }
 
         private void TreeUdpItem_Loaded(object sender, RoutedEventArgs e)
@@ -294,7 +379,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 string udpNames = string.Join(
                     ", ",
                     tableRows
-                        .Select(row => row.UdpName)
+                        .Select(row => row.DisplayUdpName)
                         .Where(name => !string.IsNullOrWhiteSpace(name))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
@@ -327,7 +412,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (rows == null)
                 return nodes;
 
-            foreach (var row in rows.OrderBy(item => item.UdpName, StringComparer.OrdinalIgnoreCase))
+            foreach (var row in rows.OrderBy(item => item.DisplayUdpName, StringComparer.OrdinalIgnoreCase))
             {
                 string nodeKey = BuildUdpNodeKey(row);
                 nodes.Add(UdpTreeNode.CreateLeaf(
@@ -403,6 +488,8 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return string.Empty;
 
             return "U|" +
+                   Safe(row.TableObjectId, string.Empty) +
+                   "|" +
                    Safe(row.TableName, string.Empty) +
                    "|" +
                    Safe(row.UdpName, string.Empty);
@@ -430,11 +517,11 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
 
             AddDetail("Tablo", node.Row.TableName);
-            AddDetail("UDP", node.Row.UdpName);
+            AddDetail("UDP", node.Row.DisplayUdpName);
             AddDetail("Deger", node.Row.Value);
         }
 
-        private async Task CalculateSelectedUdpAsync(UdpRow row)
+        private async Task PreviewSelectedUdpAsync(UdpRow row)
         {
             if (row == null || isLoading)
                 return;
@@ -443,65 +530,41 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (string.IsNullOrWhiteSpace(targetUdpKey))
                 return;
 
-            if (calculatedUdpKeys.Contains(targetUdpKey))
-                return;
-
-            Func<TableUdpSecurityService, ModelInfo, TableUdpSecurityApplyResult> operation =
-                ResolveCalculationOperation(targetUdpKey);
-
-            if (operation == null)
-                return;
-
-            if (modelInfo == null || application == null || persistenceUnit == null)
-            {
-                SetStatus("Hesaplama icin erwin oturumu hazir degil.", true);
-                return;
-            }
-
+            string rowKey = BuildUdpNodeKey(row);
             SetLoading(true);
-            SetStatus(row.UdpName + " hesaplaniyor...", false);
+            SetStatus(row.DisplayUdpName + " hesaplaniyor...", false);
             await Task.Yield();
 
             try
             {
-                var service = new TableUdpSecurityService(
-                    application,
-                    persistenceUnit);
+                TableUdpCalculationPreview preview = await Task.Run(() =>
+                    TableUdpSecurityService.PreviewCalculation(
+                        modelInfo,
+                        row.TableObjectId,
+                        row.TableName,
+                        targetUdpKey));
 
-                TableUdpSecurityApplyResult result = operation(service, modelInfo);
+                var selectedNode = treeUdp == null
+                    ? null
+                    : treeUdp.SelectedItem as UdpTreeNode;
 
-                calculatedUdpKeys.Add(targetUdpKey);
-                string summary = result == null ? string.Empty : result.ToSummary();
+                if (selectedNode != null &&
+                    selectedNode.Row != null &&
+                    string.Equals(BuildUdpNodeKey(selectedNode.Row), rowKey, StringComparison.Ordinal))
+                {
+                    AddPreviewDetails(preview);
+                }
 
-                await ReloadRowsAsync(row.UdpName + " hesaplandi. " + summary, true);
-                SetStatus(row.UdpName + " hesaplandi. " + summary, false);
+                SetStatus(row.DisplayUdpName + " hesaplandi.", false);
             }
             catch (Exception ex)
             {
-                SetStatus(row.UdpName + " hesaplanamadi: " + ex.Message, true);
+                SetStatus(row.DisplayUdpName + " hesaplanamadi: " + ex.Message, true);
             }
             finally
             {
                 SetLoading(false);
             }
-        }
-
-        private static Func<TableUdpSecurityService, ModelInfo, TableUdpSecurityApplyResult> ResolveCalculationOperation(
-            string normalizedUdpName)
-        {
-            if (string.IsNullOrWhiteSpace(normalizedUdpName))
-                return null;
-
-            if (string.Equals(normalizedUdpName, "veridegeri", StringComparison.OrdinalIgnoreCase))
-                return (service, currentModelInfo) => service.Apply(currentModelInfo);
-
-            if (string.Equals(normalizedUdpName, "bankagorecedegeri", StringComparison.OrdinalIgnoreCase))
-                return (service, currentModelInfo) => service.ApplyBankRelativeValue(currentModelInfo);
-
-            if (string.Equals(normalizedUdpName, "guvenliksinifidegeri", StringComparison.OrdinalIgnoreCase))
-                return (service, currentModelInfo) => service.ApplySecurityClassValue(currentModelInfo);
-
-            return null;
         }
 
         private static string ResolveTargetUdpKey(string propertyName)
@@ -535,6 +598,76 @@ namespace Veloxap.AddIn.Erwin.Pages
                 Property = property,
                 Value = string.IsNullOrWhiteSpace(value) ? "-" : value
             });
+        }
+
+        private void AddPreviewDetails(TableUdpCalculationPreview preview)
+        {
+            if (preview == null)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(preview.FormulaText))
+                AddDetail("Formul", preview.FormulaText);
+
+            if (!string.IsNullOrWhiteSpace(preview.CalculatedValue))
+                AddDetail("Hesaplanan Deger", preview.CalculatedValue);
+
+            if (!string.IsNullOrWhiteSpace(preview.Message))
+                AddDetail("Hesaplama", preview.Message);
+        }
+
+        private static string BuildApprovalStatusText(CatalogApprovalStatus approvalStatus)
+        {
+            if (approvalStatus == null)
+                return "Onay bilgisi bulunamadi.";
+
+            if (!string.IsNullOrWhiteSpace(approvalStatus.Status) &&
+                !string.IsNullOrWhiteSpace(approvalStatus.StepText))
+            {
+                return approvalStatus.Status + " - " + approvalStatus.StepText;
+            }
+
+            if (!string.IsNullOrWhiteSpace(approvalStatus.Status))
+                return approvalStatus.Status;
+
+            if (approvalStatus.Steps != null && approvalStatus.Steps.Count > 0)
+                return approvalStatus.Steps.Count + " onay step'i";
+
+            return "Onay bilgisi bulunamadi.";
+        }
+
+        private static string BuildApprovalStepText(CatalogApprovalStep step)
+        {
+            if (step == null)
+                return string.Empty;
+
+            string stepName = string.IsNullOrWhiteSpace(step.StepName)
+                ? "Step " + step.StepNumber
+                : step.StepName;
+
+            string status = string.IsNullOrWhiteSpace(step.Status)
+                ? string.Empty
+                : " - " + step.Status;
+
+            return step.StepNumber + ". " + stepName + status;
+        }
+
+        private static string BuildApprovalStepDetailText(CatalogApprovalStep step)
+        {
+            if (step == null)
+                return string.Empty;
+
+            var parts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(step.GroupName))
+                parts.Add(step.GroupName);
+
+            if (!string.IsNullOrWhiteSpace(step.ApproverName))
+                parts.Add("Onayci: " + step.ApproverName);
+
+            if (!string.IsNullOrWhiteSpace(step.Message))
+                parts.Add(step.Message);
+
+            return string.Join(" | ", parts);
         }
 
         private async Task ReloadRowsAsync(string loadingMessage, bool preserveTreeState)
@@ -600,6 +733,9 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (txtSearch != null)
                 txtSearch.IsEnabled = !value;
 
+            if (treeUdp != null)
+                treeUdp.IsEnabled = !value;
+
             UpdateBusyCursor();
         }
 
@@ -640,6 +776,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                             continue;
 
                         result.Rows.Add(CreateUdpRow(
+                            Safe(table.getoObjectId(), string.Empty),
                             tableName,
                             Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
                             Safe(property.getoPropertyValue(), string.Empty)));
@@ -662,14 +799,17 @@ namespace Veloxap.AddIn.Erwin.Pages
         }
 
         private static UdpRow CreateUdpRow(
+            string tableObjectId,
             string tableName,
             string udpName,
             string value)
         {
             var row = new UdpRow
             {
+                TableObjectId = tableObjectId,
                 TableName = tableName,
                 UdpName = udpName,
+                DisplayUdpName = BuildDisplayUdpName(udpName),
                 Value = value
             };
 
@@ -687,9 +827,22 @@ namespace Veloxap.AddIn.Erwin.Pages
                 new[]
                 {
                     row.TableName,
+                    row.DisplayUdpName,
                     row.UdpName,
                     row.Value
                 }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        }
+
+        private static string BuildDisplayUdpName(string udpName)
+        {
+            if (string.IsNullOrWhiteSpace(udpName))
+                return udpName;
+
+            int index = udpName.LastIndexOf('.');
+            if (index < 0 || index == udpName.Length - 1)
+                return udpName;
+
+            return udpName.Substring(index + 1);
         }
 
         private static IEnumerable<ModelObject> EnumerateTables(IEnumerable<ModelObject> objects)
@@ -756,9 +909,13 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         public sealed class UdpRow
         {
+            public string TableObjectId { get; set; }
+
             public string TableName { get; set; }
 
             public string UdpName { get; set; }
+
+            public string DisplayUdpName { get; set; }
 
             public string Value { get; set; }
 
@@ -770,6 +927,13 @@ namespace Veloxap.AddIn.Erwin.Pages
             public string Property { get; set; }
 
             public string Value { get; set; }
+        }
+
+        public sealed class ApprovalStepDisplayItem
+        {
+            public string StepText { get; set; }
+
+            public string DetailText { get; set; }
         }
 
         private sealed class UdpRowsBuildResult
@@ -886,7 +1050,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             return new UdpTreeNode
             {
-                Title = row == null ? string.Empty : row.UdpName,
+                Title = row == null ? string.Empty : row.DisplayUdpName,
                 IndentMargin = new Thickness(12, 0, 0, 0),
                 FontWeight = FontWeights.Normal,
                 Foreground = new SolidColorBrush(Color.FromRgb(55, 65, 81)),

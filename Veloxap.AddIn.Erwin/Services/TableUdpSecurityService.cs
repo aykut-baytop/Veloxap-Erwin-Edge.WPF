@@ -90,6 +90,545 @@ namespace Veloxap.AddIn.Erwin.Services
             return BuildCalculations(modelInfo, null).Count;
         }
 
+        public static TableUdpApprovalScriptResult BuildApprovalScript(ModelInfo modelInfo)
+        {
+            var changes = BuildApprovalChanges(modelInfo);
+            return new TableUdpApprovalScriptResult(changes, BuildApprovalScriptText(changes));
+        }
+
+        public static TableUdpCalculationPreview PreviewCalculation(
+            ModelInfo modelInfo,
+            string tableObjectId,
+            string tableName,
+            string normalizedUdpName)
+        {
+            ModelObject table = FindModelTable(modelInfo, tableObjectId, tableName);
+
+            if (string.Equals(normalizedUdpName, "veridegeri", StringComparison.OrdinalIgnoreCase))
+                return PreviewAssetValue(table);
+
+            if (string.Equals(normalizedUdpName, "bankagorecedegeri", StringComparison.OrdinalIgnoreCase))
+                return PreviewBankRelativeValue(table);
+
+            if (string.Equals(normalizedUdpName, "guvenliksinifidegeri", StringComparison.OrdinalIgnoreCase))
+                return PreviewSecurityClassValue(table);
+
+            return TableUdpCalculationPreview.FromMessage("Bu UDP icin hesaplama bulunamadi.");
+        }
+
+        private static TableUdpCalculationPreview PreviewAssetValue(ModelObject table)
+        {
+            string tableName = table == null
+                ? "(adsiz tablo)"
+                : Safe(table.getoName(), "(adsiz tablo)");
+
+            if (table == null)
+                return TableUdpCalculationPreview.FromMessage("Tablo bulunamadi.");
+
+            var properties = table.getoObjectProperty();
+            if (properties == null || properties.Count == 0)
+                return TableUdpCalculationPreview.FromMessage(tableName + ": UDP bulunamadi.");
+
+            ObjectProperty availability = FindProperty(properties, AvailabilityPropertyNames);
+            ObjectProperty integrity = FindProperty(properties, IntegrityPropertyNames);
+            ObjectProperty confidentiality = FindProperty(properties, ConfidentialityPropertyNames);
+            ObjectProperty assetValue = FindProperty(properties, AssetValuePropertyNames);
+
+            var missing = new List<string>();
+            int availabilityLevel = 0;
+            int integrityLevel = 0;
+            int confidentialityLevel = 0;
+
+            if (availability == null)
+                missing.Add("Erisilebilirlik");
+
+            if (integrity == null)
+                missing.Add("Butunluk");
+
+            if (confidentiality == null)
+                missing.Add("Gizlilik_Seviyesi");
+
+            if (assetValue == null)
+                missing.Add("Veri_Degeri");
+
+            if (availability != null && !TryResolveLevel(availability, out availabilityLevel))
+                missing.Add("Erisilebilirlik seviyesi");
+
+            if (integrity != null && !TryResolveLevel(integrity, out integrityLevel))
+                missing.Add("Butunluk seviyesi");
+
+            if (confidentiality != null && !TryResolveLevel(confidentiality, out confidentialityLevel))
+                missing.Add("Gizlilik_Seviyesi seviyesi");
+
+            if (missing.Count > 0)
+                return TableUdpCalculationPreview.FromMessage(
+                    BuildPreviewMissingMessage(tableName, "eksik/okunamayan alanlar", missing));
+
+            double average = (availabilityLevel + integrityLevel + confidentialityLevel) / 3.0;
+            int resultLevel = ClampLevel(
+                (int)Math.Round(
+                    average,
+                    MidpointRounding.AwayFromZero));
+
+            var calculation = new TableUdpSecurityCalculation
+            {
+                TableObjectId = table.getoObjectId(),
+                TableName = tableName,
+                AvailabilityLevel = availabilityLevel,
+                IntegrityLevel = integrityLevel,
+                ConfidentialityLevel = confidentialityLevel,
+                Average = average,
+                ResultLevel = resultLevel,
+                ResultValue = BuildAssetValue(resultLevel),
+                AssetValueProperty = assetValue
+            };
+
+            return TableUdpCalculationPreview.FromCalculation(
+                calculation.ToFormulaText(),
+                calculation.ResultValue);
+        }
+
+        private static TableUdpCalculationPreview PreviewBankRelativeValue(ModelObject table)
+        {
+            string tableName = table == null
+                ? "(adsiz tablo)"
+                : Safe(table.getoName(), "(adsiz tablo)");
+
+            if (table == null)
+                return TableUdpCalculationPreview.FromMessage("Tablo bulunamadi.");
+
+            var properties = table.getoObjectProperty();
+            if (properties == null || properties.Count == 0)
+                return TableUdpCalculationPreview.FromMessage(tableName + ": UDP bulunamadi.");
+
+            ObjectProperty businessProcessLevel = FindProperty(properties, BusinessProcessLevelPropertyNames);
+            ObjectProperty bankRelativeValue = FindProperty(properties, BankRelativeValuePropertyNames);
+
+            var missing = new List<string>();
+            int assetLevel = 0;
+            int businessLevel = 0;
+
+            TableUdpCalculationPreview assetPreview = PreviewAssetValue(table);
+            if (assetPreview == null ||
+                !TryResolveLeadingIntegerText(assetPreview.CalculatedValue, out assetLevel))
+            {
+                missing.Add("Veri_Degeri hesaplanamadi");
+            }
+
+            if (businessProcessLevel == null)
+                missing.Add("Is_Sureci_Seviyesi");
+
+            if (bankRelativeValue == null)
+                missing.Add("Banka_Gorece_Degeri");
+
+            if (businessProcessLevel != null && !TryResolveParenthesizedInteger(businessProcessLevel, out businessLevel))
+                missing.Add("Is_Sureci_Seviyesi parantez ici sayi");
+
+            if (missing.Count > 0)
+                return TableUdpCalculationPreview.FromMessage(
+                    BuildPreviewMissingMessage(tableName, "eksik/hatali alanlar", missing));
+
+            var calculation = new BankRelativeValueCalculation
+            {
+                TableObjectId = table.getoObjectId(),
+                TableName = tableName,
+                AssetLevel = assetLevel,
+                BusinessProcessLevel = businessLevel,
+                ResultValue = assetLevel * businessLevel,
+                BankRelativeValueProperty = bankRelativeValue
+            };
+
+            return TableUdpCalculationPreview.FromCalculation(
+                calculation.ToFormulaText(),
+                calculation.ResultValue.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static TableUdpCalculationPreview PreviewSecurityClassValue(ModelObject table)
+        {
+            string tableName = table == null
+                ? "(adsiz tablo)"
+                : Safe(table.getoName(), "(adsiz tablo)");
+
+            if (table == null)
+                return TableUdpCalculationPreview.FromMessage("Tablo bulunamadi.");
+
+            var properties = table.getoObjectProperty();
+            if (properties == null || properties.Count == 0)
+                return TableUdpCalculationPreview.FromMessage(tableName + ": UDP bulunamadi.");
+
+            ObjectProperty securityClassValue = FindProperty(properties, SecurityClassValuePropertyNames);
+
+            var missing = new List<string>();
+            int bankValue = 0;
+
+            TableUdpCalculationPreview bankPreview = PreviewBankRelativeValue(table);
+            if (bankPreview == null ||
+                !TryResolveLeadingIntegerText(bankPreview.CalculatedValue, out bankValue))
+            {
+                missing.Add("Banka_Gorece_Degeri hesaplanamadi");
+            }
+
+            if (securityClassValue == null)
+                missing.Add("Guvenlik_Sinifi_Degeri");
+
+            if (missing.Count > 0)
+                return TableUdpCalculationPreview.FromMessage(
+                    BuildPreviewMissingMessage(tableName, "eksik/hatali alanlar", missing));
+
+            int trueCount = 0;
+            foreach (var column in EnumerateColumns(table))
+            {
+                var columnProperties = column.getoObjectProperty();
+                if (columnProperties == null || columnProperties.Count == 0)
+                    continue;
+
+                ObjectProperty personalData = FindProperty(columnProperties, PersonalDataPropertyNames);
+                ObjectProperty sensitiveData = FindProperty(columnProperties, SensitiveDataPropertyNames);
+
+                if (IsTrueValue(personalData))
+                    trueCount++;
+
+                if (IsTrueValue(sensitiveData))
+                    trueCount++;
+            }
+
+            long securityValue = bankValue;
+            for (int i = 0; i < trueCount; i++)
+                securityValue *= 2;
+
+            var calculation = new SecurityClassValueCalculation
+            {
+                TableObjectId = table.getoObjectId(),
+                TableName = tableName,
+                BankRelativeValue = bankValue,
+                TrueFlagCount = trueCount,
+                ResultValue = securityValue,
+                SecurityClassValueProperty = securityClassValue
+            };
+
+            return TableUdpCalculationPreview.FromCalculation(
+                calculation.ToFormulaText(),
+                calculation.ResultValue.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static string BuildPreviewMissingMessage(
+            string tableName,
+            string reason,
+            IEnumerable<string> missing)
+        {
+            return Safe(tableName, "(adsiz tablo)") +
+                   ": " +
+                   reason +
+                   " - " +
+                   string.Join(", ", missing ?? new List<string>());
+        }
+
+        private static List<TableUdpApprovalChange> BuildApprovalChanges(ModelInfo modelInfo)
+        {
+            var changes = new List<TableUdpApprovalChange>();
+
+            var objects = modelInfo == null
+                ? null
+                : modelInfo.getoModelObject();
+
+            foreach (var table in EnumerateTables(objects))
+            {
+                if (table == null)
+                    continue;
+
+                string tableName = Safe(table.getoName(), "(adsiz tablo)");
+                var properties = table.getoObjectProperty();
+                if (properties == null || properties.Count == 0)
+                    continue;
+
+                ObjectProperty availability = FindProperty(properties, AvailabilityPropertyNames);
+                ObjectProperty integrity = FindProperty(properties, IntegrityPropertyNames);
+                ObjectProperty confidentiality = FindProperty(properties, ConfidentialityPropertyNames);
+                ObjectProperty assetValue = FindProperty(properties, AssetValuePropertyNames);
+                ObjectProperty businessProcessLevel = FindProperty(properties, BusinessProcessLevelPropertyNames);
+                ObjectProperty bankRelativeValue = FindProperty(properties, BankRelativeValuePropertyNames);
+                ObjectProperty securityClassValue = FindProperty(properties, SecurityClassValuePropertyNames);
+
+                int assetLevel;
+                string calculatedAssetValue;
+                string assetFormulaText;
+                if (!TryCalculateAssetValue(
+                        tableName,
+                        availability,
+                        integrity,
+                        confidentiality,
+                        out assetLevel,
+                        out calculatedAssetValue,
+                        out assetFormulaText))
+                {
+                    continue;
+                }
+
+                if (assetValue != null && !IsAssetValueSame(assetValue, assetLevel, calculatedAssetValue))
+                {
+                    changes.Add(new TableUdpApprovalChange(
+                        tableName,
+                        "Veri_Degeri",
+                        calculatedAssetValue,
+                        GetPropertyDisplayValue(assetValue),
+                        assetFormulaText));
+                }
+
+                int bankRelativeCalculatedValue;
+                string bankFormulaText;
+                if (!TryCalculateBankRelativeValue(
+                        tableName,
+                        assetLevel,
+                        businessProcessLevel,
+                        out bankRelativeCalculatedValue,
+                        out bankFormulaText))
+                {
+                    continue;
+                }
+
+                if (bankRelativeValue != null && !IsIntegerValueSame(bankRelativeValue, bankRelativeCalculatedValue))
+                {
+                    changes.Add(new TableUdpApprovalChange(
+                        tableName,
+                        "Banka_Gorece_Degeri",
+                        bankRelativeCalculatedValue.ToString(CultureInfo.InvariantCulture),
+                        GetPropertyDisplayValue(bankRelativeValue),
+                        bankFormulaText));
+                }
+
+                long securityClassCalculatedValue;
+                string securityFormulaText;
+                if (!TryCalculateSecurityClassValue(
+                        tableName,
+                        table,
+                        bankRelativeCalculatedValue,
+                        out securityClassCalculatedValue,
+                        out securityFormulaText))
+                {
+                    continue;
+                }
+
+                if (securityClassValue != null && !IsLongValueSame(securityClassValue, securityClassCalculatedValue))
+                {
+                    changes.Add(new TableUdpApprovalChange(
+                        tableName,
+                        "Guvenlik_Sinifi_Degeri",
+                        securityClassCalculatedValue.ToString(CultureInfo.InvariantCulture),
+                        GetPropertyDisplayValue(securityClassValue),
+                        securityFormulaText));
+                }
+            }
+
+            return changes;
+        }
+
+        private static bool TryCalculateAssetValue(
+            string tableName,
+            ObjectProperty availability,
+            ObjectProperty integrity,
+            ObjectProperty confidentiality,
+            out int resultLevel,
+            out string resultValue,
+            out string formulaText)
+        {
+            resultLevel = 0;
+            resultValue = string.Empty;
+            formulaText = string.Empty;
+
+            int availabilityLevel;
+            int integrityLevel;
+            int confidentialityLevel;
+
+            if (availability == null ||
+                integrity == null ||
+                confidentiality == null ||
+                !TryResolveLevel(availability, out availabilityLevel) ||
+                !TryResolveLevel(integrity, out integrityLevel) ||
+                !TryResolveLevel(confidentiality, out confidentialityLevel))
+            {
+                return false;
+            }
+
+            double average = (availabilityLevel + integrityLevel + confidentialityLevel) / 3.0;
+            resultLevel = ClampLevel(
+                (int)Math.Round(
+                    average,
+                    MidpointRounding.AwayFromZero));
+            resultValue = BuildAssetValue(resultLevel);
+
+            var calculation = new TableUdpSecurityCalculation
+            {
+                TableName = Safe(tableName, "(adsiz tablo)"),
+                AvailabilityLevel = availabilityLevel,
+                IntegrityLevel = integrityLevel,
+                ConfidentialityLevel = confidentialityLevel,
+                Average = average,
+                ResultLevel = resultLevel,
+                ResultValue = resultValue
+            };
+
+            formulaText = calculation.ToFormulaText();
+            return true;
+        }
+
+        private static bool TryCalculateBankRelativeValue(
+            string tableName,
+            int assetLevel,
+            ObjectProperty businessProcessLevel,
+            out int resultValue,
+            out string formulaText)
+        {
+            resultValue = 0;
+            formulaText = string.Empty;
+
+            int businessLevel;
+            if (assetLevel <= 0 ||
+                businessProcessLevel == null ||
+                !TryResolveParenthesizedInteger(businessProcessLevel, out businessLevel))
+            {
+                return false;
+            }
+
+            resultValue = assetLevel * businessLevel;
+            var calculation = new BankRelativeValueCalculation
+            {
+                TableName = Safe(tableName, "(adsiz tablo)"),
+                AssetLevel = assetLevel,
+                BusinessProcessLevel = businessLevel,
+                ResultValue = resultValue
+            };
+
+            formulaText = calculation.ToFormulaText();
+            return true;
+        }
+
+        private static bool TryCalculateSecurityClassValue(
+            string tableName,
+            ModelObject table,
+            int bankRelativeValue,
+            out long resultValue,
+            out string formulaText)
+        {
+            resultValue = 0;
+            formulaText = string.Empty;
+
+            if (table == null || bankRelativeValue <= 0)
+                return false;
+
+            int trueCount = 0;
+            foreach (var column in EnumerateColumns(table))
+            {
+                var columnProperties = column.getoObjectProperty();
+                if (columnProperties == null || columnProperties.Count == 0)
+                    continue;
+
+                ObjectProperty personalData = FindProperty(columnProperties, PersonalDataPropertyNames);
+                ObjectProperty sensitiveData = FindProperty(columnProperties, SensitiveDataPropertyNames);
+
+                if (IsTrueValue(personalData))
+                    trueCount++;
+
+                if (IsTrueValue(sensitiveData))
+                    trueCount++;
+            }
+
+            resultValue = bankRelativeValue;
+            for (int i = 0; i < trueCount; i++)
+                resultValue *= 2;
+
+            var calculation = new SecurityClassValueCalculation
+            {
+                TableName = Safe(tableName, "(adsiz tablo)"),
+                BankRelativeValue = bankRelativeValue,
+                TrueFlagCount = trueCount,
+                ResultValue = resultValue
+            };
+
+            formulaText = calculation.ToFormulaText();
+            return true;
+        }
+
+        private static string BuildApprovalScriptText(IEnumerable<TableUdpApprovalChange> changes)
+        {
+            var changeList = changes == null
+                ? new List<TableUdpApprovalChange>()
+                : changes.ToList();
+
+            if (changeList.Count == 0)
+                return string.Empty;
+
+            var builder = new StringBuilder();
+            builder.AppendLine("-- TABLE UDP CALCULATED DIFFERENCES");
+            builder.AppendLine("-- TableName          >          UDPName          >          UDPValue");
+
+            foreach (var change in changeList)
+            {
+                builder.Append("--  ");
+                //builder.Append("UPDATE [");
+                builder.Append(EscapeSqlIdentifier(change.TableName));
+
+                for (var i = change.TableName.Length; i < 20; i++)
+                {
+                    builder.Append(" ");
+                }
+                //builder.Append("] SET [");
+                //builder.Append("     >     ");
+                builder.Append(EscapeSqlIdentifier(change.UdpName));
+                
+                for (var i = change.UdpName.Length; i < 20; i++)
+                {
+                    builder.Append(" ");
+                }
+                
+                //builder.Append("     >     ");
+                //builder.Append("] = N'");
+                builder.Append(change.UdpValue);
+                //builder.Append("'; -- ");
+                //builder.Append(EscapeSqlComment(change.TableName));
+                //builder.Append(" > ");
+                //builder.Append(EscapeSqlComment(change.UdpName));
+                //builder.Append(" > ");
+                //builder.Append(EscapeSqlComment(change.UdpValue));
+
+                //if (!string.IsNullOrWhiteSpace(change.CurrentValue))
+                //{
+                //    builder.Append(" | Onceki: ");
+                //    builder.Append(EscapeSqlComment(change.CurrentValue));
+                //}
+
+                //if (!string.IsNullOrWhiteSpace(change.FormulaText))
+                //{
+                //    builder.Append(" | ");
+                //    builder.Append(EscapeSqlComment(change.FormulaText));
+                //}
+
+                builder.AppendLine();
+            }
+
+            return builder.ToString();
+        }
+
+        private static string EscapeSqlIdentifier(string value)
+        {
+            return Safe(value, string.Empty).Replace("]", "]]");
+        }
+
+        private static string EscapeSqlString(string value)
+        {
+            return Safe(value, string.Empty).Replace("'", "''");
+        }
+
+        private static string EscapeSqlComment(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            return value
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Replace("*/", "* /");
+        }
+
         public TableUdpSecurityApplyResult Apply(ModelInfo modelInfo)
         {
             var result = new TableUdpSecurityApplyResult();
@@ -1027,6 +1566,42 @@ namespace Veloxap.AddIn.Erwin.Services
             }
         }
 
+        private static ModelObject FindModelTable(
+            ModelInfo modelInfo,
+            string tableObjectId,
+            string tableName)
+        {
+            var objects = modelInfo == null
+                ? null
+                : modelInfo.getoModelObject();
+
+            foreach (var table in EnumerateTables(objects))
+            {
+                if (table == null)
+                    continue;
+
+                if (!string.IsNullOrWhiteSpace(tableObjectId) &&
+                    string.Equals(
+                        table.getoObjectId(),
+                        tableObjectId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return table;
+                }
+
+                if (!string.IsNullOrWhiteSpace(tableName) &&
+                    string.Equals(
+                        table.getoName(),
+                        tableName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return table;
+                }
+            }
+
+            return null;
+        }
+
         private static IEnumerable<ModelObject> EnumerateColumns(ModelObject table)
         {
             if (table == null)
@@ -1412,6 +1987,87 @@ namespace Veloxap.AddIn.Erwin.Services
         }
     }
 
+    internal sealed class TableUdpApprovalScriptResult
+    {
+        public TableUdpApprovalScriptResult(
+            IEnumerable<TableUdpApprovalChange> changes,
+            string scriptText)
+        {
+            Changes = changes == null
+                ? new List<TableUdpApprovalChange>()
+                : new List<TableUdpApprovalChange>(changes);
+            ScriptText = scriptText ?? string.Empty;
+        }
+
+        public List<TableUdpApprovalChange> Changes { get; private set; }
+
+        public string ScriptText { get; private set; }
+
+        public int ChangeCount
+        {
+            get { return Changes.Count; }
+        }
+    }
+
+    internal sealed class TableUdpApprovalChange
+    {
+        public TableUdpApprovalChange(
+            string tableName,
+            string udpName,
+            string udpValue,
+            string currentValue,
+            string formulaText)
+        {
+            TableName = tableName ?? string.Empty;
+            UdpName = udpName ?? string.Empty;
+            UdpValue = udpValue ?? string.Empty;
+            CurrentValue = currentValue ?? string.Empty;
+            FormulaText = formulaText ?? string.Empty;
+        }
+
+        public string TableName { get; private set; }
+
+        public string UdpName { get; private set; }
+
+        public string UdpValue { get; private set; }
+
+        public string CurrentValue { get; private set; }
+
+        public string FormulaText { get; private set; }
+    }
+
+    internal sealed class TableUdpCalculationPreview
+    {
+        private TableUdpCalculationPreview()
+        {
+        }
+
+        public string FormulaText { get; private set; }
+
+        public string CalculatedValue { get; private set; }
+
+        public string Message { get; private set; }
+
+        public static TableUdpCalculationPreview FromCalculation(
+            string formulaText,
+            string calculatedValue)
+        {
+            return new TableUdpCalculationPreview
+            {
+                FormulaText = formulaText ?? string.Empty,
+                CalculatedValue = calculatedValue ?? string.Empty
+            };
+        }
+
+        public static TableUdpCalculationPreview FromMessage(string message)
+        {
+            return new TableUdpCalculationPreview
+            {
+                Message = message ?? string.Empty
+            };
+        }
+    }
+
     internal sealed class TableUdpStartupApplyResult
     {
         public TableUdpStartupApplyResult(DateTime startedAt)
@@ -1516,7 +2172,7 @@ namespace Veloxap.AddIn.Erwin.Services
             get
             {
                 if (!string.IsNullOrWhiteSpace(ErrorMessage))
-                return ErrorMessage;
+                    return ErrorMessage;
 
                 return UpdatedTables + " guncellendi, " +
                        UnchangedTables + " degismedi, " +

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Veloxap.AddIn.Erwin.Models;
+using Veloxap.AddIn.Erwin.Services;
 using Veloxap.AddIn.Erwin.ViewModels;
 
 namespace Veloxap.AddIn.Erwin.Pages
@@ -13,15 +14,19 @@ namespace Veloxap.AddIn.Erwin.Pages
         private readonly ModelInfo tableUdpModelInfo;
         private readonly SCAPI.Application tableUdpApplication;
         private readonly SCAPI.PersistenceUnit tableUdpPersistenceUnit;
+        private readonly RuleService catalogRuleService;
+        private readonly string catalogName;
+        private readonly string catalogLongId;
         private readonly DispatcherTimer searchTimer;
+        private bool hasLoadedCatalogOverview;
 
         public ModelInfoView()
-            : this(null, null, null, false)
+            : this(null, null, null, false, null, null, null)
         {
         }
 
         internal ModelInfoView(ModelInfo modelInfo)
-            : this(modelInfo, null, null, false)
+            : this(modelInfo, null, null, false, null, null, null)
         {
         }
 
@@ -30,10 +35,25 @@ namespace Veloxap.AddIn.Erwin.Pages
             SCAPI.Application application,
             SCAPI.PersistenceUnit persistenceUnit,
             bool showTableUdpTab)
+            : this(modelInfo, application, persistenceUnit, showTableUdpTab, null, null, null)
+        {
+        }
+
+        internal ModelInfoView(
+            ModelInfo modelInfo,
+            SCAPI.Application application,
+            SCAPI.PersistenceUnit persistenceUnit,
+            bool showTableUdpTab,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId)
         {
             tableUdpModelInfo = modelInfo;
             tableUdpApplication = application;
             tableUdpPersistenceUnit = persistenceUnit;
+            catalogRuleService = ruleService;
+            this.catalogName = catalogName;
+            this.catalogLongId = catalogLongId;
 
             searchTimer = new DispatcherTimer
             {
@@ -42,6 +62,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             searchTimer.Tick += SearchTimer_Tick;
 
             InitializeComponent();
+            Loaded += ModelInfoView_Loaded;
             tabModelSections.SelectionChanged += TabModelSections_SelectionChanged;
 
             DataContext = modelInfo == null
@@ -53,6 +74,23 @@ namespace Veloxap.AddIn.Erwin.Pages
                 tabModelSections.SelectedItem = tabTableUdps;
                 EnsureTableUdpViewLoaded();
             }
+        }
+
+        private async void ModelInfoView_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (hasLoadedCatalogOverview)
+                return;
+
+            hasLoadedCatalogOverview = true;
+
+            var viewModel = DataContext as ModelInfoViewModel;
+            if (viewModel == null)
+                return;
+
+            await viewModel.LoadCatalogOverviewAsync(
+                catalogRuleService,
+                catalogName,
+                catalogLongId);
         }
 
         private void TabModelSections_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -74,7 +112,10 @@ namespace Veloxap.AddIn.Erwin.Pages
             tableUdpContent.Content = new ModelUdpView(
                 tableUdpModelInfo,
                 tableUdpApplication,
-                tableUdpPersistenceUnit);
+                tableUdpPersistenceUnit,
+                catalogRuleService,
+                catalogName,
+                catalogLongId);
         }
 
         private void ModelTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

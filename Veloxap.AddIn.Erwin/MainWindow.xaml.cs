@@ -95,7 +95,10 @@ namespace Veloxap.AddIn.Erwin
                     currentModelInfo,
                     oApp,
                     GetCurrentPersistenceUnit(),
-                    false);
+                    false,
+                    GetCatalogOverviewRuleService(),
+                    selectedModelName,
+                    selectedModelLongId);
             }
 
             else if (sender == rbCompare)
@@ -112,7 +115,10 @@ namespace Veloxap.AddIn.Erwin
                     currentModelInfo,
                     oApp,
                     GetCurrentPersistenceUnit(),
-                    true);
+                    true,
+                    GetCatalogOverviewRuleService(),
+                    selectedModelName,
+                    selectedModelLongId);
             }
 
             else if (sender == rbValidation)
@@ -194,7 +200,14 @@ namespace Veloxap.AddIn.Erwin
 
         private void ModelInfo_Checked(object sender, RoutedEventArgs e)
         {
-            MainContent.Content = new ModelInfoView(currentModelInfo);
+            MainContent.Content = new ModelInfoView(
+                currentModelInfo,
+                oApp,
+                GetCurrentPersistenceUnit(),
+                false,
+                GetCatalogOverviewRuleService(),
+                selectedModelName,
+                selectedModelLongId);
         }
 
         //private void ModelValidation_Checked(object sender, RoutedEventArgs e)
@@ -264,7 +277,10 @@ namespace Veloxap.AddIn.Erwin
                     currentModelInfo,
                     oApp,
                     GetCurrentPersistenceUnit(),
-                    false);
+                    false,
+                    GetCatalogOverviewRuleService(),
+                    selectedModelName,
+                    selectedModelLongId);
             }
             else if (rbTableUdps.IsChecked == true)
             {
@@ -272,7 +288,10 @@ namespace Veloxap.AddIn.Erwin
                     currentModelInfo,
                     oApp,
                     GetCurrentPersistenceUnit(),
-                    true);
+                    true,
+                    GetCatalogOverviewRuleService(),
+                    selectedModelName,
+                    selectedModelLongId);
             }
             //else if (rbRules.IsChecked == true)
             //{
@@ -472,6 +491,13 @@ namespace Veloxap.AddIn.Erwin
                     GetApiCookieContainer()));
 
             return ruleService;
+        }
+
+        private RuleService GetCatalogOverviewRuleService()
+        {
+            return RuleApiSettings.AreAuthCredentialsConfigured()
+                ? GetRuleService()
+                : null;
         }
 
         private SCAPI.PersistenceUnit GetCurrentPersistenceUnit()

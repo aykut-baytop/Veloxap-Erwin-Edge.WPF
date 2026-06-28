@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Veloxap.AddIn.Erwin.Models;
+using Veloxap.AddIn.Erwin.Services;
 
 namespace Veloxap.AddIn.Erwin.ViewModels
 {
@@ -14,10 +17,18 @@ namespace Veloxap.AddIn.Erwin.ViewModels
         private readonly ModelInfo modelInfo;
         private ModelDisplayItem selectedModelItem;
         private string statusMessage;
+        private bool isLocked;
+        private string lockStatusText;
+        private string lockDetailText;
+        private string versionOwnerText;
+        private string approvalStatusText;
+        private string catalogOverviewMessage;
 
         public ObservableCollection<ModelDisplayItem> ModelItems { get; }
 
         public ObservableCollection<PropertyDisplayItem> Properties { get; }
+
+        public ObservableCollection<ApprovalStepDisplayItem> ApprovalSteps { get; }
 
         public string StatusMessage
         {
@@ -32,6 +43,102 @@ namespace Veloxap.AddIn.Erwin.ViewModels
 
                 statusMessage = value;
                 OnPropertyChanged(nameof(StatusMessage));
+            }
+        }
+
+        public bool IsLocked
+        {
+            get
+            {
+                return isLocked;
+            }
+            private set
+            {
+                if (isLocked == value)
+                    return;
+
+                isLocked = value;
+                OnPropertyChanged(nameof(IsLocked));
+            }
+        }
+
+        public string LockStatusText
+        {
+            get
+            {
+                return lockStatusText;
+            }
+            private set
+            {
+                if (lockStatusText == value)
+                    return;
+
+                lockStatusText = value;
+                OnPropertyChanged(nameof(LockStatusText));
+            }
+        }
+
+        public string LockDetailText
+        {
+            get
+            {
+                return lockDetailText;
+            }
+            private set
+            {
+                if (lockDetailText == value)
+                    return;
+
+                lockDetailText = value;
+                OnPropertyChanged(nameof(LockDetailText));
+            }
+        }
+
+        public string VersionOwnerText
+        {
+            get
+            {
+                return versionOwnerText;
+            }
+            private set
+            {
+                if (versionOwnerText == value)
+                    return;
+
+                versionOwnerText = value;
+                OnPropertyChanged(nameof(VersionOwnerText));
+            }
+        }
+
+        public string ApprovalStatusText
+        {
+            get
+            {
+                return approvalStatusText;
+            }
+            private set
+            {
+                if (approvalStatusText == value)
+                    return;
+
+                approvalStatusText = value;
+                OnPropertyChanged(nameof(ApprovalStatusText));
+            }
+        }
+
+        public string CatalogOverviewMessage
+        {
+            get
+            {
+                return catalogOverviewMessage;
+            }
+            private set
+            {
+                if (catalogOverviewMessage == value)
+                    return;
+
+                catalogOverviewMessage = value;
+                OnPropertyChanged(nameof(CatalogOverviewMessage));
             }
         }
 
@@ -64,9 +171,260 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             this.modelInfo = modelInfo;
             ModelItems = new ObservableCollection<ModelDisplayItem>();
             Properties = new ObservableCollection<PropertyDisplayItem>();
+            ApprovalSteps = new ObservableCollection<ApprovalStepDisplayItem>();
             StatusMessage = "Model bilgisi bulunamadi.";
+            LockStatusText = "Kontrol edilmedi";
+            LockDetailText = "Lock servisi henuz sorgulanmadi.";
+            VersionOwnerText = ResolveModelOwnerText();
+            ApprovalStatusText = "Kontrol edilmedi";
+            CatalogOverviewMessage = string.Empty;
 
             LoadModel();
+        }
+
+        internal async Task LoadCatalogOverviewAsync(
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId)
+        {
+            string fallbackOwner = ResolveModelOwnerText();
+            VersionOwnerText = "Kontrol ediliyor...";
+            ApprovalSteps.Clear();
+            ApprovalStatusText = "Kontrol ediliyor...";
+            LockStatusText = "Kontrol ediliyor";
+            LockDetailText = "Lock servisi sorgulaniyor...";
+            CatalogOverviewMessage = string.Empty;
+
+            if (ruleService == null)
+            {
+                LockStatusText = "Bilinmiyor";
+                LockDetailText = "Servis baglantisi hazir degil.";
+                VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "Servis baglantisi hazir degil." : fallbackOwner;
+                ApprovalStatusText = "Servis baglantisi hazir degil.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(catalogName) || string.IsNullOrWhiteSpace(catalogLongId))
+            {
+                LockStatusText = "Bilinmiyor";
+                LockDetailText = "cName veya cLongId okunamadi.";
+                VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "cLongId okunamadi." : fallbackOwner;
+                ApprovalStatusText = "cName veya cLongId okunamadi.";
+                return;
+            }
+
+            await LoadVersionOwnerAsync(ruleService, catalogName, catalogLongId, fallbackOwner);
+            await LoadLockStatusAsync(ruleService, catalogName, catalogLongId);
+            await LoadApprovalStatusAsync(ruleService, catalogName, catalogLongId);
+        }
+
+        private async Task LoadVersionOwnerAsync(
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId,
+            string fallbackOwner)
+        {
+            try
+            {
+                string versionName = ResolveVersionName(catalogName);
+                string versionNumber = ResolveVersionNumber(catalogName);
+
+                CatalogVersionOwnerInfo ownerInfo = await ruleService.GetCatalogVersionOwnerAsync(
+                    RuleApiSettings.GetMartCatalogsUrl(),
+                    RuleApiSettings.GetMartCatalogVersionsUrlTemplate(),
+                    RuleApiSettings.GetAuthUsername(),
+                    catalogLongId,
+                    versionName,
+                    versionNumber);
+
+                VersionOwnerText = ownerInfo == null || string.IsNullOrWhiteSpace(ownerInfo.CreatedBy)
+                    ? "Bulunamadi"
+                    : ownerInfo.CreatedBy;
+            }
+            catch (Exception ex)
+            {
+                VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) || string.Equals(fallbackOwner, "Bulunamadi", StringComparison.OrdinalIgnoreCase)
+                    ? "Okunamadi: " + ex.Message
+                    : fallbackOwner;
+            }
+        }
+
+        private async Task LoadLockStatusAsync(
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId)
+        {
+            try
+            {
+                List<CatalogLockInfo> locks = await ruleService.GetCatalogLocksAsync(
+                    RuleApiSettings.GetCatalogLocksUrl(),
+                    catalogName,
+                    catalogLongId);
+
+                IsLocked = locks != null && locks.Count > 0;
+                LockStatusText = IsLocked ? BuildLockStatusText(locks) : "Lock yok";
+                LockDetailText = IsLocked
+                    ? BuildLockDetailText(locks)
+                    : "Aktif catalog lock kaydi bulunmadi.";
+            }
+            catch (Exception ex)
+            {
+                IsLocked = false;
+                LockStatusText = "Bilinmiyor";
+                LockDetailText = "Lock bilgisi okunamadi: " + ex.Message;
+            }
+        }
+
+        private async Task LoadApprovalStatusAsync(
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId)
+        {
+            try
+            {
+                CatalogApprovalStatus approvalStatus = await ruleService.GetApprovalStatusByCatalogAsync(
+                    RuleApiSettings.GetApprovalStatusByCatalogUrl(),
+                    catalogName,
+                    catalogLongId);
+
+                ApprovalSteps.Clear();
+
+                foreach (CatalogApprovalStep step in approvalStatus == null
+                    ? Enumerable.Empty<CatalogApprovalStep>()
+                    : approvalStatus.Steps)
+                {
+                    ApprovalSteps.Add(new ApprovalStepDisplayItem
+                    {
+                        StepText = BuildApprovalStepText(step),
+                        StatusText = step == null ? string.Empty : step.Status
+                    });
+                }
+
+                ApprovalStatusText = BuildApprovalStatusText(approvalStatus);
+            }
+            catch (Exception ex)
+            {
+                ApprovalSteps.Clear();
+                ApprovalStatusText = "Onay durumu okunamadi: " + ex.Message;
+            }
+        }
+
+        private static string BuildLockDetailText(IEnumerable<CatalogLockInfo> locks)
+        {
+            var lockTexts = (locks ?? Enumerable.Empty<CatalogLockInfo>())
+                .Where(lockInfo => lockInfo != null)
+                .Select(lockInfo =>
+                {
+                    string owner = string.IsNullOrWhiteSpace(lockInfo.Session)
+                        ? "oturum bilinmiyor"
+                        : lockInfo.Session;
+
+                    string lockType = string.IsNullOrWhiteSpace(lockInfo.Lock)
+                        ? "lock"
+                        : lockInfo.Lock;
+
+                    string time = string.IsNullOrWhiteSpace(lockInfo.Time)
+                        ? string.Empty
+                        : " - " + lockInfo.Time;
+
+                    return owner + " / " + lockType + time;
+                })
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToList();
+
+            return lockTexts.Count == 0
+                ? "Aktif catalog lock kaydi var."
+                : string.Join("; ", lockTexts);
+        }
+
+        private static string BuildLockStatusText(IEnumerable<CatalogLockInfo> locks)
+        {
+            var lockTypes = (locks ?? Enumerable.Empty<CatalogLockInfo>())
+                .Where(lockInfo => lockInfo != null)
+                .Select(lockInfo => FormatLockTypeText(lockInfo.Lock))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return lockTypes.Count == 0
+                ? "Lock"
+                : string.Join(", ", lockTypes);
+        }
+
+        private static string FormatLockTypeText(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string text = value.Trim()
+                .Replace("_", " ")
+                .Replace("-", " ");
+
+            text = Regex.Replace(text, "([a-z0-9])([A-Z])", "$1 $2");
+            text = Regex.Replace(text, "\\s+", " ").Trim();
+
+            if (string.Equals(text, text.ToUpperInvariant(), StringComparison.Ordinal))
+                text = ToTitleCase(text);
+
+            return text;
+        }
+
+        private static string ToTitleCase(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var words = value
+                .ToLowerInvariant()
+                .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1));
+
+            return string.Join(" ", words);
+        }
+
+        private static string BuildApprovalStatusText(CatalogApprovalStatus approvalStatus)
+        {
+            if (approvalStatus == null)
+                return "Onay bilgisi bulunamadi.";
+
+            if (!string.IsNullOrWhiteSpace(approvalStatus.Status) &&
+                !string.IsNullOrWhiteSpace(approvalStatus.StepText))
+            {
+                return approvalStatus.Status + " - " + approvalStatus.StepText;
+            }
+
+            bool hasStatus = !string.IsNullOrWhiteSpace(approvalStatus.Status);
+            bool hasSteps = approvalStatus.Steps != null && approvalStatus.Steps.Count > 0;
+
+            if (hasStatus && hasSteps)
+                return approvalStatus.Status + " - " + approvalStatus.Steps.Count + " step";
+
+            if (hasStatus)
+                return approvalStatus.Status;
+
+            return hasSteps
+                ? approvalStatus.Steps.Count + " bekleyen onay step'i"
+                : "Onay bilgisi bulunamadi.";
+        }
+
+        private static string BuildApprovalStepText(CatalogApprovalStep step)
+        {
+            if (step == null)
+                return string.Empty;
+
+            string stepName = string.IsNullOrWhiteSpace(step.StepName)
+                ? "Step " + step.StepNumber
+                : step.StepName;
+
+            string approver = string.IsNullOrWhiteSpace(step.ApproverName)
+                ? "Onayci bilinmiyor"
+                : step.ApproverName;
+
+            string group = string.IsNullOrWhiteSpace(step.GroupName)
+                ? string.Empty
+                : " / " + step.GroupName;
+
+            return step.StepNumber + ". " + stepName + group + ": " + approver;
         }
 
         public void ApplyFilter(string filter)
@@ -275,6 +633,153 @@ namespace Veloxap.AddIn.Erwin.ViewModels
 
             foreach (var objectProperty in SortProperties(objectProperties))
                 Properties.Add(ToPropertyItem(objectProperty));
+        }
+
+        private string ResolveModelOwnerText()
+        {
+            if (modelInfo == null)
+                return "Model bilgisi yok.";
+
+            string owner = FindPropertyValue(
+                modelInfo.getoObjectProperty(),
+                "version owner",
+                "owner",
+                "created by",
+                "createdby",
+                "creator",
+                "created user",
+                "modified by",
+                "modifiedby");
+
+            return string.IsNullOrWhiteSpace(owner)
+                ? "Bulunamadi"
+                : owner;
+        }
+
+        private string ResolveVersionName(string catalogName)
+        {
+            if (!string.IsNullOrWhiteSpace(catalogName) &&
+                catalogName.Trim().StartsWith("Version", StringComparison.OrdinalIgnoreCase))
+            {
+                return catalogName.Trim();
+            }
+
+            string versionNumber = ResolveVersionNumber(catalogName);
+            return string.IsNullOrWhiteSpace(versionNumber)
+                ? Safe(catalogName, string.Empty)
+                : "Version " + versionNumber;
+        }
+
+        private string ResolveVersionNumber(string catalogName)
+        {
+            string versionNumber = ExtractVersionNumber(catalogName);
+            if (!string.IsNullOrWhiteSpace(versionNumber))
+                return versionNumber;
+
+            if (modelInfo != null)
+            {
+                versionNumber = ExtractVersionNumber(modelInfo.getoName());
+                if (!string.IsNullOrWhiteSpace(versionNumber))
+                    return versionNumber;
+
+                versionNumber = FindPropertyValue(
+                    modelInfo.getoObjectProperty(),
+                    "version number",
+                    "versionnumber",
+                    "version no",
+                    "version");
+
+                versionNumber = ExtractVersionNumber(versionNumber);
+                if (!string.IsNullOrWhiteSpace(versionNumber))
+                    return versionNumber;
+            }
+
+            return string.Empty;
+        }
+
+        private static string ExtractVersionNumber(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            Match match = Regex.Match(
+                value,
+                @"(?:^|\b)version\s*(?<number>\d+)(?:\b|$)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            if (match.Success)
+                return match.Groups["number"].Value;
+
+            match = Regex.Match(value, @"\b(?<number>\d+)\b", RegexOptions.CultureInvariant);
+            return match.Success ? match.Groups["number"].Value : string.Empty;
+        }
+
+        private static string FindPropertyValue(
+            IEnumerable<ObjectProperty> objectProperties,
+            params string[] nameHints)
+        {
+            if (objectProperties == null || nameHints == null)
+                return string.Empty;
+
+            var properties = objectProperties
+                .Where(property => property != null)
+                .Select(property => new
+                {
+                    Name = NormalizePropertyName(property.getoPropertyClassName()),
+                    Value = FirstNonEmpty(
+                        property.getoPropertyFormatAsString(),
+                        property.getoPropertyValue())
+                })
+                .Where(property => !string.IsNullOrWhiteSpace(property.Value))
+                .ToList();
+
+            foreach (string hint in nameHints)
+            {
+                string normalizedHint = NormalizePropertyName(hint);
+                var match = properties.FirstOrDefault(
+                    property => string.Equals(property.Name, normalizedHint, StringComparison.OrdinalIgnoreCase));
+
+                if (match != null)
+                    return match.Value;
+            }
+
+            foreach (string hint in nameHints)
+            {
+                string normalizedHint = NormalizePropertyName(hint);
+                var match = properties.FirstOrDefault(
+                    property => property.Name.IndexOf(normalizedHint, StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (match != null)
+                    return match.Value;
+            }
+
+            return string.Empty;
+        }
+
+        private static string NormalizePropertyName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            return value
+                .Replace("_", " ")
+                .Replace("-", " ")
+                .Trim()
+                .ToLowerInvariant();
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+                return string.Empty;
+
+            foreach (string value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+            }
+
+            return string.Empty;
         }
 
         private static IEnumerable<ModelObject> SortModelObjects(IEnumerable<ModelObject> modelObjects)
@@ -576,6 +1081,13 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             public string Value { get; set; }
 
             public string AsString { get; set; }
+        }
+
+        public sealed class ApprovalStepDisplayItem
+        {
+            public string StepText { get; set; }
+
+            public string StatusText { get; set; }
         }
 
         private sealed class NaturalStringComparer : IComparer<string>

@@ -13,6 +13,10 @@ namespace Veloxap.AddIn.Erwin.Services
         private const string RulesByModelUrlKey = "ValidationRulesByModelUrl";
         private const string AlterDdlUrlKey = "AlterDdlUrl";
         private const string ApprovalStartByCatalogUrlKey = "ApprovalStartByCatalogUrl";
+        private const string CatalogLocksUrlKey = "CatalogLocksUrl";
+        private const string ApprovalStatusByCatalogUrlKey = "ApprovalStatusByCatalogUrl";
+        private const string MartCatalogsUrlKey = "MartCatalogsUrl";
+        private const string MartCatalogVersionsUrlKey = "MartCatalogVersionsUrl";
         private const string EnableModelComparisonKey = "EnableModelComparison";
 
         public static string GetApiBaseUrl()
@@ -64,6 +68,36 @@ namespace Veloxap.AddIn.Erwin.Services
             return GetServiceUrl(ApprovalStartByCatalogUrlKey);
         }
 
+        public static string GetCatalogLocksUrl()
+        {
+            return GetServiceUrl(CatalogLocksUrlKey);
+        }
+
+        public static string GetApprovalStatusByCatalogUrl()
+        {
+            return GetServiceUrl(ApprovalStatusByCatalogUrlKey);
+        }
+
+        public static string GetMartCatalogsUrl()
+        {
+            return GetServiceUrl(MartCatalogsUrlKey);
+        }
+
+        public static string GetMartCatalogVersionsUrl(string catalogId)
+        {
+            string serviceUrl = GetMartCatalogVersionsUrlTemplate();
+            string safeCatalogId = (catalogId ?? string.Empty).Trim();
+
+            return serviceUrl
+                .Replace("{catalogId}", safeCatalogId)
+                .Replace("{0}", safeCatalogId);
+        }
+
+        public static string GetMartCatalogVersionsUrlTemplate()
+        {
+            return GetServiceUrl(MartCatalogVersionsUrlKey);
+        }
+
         public static List<string> GetAppSettingKeys()
         {
             return new List<string>
@@ -75,6 +109,10 @@ namespace Veloxap.AddIn.Erwin.Services
                 RulesByModelUrlKey,
                 AlterDdlUrlKey,
                 ApprovalStartByCatalogUrlKey,
+                CatalogLocksUrlKey,
+                ApprovalStatusByCatalogUrlKey,
+                MartCatalogsUrlKey,
+                MartCatalogVersionsUrlKey,
                 EnableModelComparisonKey
             };
         }

@@ -13,6 +13,47 @@
             <Setter Property="FontSize" Value="12"/>
         </Style>
 
+        <Style x:Key="SummaryLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6B7280"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="SummaryValueStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="LockBadgeStyle" TargetType="Border">
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Background" Value="#ECFDF5"/>
+            <Setter Property="BorderBrush" Value="#A7F3D0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="0,5,0,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsLocked}" Value="True">
+                    <Setter Property="Background" Value="#FFF1F2"/>
+                    <Setter Property="BorderBrush" Value="#FFE4E6"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LockBadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#047857"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsLocked}" Value="True">
+                    <Setter Property="Foreground" Value="#BE123C"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="ModelTreeViewItemStyle" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
@@ -26,10 +67,99 @@
         </Style>
     </UserControl.Resources>
 
-    <TabControl x:Name="tabModelSections"
-                Background="White"
-                BorderThickness="0"
-                Padding="0">
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Background="#F8FAFC"
+                BorderBrush="#E5E7EB"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="180"/>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="MODEL LOCK DURUMU"
+                               Style="{StaticResource SummaryLabelStyle}"/>
+
+                    <Border Style="{StaticResource LockBadgeStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE72E;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       Style="{StaticResource LockBadgeTextStyle}"
+                                       FontSize="12"
+                                       Margin="0,0,6,0"/>
+
+                            <TextBlock Text="{Binding LockStatusText}"
+                                       Style="{StaticResource LockBadgeTextStyle}"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding LockDetailText}"
+                               Style="{StaticResource MutedTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,3,12,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="VERSIYON SAHIBI"
+                               Style="{StaticResource SummaryLabelStyle}"/>
+
+                    <TextBlock Text="{Binding VersionOwnerText}"
+                               Style="{StaticResource SummaryValueStyle}"
+                               Margin="0,4,12,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="ONAY DURUMU"
+                               Style="{StaticResource SummaryLabelStyle}"/>
+
+                    <TextBlock Text="{Binding ApprovalStatusText}"
+                               Style="{StaticResource SummaryValueStyle}"
+                               Margin="0,4,0,0"/>
+
+                    <ItemsControl ItemsSource="{Binding ApprovalSteps}"
+                                  Margin="0,6,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White"
+                                        BorderBrush="#E5E7EB"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="8,4"
+                                        Margin="0,0,6,6">
+                                    <TextBlock Text="{Binding StepText}"
+                                               Foreground="#374151"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TabControl x:Name="tabModelSections"
+                    Grid.Row="1"
+                    Background="White"
+                    BorderThickness="0"
+                    Padding="0">
         <TabItem Header="Model Bilgileri" HorizontalAlignment="Left" Margin="-2,-2,0,0" Width="92">
             <Grid Background="White"
                   Margin="0,12,0,0">
@@ -46,18 +176,6 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="260"/>
                     </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock Text="Model Bilgileri"
-                                   FontSize="22"
-                                   FontWeight="SemiBold"
-                                   Foreground="#111827"/>
-
-                        <TextBlock Text="Secili modele ait property ve deger bilgilerini goruntuleyin."
-                                   Margin="0,6,0,0"
-                                   Foreground="#6B7280"
-                                   FontSize="13"/>
-                    </StackPanel>
 
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="Arama"
@@ -208,5 +326,6 @@
             <ContentControl x:Name="tableUdpContent"
                             Margin="0,12,0,0"/>
         </TabItem>
-    </TabControl>
+        </TabControl>
+    </Grid>
 </UserControl>

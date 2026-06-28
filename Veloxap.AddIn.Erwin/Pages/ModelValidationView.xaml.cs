@@ -218,8 +218,12 @@ namespace Veloxap.AddIn.Erwin.Pages
             try
             {
                 isSendingApproval = true;
-                btnSendApproval.IsEnabled = false;
+                SetApprovalBusy(true);
                 validationTabs.SelectedItem = tabValidationResults;
+                SetStatus("Tablo UDP degerleri hesaplanarak onay metni hazirlaniyor...");
+
+                string approvalDdl = await BuildApprovalDdlTextAsync(currentAlterDdl ?? string.Empty);
+
                 SetStatus("Onaya gonderiliyor...");
 
                 string response = await ruleService.StartApprovalByCatalogAsync(
@@ -229,7 +233,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                     versionId,
                     targetVersionId,
                     description,
-                    currentAlterDdl ?? string.Empty);
+                    approvalDdl);
 
                 SetStatus(
                     "Onaya gonderildi. cName: " + cName +
@@ -246,8 +250,37 @@ namespace Veloxap.AddIn.Erwin.Pages
             finally
             {
                 isSendingApproval = false;
-                btnSendApproval.IsEnabled = isValidationOk;
+                SetApprovalBusy(false);
             }
+        }
+
+        private async Task<string> BuildApprovalDdlTextAsync(string existingDdl)
+        {
+            TableUdpApprovalScriptResult result = await Task.Run(() =>
+                TableUdpSecurityService.BuildApprovalScript(modelInfo));
+
+            if (result == null || string.IsNullOrWhiteSpace(result.ScriptText))
+                return existingDdl ?? string.Empty;
+
+            SetStatus(
+                result.ChangeCount +
+                " UDP farki onay metninin basina eklendi. Onaya gonderiliyor...");
+
+            return CombineDdlPrefix(result.ScriptText, existingDdl);
+        }
+
+        private static string CombineDdlPrefix(string prefix, string existingDdl)
+        {
+            if (string.IsNullOrWhiteSpace(prefix))
+                return existingDdl ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(existingDdl))
+                return prefix.TrimEnd();
+
+            return prefix.TrimEnd() +
+                   Environment.NewLine +
+                   Environment.NewLine +
+                   existingDdl.TrimStart();
         }
 
         private string PromptForValidationDescription()
@@ -656,6 +689,20 @@ namespace Veloxap.AddIn.Erwin.Pages
             isValidationOk = false;
             btnSendApproval.IsEnabled = false;
             SetStatus(message);
+        }
+
+        private void SetApprovalBusy(bool value)
+        {
+            if (btnRunValidation != null)
+                btnRunValidation.IsEnabled = !value;
+
+            if (btnSendApproval != null)
+                btnSendApproval.IsEnabled = !value && isValidationOk;
+
+            if (approvalBusyBar != null)
+                approvalBusyBar.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+
+            Mouse.OverrideCursor = value ? Cursors.Wait : null;
         }
 
         private void SetStatus(string message)

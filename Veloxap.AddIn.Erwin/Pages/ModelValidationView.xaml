@@ -129,6 +129,14 @@
                        MaxHeight="38"/>
         </Border>
 
+        <ProgressBar x:Name="approvalBusyBar"
+                     Grid.Row="3"
+                     Height="3"
+                     IsIndeterminate="True"
+                     Visibility="Collapsed"
+                     BorderThickness="0"
+                     Foreground="#059669"/>
+
         <TabControl x:Name="validationTabs"
                     Grid.Row="4"
                     Background="Transparent"
