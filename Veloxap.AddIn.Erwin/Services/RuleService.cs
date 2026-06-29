@@ -105,7 +105,7 @@ namespace Veloxap.AddIn.Erwin.Services
             }
         }
 
-        public async Task<string> StartApprovalByCatalogAsync(
+        public async Task<ApprovalStartResult> StartApprovalByCatalogAsync(
             string serviceUrl,
             string cName,
             string cLongId,
@@ -150,12 +150,22 @@ namespace Veloxap.AddIn.Erwin.Services
                     "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
                     "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
 
-                response.EnsureSuccessStatusCode();
-                return json ?? string.Empty;
+                ApprovalStartResult result = ParseApprovalStartResult(json);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorMessage = result == null || string.IsNullOrWhiteSpace(result.Message)
+                        ? "Approval servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                        : result.Message;
+
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                return result ?? new ApprovalStartResult(true, string.Empty, json ?? string.Empty);
             }
         }
 
-        public async Task<List<CatalogLockInfo>> GetCatalogLocksAsync(
+        public async Task<CatalogLocksResult> GetCatalogLocksAsync(
             string serviceUrl,
             string cName,
             string cLongId)
@@ -179,16 +189,83 @@ namespace Veloxap.AddIn.Erwin.Services
                 "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
                 "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
 
-            response.EnsureSuccessStatusCode();
+            CatalogLocksResult result = ParseCatalogLocksResult(json);
 
-            var locks = ParseCatalogLocks(json);
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorMessage = result == null || string.IsNullOrWhiteSpace(result.Message)
+                    ? "Catalog lock servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                    : result.Message;
+
+                throw new InvalidOperationException(errorMessage);
+            }
+
+            var locks = result == null ? new List<CatalogLockInfo>() : result.Locks;
 
             ApiTraceLogger.Info(
                 "CATALOG LOCKS PARSE" + Environment.NewLine +
                 "Url: " + requestUrl + Environment.NewLine +
+                "Success: " + (result == null || result.Success ? "true" : "false") + Environment.NewLine +
+                "Message: " + (result == null ? string.Empty : result.Message) + Environment.NewLine +
                 "ParsedLockCount: " + locks.Count);
 
-            return locks;
+            return result ?? new CatalogLocksResult(true, string.Empty, locks, json ?? string.Empty);
+        }
+
+        public async Task<string> UnlockCatalogAsync(
+            string serviceUrl,
+            string cName,
+            string cLongId,
+            string lockId)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Catalog unlock servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            if (string.IsNullOrWhiteSpace(lockId))
+                throw new ArgumentException("lockId bos olamaz.", nameof(lockId));
+
+            var serializer = new JavaScriptSerializer
+            {
+                MaxJsonLength = int.MaxValue
+            };
+
+            string payload = serializer.Serialize(new Dictionary<string, object>
+            {
+                { "cName", cName ?? string.Empty },
+                { "cLongId", cLongId ?? string.Empty },
+                { "lockId", lockId ?? string.Empty }
+            });
+
+            ApiTraceLogger.Info(
+                "CATALOG UNLOCK REQUEST" + Environment.NewLine +
+                "Url: " + serviceUrl + Environment.NewLine +
+                "Body: " + payload);
+
+            using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
+            {
+                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "CATALOG UNLOCK RESPONSE" + Environment.NewLine +
+                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                string message = ExtractResponseMessage(json);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorMessage = string.IsNullOrWhiteSpace(message)
+                        ? "Catalog unlock servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                        : message;
+
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                return message ?? string.Empty;
+            }
         }
 
         public async Task<CatalogApprovalStatus> GetApprovalStatusByCatalogAsync(
@@ -512,6 +589,24 @@ namespace Veloxap.AddIn.Erwin.Services
                 .ToList();
         }
 
+        private static CatalogLocksResult ParseCatalogLocksResult(string json)
+        {
+            object payload = DeserializeJson(json);
+            Dictionary<string, object> dictionary = payload as Dictionary<string, object>;
+            bool? success = dictionary == null ? null : GetNullableBool(dictionary, "success");
+            string message = ExtractResponseMessage(payload);
+            List<CatalogLockInfo> locks = ResolveCatalogLockItems(payload)
+                .Select(ToCatalogLockInfo)
+                .Where(item => item != null)
+                .ToList();
+
+            return new CatalogLocksResult(
+                success.HasValue ? success.Value : true,
+                message,
+                locks,
+                json ?? string.Empty);
+        }
+
         private static IEnumerable<object> ResolveCatalogLockItems(object payload)
         {
             var array = payload as object[];
@@ -595,7 +690,9 @@ namespace Veloxap.AddIn.Erwin.Services
             {
                 Status = ResolveApprovalStatusText(payload),
                 Message = ResolveApprovalMessageText(payload),
-                StepText = ResolveApprovalStepText(payload)
+                StepText = ResolveApprovalStepText(payload),
+                CurrentApprovalOrder = ResolveCurrentApprovalOrder(payload),
+                ApprovalProcessStarted = ResolveApprovalProcessStarted(payload)
             };
 
             foreach (var step in ResolveApprovalStepItems(payload)
@@ -612,6 +709,66 @@ namespace Veloxap.AddIn.Erwin.Services
             AddCurrentApprovalStep(status, payload);
 
             return status;
+        }
+
+        private static ApprovalStartResult ParseApprovalStartResult(string json)
+        {
+            object payload = DeserializeJson(json);
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary == null)
+            {
+                var nestedPayload = DeserializeNestedJson(payload as string);
+                dictionary = nestedPayload as Dictionary<string, object>;
+            }
+
+            Dictionary<string, object> data = ResolveApprovalStartDataDictionary(dictionary);
+            if (data == null)
+            {
+                return new ApprovalStartResult(
+                    true,
+                    ResolveApprovalStartMessage(dictionary),
+                    json ?? string.Empty);
+            }
+
+            bool? success = GetNullableBool(data, "success");
+            string message = GetString(data, "message", "errorMessage", "resultMessage");
+
+            return new ApprovalStartResult(
+                success.HasValue ? success.Value : true,
+                message,
+                json ?? string.Empty);
+        }
+
+        private static Dictionary<string, object> ResolveApprovalStartDataDictionary(Dictionary<string, object> dictionary)
+        {
+            if (dictionary == null)
+                return null;
+
+            var data = GetDictionaryValue(dictionary, "data");
+            var dataDictionary = data as Dictionary<string, object>;
+            if (dataDictionary != null)
+                return dataDictionary;
+
+            var nestedDataDictionary = DeserializeNestedJson(data as string) as Dictionary<string, object>;
+            if (nestedDataDictionary != null)
+                return nestedDataDictionary;
+
+            return null;
+        }
+
+        private static string ResolveApprovalStartMessage(Dictionary<string, object> dictionary)
+        {
+            if (dictionary == null)
+                return string.Empty;
+
+            string message = GetString(dictionary, "message", "errorMessage", "resultMessage");
+            if (!string.IsNullOrWhiteSpace(message))
+                return message;
+
+            var data = ResolveApprovalStartDataDictionary(dictionary);
+            return data == null
+                ? string.Empty
+                : GetString(data, "message", "errorMessage", "resultMessage");
         }
 
         private static CatalogItem FindCatalogByLongId(object payload, string cLongId)
@@ -941,7 +1098,9 @@ namespace Veloxap.AddIn.Erwin.Services
                     "rejectedBy"),
                 Status = GetString(dictionary, "status", "state", "approvalStatus", "statusName"),
                 GroupName = GetString(dictionary, "groupName", "currentGroupName", "approvalGroupName"),
-                Message = GetString(dictionary, "message", "waitingAtText", "description", "comment", "actionDescription")
+                Message = GetString(dictionary, "message", "waitingAtText", "description", "comment", "actionDescription"),
+                ApprovedBy = GetString(dictionary, "approvedBy"),
+                RejectedBy = GetString(dictionary, "rejectedBy")
             };
 
             if (string.IsNullOrWhiteSpace(step.ApproverName))
@@ -1057,6 +1216,43 @@ namespace Veloxap.AddIn.Erwin.Services
             return GetString(dictionary, "waitingAtText", "message", "approvalProcessText");
         }
 
+        private static string ExtractResponseMessage(string json)
+        {
+            return ExtractResponseMessage(DeserializeJson(json));
+        }
+
+        private static string ExtractResponseMessage(object payload)
+        {
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                string message = GetString(dictionary, "message", "errorMessage", "resultMessage");
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
+
+                object data = GetDictionaryValue(dictionary, "data", "result");
+                message = ExtractResponseMessage(data);
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
+            }
+
+            var array = payload as object[];
+            if (array != null)
+            {
+                foreach (var value in array)
+                {
+                    string message = ExtractResponseMessage(value);
+                    if (!string.IsNullOrWhiteSpace(message))
+                        return message;
+                }
+            }
+
+            object nestedPayload = DeserializeNestedJson(payload as string);
+            return nestedPayload == null
+                ? string.Empty
+                : ExtractResponseMessage(nestedPayload);
+        }
+
         private static string ResolveApprovalStepText(object payload)
         {
             var dictionary = FindApprovalDataDictionary(payload);
@@ -1064,6 +1260,24 @@ namespace Veloxap.AddIn.Erwin.Services
                 return string.Empty;
 
             return GetString(dictionary, "stepText");
+        }
+
+        private static string ResolveCurrentApprovalOrder(object payload)
+        {
+            var dictionary = FindApprovalDataDictionary(payload);
+            if (dictionary == null)
+                return string.Empty;
+
+            return GetString(dictionary, "currentApprovalOrder");
+        }
+
+        private static bool? ResolveApprovalProcessStarted(object payload)
+        {
+            var dictionary = FindApprovalDataDictionary(payload);
+            if (dictionary == null)
+                return null;
+
+            return GetNullableBool(dictionary, "approvalProcessStarted");
         }
 
         private static string BuildApproverNames(object value)
@@ -1297,6 +1511,51 @@ namespace Veloxap.AddIn.Erwin.Services
             return value == null ? string.Empty : Convert.ToString(value);
         }
 
+        private static bool? GetNullableBool(Dictionary<string, object> dictionary, params string[] keys)
+        {
+            object value = GetDictionaryValue(dictionary, keys);
+            if (value == null)
+                return null;
+
+            try
+            {
+                if (value is bool)
+                    return (bool)value;
+
+                string text = Convert.ToString(value);
+                bool parsed;
+                if (bool.TryParse(text, out parsed))
+                    return parsed;
+
+                int number;
+                if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out number))
+                    return number != 0;
+
+                if (string.Equals(text, "yes", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(text, "evet", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                if (string.Equals(text, "no", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(text, "hayir", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(text, "hayır", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
+            catch (InvalidCastException)
+            {
+                return null;
+            }
+
+            return null;
+        }
+
         private static object GetDictionaryValue(Dictionary<string, object> dictionary, params string[] keys)
         {
             if (dictionary == null || keys == null)
@@ -1323,6 +1582,29 @@ namespace Veloxap.AddIn.Erwin.Services
         public string Time { get; set; }
 
         public string SessionId { get; set; }
+    }
+
+    internal sealed class CatalogLocksResult
+    {
+        public CatalogLocksResult(
+            bool success,
+            string message,
+            List<CatalogLockInfo> locks,
+            string rawResponse)
+        {
+            Success = success;
+            Message = message ?? string.Empty;
+            Locks = locks ?? new List<CatalogLockInfo>();
+            RawResponse = rawResponse ?? string.Empty;
+        }
+
+        public bool Success { get; private set; }
+
+        public string Message { get; private set; }
+
+        public List<CatalogLockInfo> Locks { get; private set; }
+
+        public string RawResponse { get; private set; }
     }
 
     internal sealed class CatalogVersionOwnerInfo
@@ -1381,7 +1663,27 @@ namespace Veloxap.AddIn.Erwin.Services
 
         public string StepText { get; set; }
 
+        public string CurrentApprovalOrder { get; set; }
+
+        public bool? ApprovalProcessStarted { get; set; }
+
         public List<CatalogApprovalStep> Steps { get; private set; }
+    }
+
+    internal sealed class ApprovalStartResult
+    {
+        public ApprovalStartResult(bool success, string message, string rawResponse)
+        {
+            Success = success;
+            Message = message ?? string.Empty;
+            RawResponse = rawResponse ?? string.Empty;
+        }
+
+        public bool Success { get; private set; }
+
+        public string Message { get; private set; }
+
+        public string RawResponse { get; private set; }
     }
 
     internal sealed class CatalogApprovalStep
@@ -1397,5 +1699,9 @@ namespace Veloxap.AddIn.Erwin.Services
         public string GroupName { get; set; }
 
         public string Message { get; set; }
+
+        public string ApprovedBy { get; set; }
+
+        public string RejectedBy { get; set; }
     }
 }

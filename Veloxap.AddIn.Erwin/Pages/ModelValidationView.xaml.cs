@@ -226,7 +226,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
                 SetStatus("Onaya gonderiliyor...");
 
-                string response = await ruleService.StartApprovalByCatalogAsync(
+                ApprovalStartResult response = await ruleService.StartApprovalByCatalogAsync(
                     RuleApiSettings.GetApprovalStartByCatalogUrl(),
                     cName,
                     cLongId,
@@ -235,17 +235,33 @@ namespace Veloxap.AddIn.Erwin.Pages
                     description,
                     approvalDdl);
 
-                SetStatus(
-                    "Onaya gonderildi. cName: " + cName +
-                    ", cLongId: " + cLongId +
-                    ", versionId: " + versionId +
-                    ", targetVersionId: " + targetVersionId +
-                    ", responseLength: " + (response == null ? 0 : response.Length) + ".");
+                if (response != null && !response.Success)
+                {
+                    string message = string.IsNullOrWhiteSpace(response.Message)
+                        ? "Approval servisi basarisiz dondu."
+                        : response.Message;
+
+                    SetStatus("Onaya gonderme basarisiz: " + message);
+                    txtValidationResults.Text = message;
+                    return;
+                }
+
+                string successMessage = response == null || string.IsNullOrWhiteSpace(response.Message)
+                    ? "Onaya gonderildi"
+                    : response.Message;
+
+                SetStatus(successMessage);
+                //SetStatus(
+                //    "Onaya gonderildi. cName: " + cName +
+                //    ", cLongId: " + cLongId +
+                //    ", versionId: " + versionId +
+                //    ", targetVersionId: " + targetVersionId +
+                //    ", responseLength: " + (response == null ? 0 : response.RawResponse.Length) + ".");
             }
             catch (Exception ex)
             {
-                SetStatus("Onaya gonderme istegi sirasinda hata olustu.");
-                txtValidationResults.Text = ex.ToString();
+                SetStatus("Onaya gonderme istegi sirasinda hata olustu: " + ex.Message);
+                txtValidationResults.Text = ex.Message;
             }
             finally
             {
@@ -755,7 +771,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private static Brush ResolveStatusForeground(string message)
         {
-            if (ContainsAny(message, "hata", "bulunamadi", "okunamadi", "iptal", "bos dondu", "kullanilabilir degil"))
+            if (ContainsAny(message, "hata", "basarisiz", "başarısız", "bulunamadi", "okunamadi", "iptal", "bos dondu", "kullanilabilir degil"))
                 return new SolidColorBrush(Color.FromRgb(185, 28, 28));
 
             if (ContainsAny(message, "basarili", "gonderildi", "hazirlandi", "onaya gonderilebilir"))

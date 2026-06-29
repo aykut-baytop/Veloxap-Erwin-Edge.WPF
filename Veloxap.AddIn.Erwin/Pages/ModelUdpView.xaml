@@ -21,12 +21,6 @@
             <Setter Property="Margin" Value="0,2,0,0"/>
         </Style>
 
-        <Style x:Key="ApprovalStepTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#374151"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-        </Style>
-
         <Style x:Key="UdpTreeItemStyle" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
@@ -53,8 +47,6 @@
 
     <Grid Background="White">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>
@@ -92,66 +84,6 @@
         </Grid>
 
         <Border Grid.Row="2"
-                Background="#F8FAFC"
-                BorderBrush="#E5E7EB"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="210"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="Onay Durumu"
-                               Style="{StaticResource MutedTextStyle}"/>
-                    <TextBlock x:Name="txtApprovalStatus"
-                               Text="Kontrol ediliyor..."
-                               Style="{StaticResource SummaryValueStyle}"
-                               FontSize="16"/>
-                    <TextBlock x:Name="txtApprovalMessage"
-                               Text=""
-                               Foreground="#4B5563"
-                               FontSize="12"
-                               TextWrapping="Wrap"
-                               Margin="0,4,14,0"/>
-                </StackPanel>
-
-                <ItemsControl x:Name="approvalSteps"
-                              Grid.Column="1"
-                              Margin="0,2,0,0">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="White"
-                                    BorderBrush="#D1D5DB"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Padding="8,5"
-                                    Margin="0,0,8,8"
-                                    MaxWidth="360">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding StepText}"
-                                               Style="{StaticResource ApprovalStepTextStyle}"
-                                               FontWeight="SemiBold"/>
-                                    <TextBlock Text="{Binding DetailText}"
-                                               Style="{StaticResource ApprovalStepTextStyle}"
-                                               Margin="0,2,0,0"/>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="4"
                 Background="#F8FAFC"
                 BorderBrush="#E5E7EB"
                 BorderThickness="1"
@@ -206,7 +138,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="6"
+        <Border Grid.Row="4"
                 Background="White">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -241,12 +173,12 @@
                     </DockPanel>
                 </Border>
 
-                <Border Grid.Column="2"
+                <Border
                         Background="#F9FAFB"
                         BorderBrush="#E5E7EB"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Padding="12">
+                        Padding="12" Grid.ColumnSpan="3" Margin="297,0,0,0">
                     <DockPanel>
                         <TextBlock x:Name="txtDetailTitle"
                                    Text="UDP Detaylari"
@@ -269,14 +201,18 @@
                                   EnableColumnVirtualization="True"
                                   BorderThickness="0"
                                   Background="White"
-                                  AlternatingRowBackground="#F3F4F6">
+                                  AlternatingRowBackground="#F3F4F6"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Property"
                                                     Binding="{Binding Property}"
-                                                    Width="180"/>
+                                                    Width="220"
+                                                    MinWidth="180"/>
                                 <DataGridTextColumn Header="Value"
                                                     Binding="{Binding Value}"
-                                                    Width="*"/>
+                                                    Width="SizeToCells"
+                                                    MinWidth="360"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>

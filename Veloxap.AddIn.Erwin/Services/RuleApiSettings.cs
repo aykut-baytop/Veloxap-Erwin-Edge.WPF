@@ -14,6 +14,7 @@ namespace Veloxap.AddIn.Erwin.Services
         private const string AlterDdlUrlKey = "AlterDdlUrl";
         private const string ApprovalStartByCatalogUrlKey = "ApprovalStartByCatalogUrl";
         private const string CatalogLocksUrlKey = "CatalogLocksUrl";
+        private const string CatalogUnlockUrlKey = "CatalogUnlockUrl";
         private const string ApprovalStatusByCatalogUrlKey = "ApprovalStatusByCatalogUrl";
         private const string MartCatalogsUrlKey = "MartCatalogsUrl";
         private const string MartCatalogVersionsUrlKey = "MartCatalogVersionsUrl";
@@ -73,6 +74,11 @@ namespace Veloxap.AddIn.Erwin.Services
             return GetServiceUrl(CatalogLocksUrlKey);
         }
 
+        public static string GetCatalogUnlockUrl()
+        {
+            return GetServiceUrl(CatalogUnlockUrlKey);
+        }
+
         public static string GetApprovalStatusByCatalogUrl()
         {
             return GetServiceUrl(ApprovalStatusByCatalogUrlKey);
@@ -110,6 +116,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 AlterDdlUrlKey,
                 ApprovalStartByCatalogUrlKey,
                 CatalogLocksUrlKey,
+                CatalogUnlockUrlKey,
                 ApprovalStatusByCatalogUrlKey,
                 MartCatalogsUrlKey,
                 MartCatalogVersionsUrlKey,

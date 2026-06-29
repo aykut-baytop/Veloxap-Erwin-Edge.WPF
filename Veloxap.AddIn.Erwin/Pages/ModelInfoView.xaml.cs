@@ -127,6 +127,18 @@ namespace Veloxap.AddIn.Erwin.Pages
             viewModel.SelectedModelItem = e.NewValue as ModelInfoViewModel.ModelDisplayItem;
         }
 
+        private async void BtnUnlockCatalog_Click(object sender, RoutedEventArgs e)
+        {
+            var viewModel = DataContext as ModelInfoViewModel;
+            if (viewModel == null)
+                return;
+
+            await viewModel.UnlockCatalogAsync(
+                catalogRuleService,
+                catalogName,
+                catalogLongId);
+        }
+
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (searchTimer == null)

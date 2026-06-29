@@ -16,12 +16,8 @@ namespace Veloxap.AddIn.Erwin.Pages
     public partial class ModelUdpView : UserControl
     {
         private readonly ModelInfo modelInfo;
-        private readonly RuleService catalogRuleService;
-        private readonly string catalogName;
-        private readonly string catalogLongId;
         private readonly List<UdpRow> allRows;
         private readonly ObservableCollection<UdpDetailRow> selectedDetails;
-        private readonly ObservableCollection<ApprovalStepDisplayItem> approvalStepItems;
         private readonly DispatcherTimer searchTimer;
         private const int MinimumSearchLength = 3;
         private const int SearchDelayMilliseconds = 500;
@@ -57,12 +53,8 @@ namespace Veloxap.AddIn.Erwin.Pages
             string catalogLongId)
         {
             this.modelInfo = modelInfo;
-            catalogRuleService = ruleService;
-            this.catalogName = catalogName;
-            this.catalogLongId = catalogLongId;
             allRows = new List<UdpRow>();
             selectedDetails = new ObservableCollection<UdpDetailRow>();
-            approvalStepItems = new ObservableCollection<ApprovalStepDisplayItem>();
             searchTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(SearchDelayMilliseconds)
@@ -73,10 +65,8 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             treeUdp.ItemsSource = new List<UdpTreeNode>();
             gridUdpDetails.ItemsSource = selectedDetails;
-            approvalSteps.ItemsSource = approvalStepItems;
 
             UpdateSummaryCounts();
-            ResetApprovalHistory();
             ShowDetails(null);
             SetStatus(
                 modelInfo == null ? "UDP bulunamadi." : "UDP'ler yukleniyor...",
@@ -92,77 +82,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
 
             hasStartedLoading = true;
-            Task approvalTask = LoadApprovalHistoryAsync();
             await ReloadRowsAsync("UDP'ler yukleniyor...", false);
-            await approvalTask;
-        }
-
-        private async Task LoadApprovalHistoryAsync()
-        {
-            ResetApprovalHistory();
-
-            if (catalogRuleService == null)
-            {
-                SetApprovalStatus("Servis baglantisi hazir degil.", string.Empty, true);
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(catalogName) || string.IsNullOrWhiteSpace(catalogLongId))
-            {
-                SetApprovalStatus("cName veya cLongId okunamadi.", string.Empty, true);
-                return;
-            }
-
-            try
-            {
-                CatalogApprovalStatus approvalStatus = await catalogRuleService.GetApprovalStatusByCatalogAsync(
-                    RuleApiSettings.GetApprovalStatusByCatalogUrl(),
-                    catalogName,
-                    catalogLongId);
-
-                approvalStepItems.Clear();
-
-                foreach (CatalogApprovalStep step in approvalStatus == null
-                    ? Enumerable.Empty<CatalogApprovalStep>()
-                    : approvalStatus.Steps)
-                {
-                    approvalStepItems.Add(new ApprovalStepDisplayItem
-                    {
-                        StepText = BuildApprovalStepText(step),
-                        DetailText = BuildApprovalStepDetailText(step)
-                    });
-                }
-
-                SetApprovalStatus(
-                    BuildApprovalStatusText(approvalStatus),
-                    approvalStatus == null ? string.Empty : approvalStatus.Message,
-                    false);
-            }
-            catch (Exception ex)
-            {
-                approvalStepItems.Clear();
-                SetApprovalStatus("Onay durumu okunamadi.", ex.Message, true);
-            }
-        }
-
-        private void ResetApprovalHistory()
-        {
-            approvalStepItems.Clear();
-            SetApprovalStatus("Kontrol ediliyor...", string.Empty, false);
-        }
-
-        private void SetApprovalStatus(string status, string message, bool isError)
-        {
-            if (txtApprovalStatus != null)
-            {
-                txtApprovalStatus.Text = string.IsNullOrWhiteSpace(status) ? "-" : status;
-                txtApprovalStatus.Foreground = isError
-                    ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
-                    : new SolidColorBrush(Color.FromRgb(17, 24, 39));
-            }
-
-            if (txtApprovalMessage != null)
-                txtApprovalMessage.Text = message ?? string.Empty;
         }
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -615,61 +535,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 AddDetail("Hesaplama", preview.Message);
         }
 
-        private static string BuildApprovalStatusText(CatalogApprovalStatus approvalStatus)
-        {
-            if (approvalStatus == null)
-                return "Onay bilgisi bulunamadi.";
-
-            if (!string.IsNullOrWhiteSpace(approvalStatus.Status) &&
-                !string.IsNullOrWhiteSpace(approvalStatus.StepText))
-            {
-                return approvalStatus.Status + " - " + approvalStatus.StepText;
-            }
-
-            if (!string.IsNullOrWhiteSpace(approvalStatus.Status))
-                return approvalStatus.Status;
-
-            if (approvalStatus.Steps != null && approvalStatus.Steps.Count > 0)
-                return approvalStatus.Steps.Count + " onay step'i";
-
-            return "Onay bilgisi bulunamadi.";
-        }
-
-        private static string BuildApprovalStepText(CatalogApprovalStep step)
-        {
-            if (step == null)
-                return string.Empty;
-
-            string stepName = string.IsNullOrWhiteSpace(step.StepName)
-                ? "Step " + step.StepNumber
-                : step.StepName;
-
-            string status = string.IsNullOrWhiteSpace(step.Status)
-                ? string.Empty
-                : " - " + step.Status;
-
-            return step.StepNumber + ". " + stepName + status;
-        }
-
-        private static string BuildApprovalStepDetailText(CatalogApprovalStep step)
-        {
-            if (step == null)
-                return string.Empty;
-
-            var parts = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(step.GroupName))
-                parts.Add(step.GroupName);
-
-            if (!string.IsNullOrWhiteSpace(step.ApproverName))
-                parts.Add("Onayci: " + step.ApproverName);
-
-            if (!string.IsNullOrWhiteSpace(step.Message))
-                parts.Add(step.Message);
-
-            return string.Join(" | ", parts);
-        }
-
         private async Task ReloadRowsAsync(string loadingMessage, bool preserveTreeState)
         {
             if (searchTimer != null)
@@ -927,13 +792,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             public string Property { get; set; }
 
             public string Value { get; set; }
-        }
-
-        public sealed class ApprovalStepDisplayItem
-        {
-            public string StepText { get; set; }
-
-            public string DetailText { get; set; }
         }
 
         private sealed class UdpRowsBuildResult

@@ -23,6 +23,12 @@ namespace Veloxap.AddIn.Erwin.ViewModels
         private string versionOwnerText;
         private string approvalStatusText;
         private string catalogOverviewMessage;
+        private List<CatalogLockInfo> catalogLocks;
+        private CatalogApprovalStatus catalogApprovalStatus;
+        private bool canUnlockCatalog;
+        private bool isUnlockingCatalog;
+        private bool showApprovalStatus;
+        private string unlockCatalogMessage;
 
         public ObservableCollection<ModelDisplayItem> ModelItems { get; }
 
@@ -142,6 +148,71 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             }
         }
 
+        public bool CanUnlockCatalog
+        {
+            get
+            {
+                return canUnlockCatalog;
+            }
+            private set
+            {
+                if (canUnlockCatalog == value)
+                    return;
+
+                canUnlockCatalog = value;
+                OnPropertyChanged(nameof(CanUnlockCatalog));
+            }
+        }
+
+        public bool ShowApprovalStatus
+        {
+            get
+            {
+                return showApprovalStatus;
+            }
+            private set
+            {
+                if (showApprovalStatus == value)
+                    return;
+
+                showApprovalStatus = value;
+                OnPropertyChanged(nameof(ShowApprovalStatus));
+            }
+        }
+
+        public bool IsUnlockingCatalog
+        {
+            get
+            {
+                return isUnlockingCatalog;
+            }
+            private set
+            {
+                if (isUnlockingCatalog == value)
+                    return;
+
+                isUnlockingCatalog = value;
+                OnPropertyChanged(nameof(IsUnlockingCatalog));
+                UpdateCanUnlockCatalog();
+            }
+        }
+
+        public string UnlockCatalogMessage
+        {
+            get
+            {
+                return unlockCatalogMessage;
+            }
+            private set
+            {
+                if (unlockCatalogMessage == value)
+                    return;
+
+                unlockCatalogMessage = value;
+                OnPropertyChanged(nameof(UnlockCatalogMessage));
+            }
+        }
+
         public ModelDisplayItem SelectedModelItem
         {
             get
@@ -172,12 +243,15 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             ModelItems = new ObservableCollection<ModelDisplayItem>();
             Properties = new ObservableCollection<PropertyDisplayItem>();
             ApprovalSteps = new ObservableCollection<ApprovalStepDisplayItem>();
+            catalogLocks = new List<CatalogLockInfo>();
             StatusMessage = "Model bilgisi bulunamadi.";
             LockStatusText = "Kontrol edilmedi";
             LockDetailText = "Lock servisi henuz sorgulanmadi.";
             VersionOwnerText = ResolveModelOwnerText();
             ApprovalStatusText = "Kontrol edilmedi";
             CatalogOverviewMessage = string.Empty;
+            UnlockCatalogMessage = string.Empty;
+            ShowApprovalStatus = true;
 
             LoadModel();
         }
@@ -194,6 +268,11 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             LockStatusText = "Kontrol ediliyor";
             LockDetailText = "Lock servisi sorgulaniyor...";
             CatalogOverviewMessage = string.Empty;
+            UnlockCatalogMessage = string.Empty;
+            ShowApprovalStatus = true;
+            catalogLocks.Clear();
+            catalogApprovalStatus = null;
+            CanUnlockCatalog = false;
 
             if (ruleService == null)
             {
@@ -201,6 +280,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
                 LockDetailText = "Servis baglantisi hazir degil.";
                 VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "Servis baglantisi hazir degil." : fallbackOwner;
                 ApprovalStatusText = "Servis baglantisi hazir degil.";
+                UpdateCanUnlockCatalog();
                 return;
             }
 
@@ -210,12 +290,14 @@ namespace Veloxap.AddIn.Erwin.ViewModels
                 LockDetailText = "cName veya cLongId okunamadi.";
                 VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "cLongId okunamadi." : fallbackOwner;
                 ApprovalStatusText = "cName veya cLongId okunamadi.";
+                UpdateCanUnlockCatalog();
                 return;
             }
 
             await LoadVersionOwnerAsync(ruleService, catalogName, catalogLongId, fallbackOwner);
-            await LoadLockStatusAsync(ruleService, catalogName, catalogLongId);
-            await LoadApprovalStatusAsync(ruleService, catalogName, catalogLongId);
+            bool shouldLoadApprovalStatus = await LoadLockStatusAsync(ruleService, catalogName, catalogLongId);
+            if (shouldLoadApprovalStatus)
+                await LoadApprovalStatusAsync(ruleService, catalogName, catalogLongId);
         }
 
         private async Task LoadVersionOwnerAsync(
@@ -249,30 +331,49 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             }
         }
 
-        private async Task LoadLockStatusAsync(
+        private async Task<bool> LoadLockStatusAsync(
             RuleService ruleService,
             string catalogName,
             string catalogLongId)
         {
             try
             {
-                List<CatalogLockInfo> locks = await ruleService.GetCatalogLocksAsync(
+                CatalogLocksResult result = await ruleService.GetCatalogLocksAsync(
                     RuleApiSettings.GetCatalogLocksUrl(),
                     catalogName,
                     catalogLongId);
 
-                IsLocked = locks != null && locks.Count > 0;
-                LockStatusText = IsLocked ? BuildLockStatusText(locks) : "Lock yok";
+                if (IsCatalogCouldNotBeResolved(result))
+                {
+                    catalogLocks = new List<CatalogLockInfo>();
+                    IsLocked = false;
+                    LockStatusText = "Bilinmiyor";
+                    LockDetailText = result.Message;
+                    ApprovalSteps.Clear();
+                    ApprovalStatusText = string.Empty;
+                    catalogApprovalStatus = null;
+                    ShowApprovalStatus = false;
+                    UpdateCanUnlockCatalog();
+                    return false;
+                }
+
+                catalogLocks = result == null ? new List<CatalogLockInfo>() : result.Locks;
+                IsLocked = catalogLocks.Count > 0;
+                LockStatusText = IsLocked ? BuildLockStatusText(catalogLocks) : "Lock yok";
                 LockDetailText = IsLocked
-                    ? BuildLockDetailText(locks)
-                    : "Aktif catalog lock kaydi bulunmadi.";
+                    ? BuildLockDetailText(catalogLocks, VersionOwnerText)
+                    : BuildNoLockDetailText(result);
             }
             catch (Exception ex)
             {
+                catalogLocks = new List<CatalogLockInfo>();
                 IsLocked = false;
                 LockStatusText = "Bilinmiyor";
                 LockDetailText = "Lock bilgisi okunamadi: " + ex.Message;
             }
+
+            UpdateCanUnlockCatalog();
+            return true;
         }
 
         private async Task LoadApprovalStatusAsync(
@@ -286,6 +387,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
                     RuleApiSettings.GetApprovalStatusByCatalogUrl(),
                     catalogName,
                     catalogLongId);
+                catalogApprovalStatus = approvalStatus;
 
                 ApprovalSteps.Clear();
 
@@ -304,21 +406,158 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             }
             catch (Exception ex)
             {
+                catalogApprovalStatus = null;
                 ApprovalSteps.Clear();
                 ApprovalStatusText = "Onay durumu okunamadi: " + ex.Message;
             }
+
+            UpdateCanUnlockCatalog();
         }
 
-        private static string BuildLockDetailText(IEnumerable<CatalogLockInfo> locks)
+        internal async Task UnlockCatalogAsync(
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId)
         {
+            if (ruleService == null)
+            {
+                UnlockCatalogMessage = "Servis baglantisi hazir degil.";
+                return;
+            }
+
+            UpdateCanUnlockCatalog();
+
+            if (!CanUnlockCatalog)
+                return;
+
+            string lockId = ResolveUnlockLockId();
+            IsUnlockingCatalog = true;
+            UnlockCatalogMessage = "Lock kaldiriliyor...";
+
+            try
+            {
+                string unlockMessage = await ruleService.UnlockCatalogAsync(
+                    RuleApiSettings.GetCatalogUnlockUrl(),
+                    catalogName,
+                    catalogLongId,
+                    lockId);
+
+                UnlockCatalogMessage = string.IsNullOrWhiteSpace(unlockMessage)
+                    ? "Lock kaldirildi."
+                    : unlockMessage;
+                await LoadLockStatusAsync(ruleService, catalogName, catalogLongId);
+            }
+            catch (Exception ex)
+            {
+                UnlockCatalogMessage = "Lock kaldirilamadi: " + ex.Message;
+            }
+            finally
+            {
+                IsUnlockingCatalog = false;
+                UpdateCanUnlockCatalog();
+            }
+        }
+
+        private void UpdateCanUnlockCatalog()
+        {
+            CanUnlockCatalog =
+                !IsUnlockingCatalog &&
+                IsLocked &&
+                !string.IsNullOrWhiteSpace(ResolveUnlockLockId()) &&
+                IsCurrentUserVersionOwner() &&
+                IsApprovalNotStarted(catalogApprovalStatus);
+        }
+
+        private string ResolveUnlockLockId()
+        {
+            CatalogLockInfo lockInfo = (catalogLocks ?? new List<CatalogLockInfo>())
+                .FirstOrDefault(item => item != null && !string.IsNullOrWhiteSpace(item.LockId));
+
+            return lockInfo == null ? string.Empty : lockInfo.LockId;
+        }
+
+        private bool IsCurrentUserVersionOwner()
+        {
+            return NamesMatch(VersionOwnerText, RuleApiSettings.GetAuthUsername());
+        }
+
+        private static bool IsApprovalNotStarted(CatalogApprovalStatus approvalStatus)
+        {
+            if (approvalStatus == null)
+                return false;
+
+            if (approvalStatus.ApprovalProcessStarted.HasValue)
+                return !approvalStatus.ApprovalProcessStarted.Value;
+
+            bool hasApprovalSignal =
+                !string.IsNullOrWhiteSpace(approvalStatus.Status) ||
+                !string.IsNullOrWhiteSpace(approvalStatus.Message) ||
+                !string.IsNullOrWhiteSpace(approvalStatus.StepText) ||
+                !string.IsNullOrWhiteSpace(approvalStatus.CurrentApprovalOrder) ||
+                (approvalStatus.Steps != null && approvalStatus.Steps.Count > 0);
+
+            if (!hasApprovalSignal)
+                return true;
+
+            string statusText = string.Join(" ", new[] { approvalStatus.Status, approvalStatus.Message, approvalStatus.StepText });
+            if (ContainsAny(statusText, "baslamadi", "başlamadı", "not started", "notstarted"))
+                return true;
+
+            if (ContainsAny(statusText, "basladi", "başladı", "pending", "waiting", "approved", "rejected"))
+                return false;
+
+            return false;
+        }
+
+        private static bool NamesMatch(string left, string right)
+        {
+            string normalizedLeft = NormalizeUserName(left);
+            string normalizedRight = NormalizeUserName(right);
+
+            return !string.IsNullOrWhiteSpace(normalizedLeft) &&
+                   !string.IsNullOrWhiteSpace(normalizedRight) &&
+                   string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeUserName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string normalized = value.Trim();
+            int domainIndex = normalized.LastIndexOf('\\');
+            if (domainIndex >= 0 && domainIndex < normalized.Length - 1)
+                normalized = normalized.Substring(domainIndex + 1);
+
+            int mailIndex = normalized.IndexOf('@');
+            if (mailIndex > 0)
+                normalized = normalized.Substring(0, mailIndex);
+
+            return normalized.Trim();
+        }
+
+        private static bool ContainsAny(string value, params string[] tokens)
+        {
+            if (string.IsNullOrWhiteSpace(value) || tokens == null)
+                return false;
+
+            return tokens.Any(token =>
+                !string.IsNullOrWhiteSpace(token) &&
+                value.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static string BuildLockDetailText(
+            IEnumerable<CatalogLockInfo> locks,
+            string versionOwnerText)
+        {
+            string owner = string.IsNullOrWhiteSpace(versionOwnerText)
+                ? "versiyon sahibi bilinmiyor"
+                : versionOwnerText;
+
             var lockTexts = (locks ?? Enumerable.Empty<CatalogLockInfo>())
                 .Where(lockInfo => lockInfo != null)
                 .Select(lockInfo =>
                 {
-                    string owner = string.IsNullOrWhiteSpace(lockInfo.Session)
-                        ? "oturum bilinmiyor"
-                        : lockInfo.Session;
-
                     string lockType = string.IsNullOrWhiteSpace(lockInfo.Lock)
                         ? "lock"
                         : lockInfo.Lock;
@@ -335,6 +574,28 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             return lockTexts.Count == 0
                 ? "Aktif catalog lock kaydi var."
                 : string.Join("; ", lockTexts);
+        }
+
+        private static string BuildNoLockDetailText(CatalogLocksResult result)
+        {
+            if (result != null &&
+                !result.Success &&
+                !string.IsNullOrWhiteSpace(result.Message))
+            {
+                return result.Message;
+            }
+
+            return "Aktif catalog lock kaydi bulunmadi.";
+        }
+
+        private static bool IsCatalogCouldNotBeResolved(CatalogLocksResult result)
+        {
+            return result != null &&
+                   !result.Success &&
+                   string.Equals(
+                       result.Message,
+                       "Catalog could not be resolved.",
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildLockStatusText(IEnumerable<CatalogLockInfo> locks)
