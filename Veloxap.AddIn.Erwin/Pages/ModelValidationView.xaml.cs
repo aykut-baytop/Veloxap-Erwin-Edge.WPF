@@ -140,20 +140,20 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
 
             isInitializing = false;
-            //_ = RefreshAlterDdlPreviewAsync();
+            _ = RefreshAlterDdlPreviewAsync();
         }
 
-        //private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
-        //{
-        //    if (isInitializing || isUpdatingTargetVersion)
-        //        return;
+        private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
+        {
+           if (isInitializing || isUpdatingTargetVersion)
+               return;
 
-        //    if (sender == cmbSourceVersion)
-        //        SelectPreviousTargetVersion();
+           if (sender == cmbSourceVersion)
+               SelectPreviousTargetVersion();
 
-        //    ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
-        //    await RefreshAlterDdlPreviewAsync();
-        //}
+           ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
+           await RefreshAlterDdlPreviewAsync();
+        }
 
         private void BtnRunValidation_Click(object sender, RoutedEventArgs e)
         {
@@ -503,39 +503,39 @@ namespace Veloxap.AddIn.Erwin.Pages
             return builder.ToString();
         }
 
-        //private async Task RefreshAlterDdlPreviewAsync()
-        //{
-        //    var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
-        //    var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
+        private async Task RefreshAlterDdlPreviewAsync()
+        {
+           var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
+           var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
 
-        //    if (sourceVersion == null || targetVersion == null)
-        //    {
-        //        currentAlterDdl = string.Empty;
-        //        txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
-        //        return;
-        //    }
+           if (sourceVersion == null || targetVersion == null)
+           {
+               currentAlterDdl = string.Empty;
+               txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
+               return;
+           }
 
-        //    try
-        //    {
-        //        currentAlterDdl = string.Empty;
-        //        txtAlterDdl.Text = "Alter DDL hazirlaniyor...";
-        //        string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
+           try
+           {
+               currentAlterDdl = string.Empty;
+               txtAlterDdl.Text = "Alter DDL hazirlaniyor...";
+               string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
 
-        //        currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
-        //            ? string.Empty
-        //            : ddl;
+               currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
+                   ? string.Empty
+                   : ddl;
 
-        //        txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
-        //            ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
-        //            : ddl;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        currentAlterDdl = string.Empty;
-        //        txtAlterDdl.Text = ex.ToString();
-        //        SetStatus("Alter DDL istegi sirasinda hata olustu.");
-        //    }
-        //}
+               txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
+                   ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
+                   : ddl;
+           }
+           catch (Exception ex)
+           {
+               currentAlterDdl = string.Empty;
+               txtAlterDdl.Text = ex.ToString();
+               SetStatus("Alter DDL istegi sirasinda hata olustu.");
+           }
+        }
 
         private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
         {
