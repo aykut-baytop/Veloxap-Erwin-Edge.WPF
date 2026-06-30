@@ -559,26 +559,27 @@ namespace Veloxap.AddIn.Erwin.Services
 
             var builder = new StringBuilder();
             builder.AppendLine("-- TABLE UDP CALCULATED DIFFERENCES");
-            builder.AppendLine("-- TableName          >          UDPName          >          UDPValue");
+            builder.AppendLine("");
+            //builder.AppendLine("-- TableName          >          UDPName          >          UDPValue");
 
             foreach (var change in changeList)
             {
                 builder.Append("--  ");
                 //builder.Append("UPDATE [");
-                builder.Append(EscapeSqlIdentifier(change.TableName));
+                builder.Append(EscapeSqlIdentifier(change.TableName) + " = ");
 
-                for (var i = change.TableName.Length; i < 20; i++)
-                {
-                    builder.Append(" ");
-                }
+                //for (var i = change.TableName.Length; i < 20; i++)
+                //{
+                //    builder.Append(" ");
+                //}
                 //builder.Append("] SET [");
                 //builder.Append("     >     ");
-                builder.Append(EscapeSqlIdentifier(change.UdpName));
+                builder.Append(EscapeSqlIdentifier(change.UdpName) + " : ");
                 
-                for (var i = change.UdpName.Length; i < 20; i++)
-                {
-                    builder.Append(" ");
-                }
+                //for (var i = change.UdpName.Length; i < 20; i++)
+                //{
+                //    builder.Append(" ");
+                //}
                 
                 //builder.Append("     >     ");
                 //builder.Append("] = N'");

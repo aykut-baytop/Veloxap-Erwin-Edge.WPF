@@ -678,7 +678,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
                 : step.StepName;
 
             string approver = string.IsNullOrWhiteSpace(step.ApproverName)
-                ? "Onayci bilinmiyor"
+                ? ""
                 : step.ApproverName;
 
             string group = string.IsNullOrWhiteSpace(step.GroupName)
