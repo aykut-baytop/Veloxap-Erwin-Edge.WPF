@@ -9,20 +9,24 @@
 
     <UserControl.Resources>
         <Style x:Key="ActionButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="MinWidth" Value="132"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="148"/>
             <Setter Property="Padding" Value="14,0"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#1D4ED8"/>
             <Setter Property="Background" Value="#2563EB"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Root"
                                 Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
@@ -33,6 +37,39 @@
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Root" Property="Background" Value="#D1D5DB"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#D1D5DB"/>
+                                <Setter Property="Foreground" Value="#6B7280"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SuccessActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#059669"/>
+            <Setter Property="BorderBrush" Value="#047857"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#047857"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Background" Value="#D1D5DB"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#D1D5DB"/>
                                 <Setter Property="Foreground" Value="#6B7280"/>
                                 <Setter Property="Cursor" Value="Arrow"/>
                             </Trigger>
@@ -47,6 +84,18 @@
             <Setter Property="Foreground" Value="#6B7280"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
         </Style>
+
+        <Style x:Key="VersionComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="170"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -58,63 +107,85 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="150"/>
-            </Grid.ColumnDefinitions>
-
+        <Border Background="#F8FAFC"
+                BorderBrush="#E5E7EB"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <Grid>
+                <Grid MaxWidth="520"
+                      HorizontalAlignment="Left">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="36"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="Versiyon" Style="{StaticResource FieldLabelStyle}"/>
+                        <TextBlock Text="Kaynak Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbSourceVersion"
-                                  Height="34"
-                                  MinWidth="150"
-                                  IsEnabled="False"
+                                  Style="{StaticResource VersionComboBoxStyle}"
+                                  IsEnabled="True"
                                   DisplayMemberPath="DisplayName"
-                                  />
+                                  SelectionChanged="VersionSelection_Changed"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Visibility="Hidden" Text="Hedef Versiyon" Style="{StaticResource FieldLabelStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="&#xE72A;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="#64748B"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Bottom"
+                               Margin="0,0,0,11"/>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Hedef Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbTargetVersion"
-                                  Height="34"
-                                  MaxWidth="0"
-                                  IsEnabled="False"
+                                  Style="{StaticResource VersionComboBoxStyle}"
+                                  IsEnabled="True"
                                   DisplayMemberPath="DisplayName"
-                                  Visibility="Hidden"
-                                  />
+                                  SelectionChanged="VersionSelection_Changed"/>
                     </StackPanel>
                 </Grid>
+
+                <StackPanel Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Orientation="Horizontal"
+                            Margin="16,0,0,0">
+                    <Button x:Name="btnRunValidation"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Click="BtnRunValidation_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE9D9;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="13"
+                                       Margin="0,0,7,0"/>
+                            <TextBlock Text="Validasyon Testi"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="btnSendApproval"
+                            Style="{StaticResource SuccessActionButtonStyle}"
+                            Click="BtnSendApproval_Click"
+                            IsEnabled="False">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE724;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="13"
+                                       Margin="0,0,7,0"/>
+                            <TextBlock Text="Onaya Gonder"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
-
-            <StackPanel
-                        HorizontalAlignment="Center" Grid.ColumnSpan="3" Margin="341,0,5,0" Orientation="Horizontal">
-                <Button x:Name="btnRunValidation"
-                        Content="Validasyon Testi"
-                        Style="{StaticResource ActionButtonStyle}"
-                        Click="BtnRunValidation_Click"/>
-
-                <Button x:Name="btnSendApproval"
-                        Content="Onaya Gonder"
-                        Style="{StaticResource ActionButtonStyle}"
-                        Background="#059669"
-                        Click="BtnSendApproval_Click"
-                        IsEnabled="False"/>
-            </StackPanel>
-        </Grid>
+        </Border>
 
         <Border Grid.Row="2"
                 Background="#F9FAFB"
