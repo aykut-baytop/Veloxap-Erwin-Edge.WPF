@@ -20,15 +20,14 @@
 
             </ResourceDictionary.MergedDictionaries>
 
-            <Style x:Key="TopSettingsButtonStyle" TargetType="Button">
-                <Setter Property="Height" Value="38"/>
-                <Setter Property="Width" Value="40"/>
-                <Setter Property="MinWidth" Value="40"/>
+            <Style x:Key="MenuSettingsButtonStyle" TargetType="Button">
+                <Setter Property="Height" Value="26"/>
+                <Setter Property="Width" Value="28"/>
                 <Setter Property="Padding" Value="0"/>
                 <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="BorderBrush" Value="#CBD5E1"/>
-                <Setter Property="Background" Value="#F8FAFC"/>
-                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#3B5774"/>
+                <Setter Property="Background" Value="#1F3A5A"/>
+                <Setter Property="Foreground" Value="#E5EEF8"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Template">
                     <Setter.Value>
@@ -37,7 +36,7 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="8">
+                                    CornerRadius="6">
                                 <ContentPresenter HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
                                                   Margin="{TemplateBinding Padding}"/>
@@ -45,11 +44,11 @@
 
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Root" Property="Background" Value="#EFF6FF"/>
-                                    <Setter TargetName="Root" Property="BorderBrush" Value="#93C5FD"/>
+                                    <Setter TargetName="Root" Property="Background" Value="#29496B"/>
+                                    <Setter TargetName="Root" Property="BorderBrush" Value="#5F7EA0"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="Root" Property="Background" Value="#DBEAFE"/>
+                                    <Setter TargetName="Root" Property="Background" Value="#17304D"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -172,8 +171,31 @@
                           ItemContainerStyle="{StaticResource MainModelComboBoxItemStyle}"
                           ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
 
-                <TextBlock Text="Navigasyon"
-                           Style="{StaticResource MenuSectionLabelStyle}"/>
+                <Grid Margin="8,0,8,7">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="Navigasyon"
+                               Style="{StaticResource MenuSectionLabelStyle}"
+                               Margin="0"
+                               VerticalAlignment="Center"/>
+
+                    <Button x:Name="btnSettings"
+                            Grid.Column="1"
+                            Style="{StaticResource MenuSettingsButtonStyle}"
+                            Click="BtnSettings_Click"
+                            ToolTip="Ayarlar"
+                            AutomationProperties.Name="Ayarlar">
+                        <TextBlock Text="&#xE713;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Button>
+                </Grid>
 
                 <RadioButton x:Name="rbModelInfo"
              GroupName="MainMenu"
@@ -262,27 +284,11 @@
             </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Button x:Name="btnSettings"
-                        HorizontalAlignment="Right"
-                        Style="{StaticResource TopSettingsButtonStyle}"
-                        Click="BtnSettings_Click"
-                        ToolTip="Ayarlar"
-                        AutomationProperties.Name="Ayarlar">
-                    <TextBlock Text="&#xE713;"
-                               FontFamily="Segoe MDL2 Assets"
-                               FontSize="16"
-                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                </Button>
-
                 <!--<pages:ModelInfoView/>-->
-                <ContentControl x:Name="MainContent" Grid.Row="2"/>
+                <ContentControl x:Name="MainContent"/>
                 <!--<ContentControl Content="{Binding SelectedPage}"/>-->
             </Grid>
         </Border>

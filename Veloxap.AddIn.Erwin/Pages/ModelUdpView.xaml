@@ -60,12 +60,6 @@
                 <ColumnDefinition Width="260"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Tablo UDP'leri"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       Foreground="#111827"
-                       VerticalAlignment="Center"/>
-
             <StackPanel Grid.Column="1">
                 <TextBlock Text="Arama"
                            Style="{StaticResource MutedTextStyle}"
@@ -88,7 +82,8 @@
                 BorderBrush="#E5E7EB"
                 BorderThickness="1"
                 CornerRadius="8"
-                Padding="12">
+                Padding="12"
+                MaxHeight="70">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>

@@ -7,12 +7,6 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
-        <Style x:Key="WrappedCellTextStyle" TargetType="TextBlock">
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,4"/>
-        </Style>
-
         <Style x:Key="MutedTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#6B7280"/>
             <Setter Property="FontSize" Value="12"/>
@@ -103,21 +97,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <Style x:Key="SettingsDataGridStyle" TargetType="DataGrid">
-            <Setter Property="AutoGenerateColumns" Value="False"/>
-            <Setter Property="CanUserAddRows" Value="False"/>
-            <Setter Property="IsReadOnly" Value="False"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="GridLinesVisibility" Value="None"/>
-            <Setter Property="RowHeight" Value="42"/>
-            <Setter Property="ColumnHeaderHeight" Value="38"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="AlternatingRowBackground" Value="#F8FAFC"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="#E5E7EB"/>
-            <Setter Property="VerticalGridLinesBrush" Value="#E5E7EB"/>
-        </Style>
     </UserControl.Resources>
 
     <Border Background="#F8FAFC"
@@ -128,6 +107,8 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="16"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="12"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Grid>
@@ -145,25 +126,22 @@
                     <TextBlock x:Name="txtConfigSource"
                                Margin="0,6,0,0"
                                Style="{StaticResource MutedTextStyle}"
-                               TextWrapping="Wrap"/>
+                               TextWrapping="Wrap" RenderTransformOrigin="0.5,0.5">
+                        <TextBlock.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform/>
+                                <SkewTransform/>
+                                <RotateTransform Angle="0.128"/>
+                                <TranslateTransform/>
+                            </TransformGroup>
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <TextBlock x:Name="txtSettingCount"
-                               Style="{StaticResource CountBadgeStyle}"
-                               Margin="0,0,10,0"/>
-
-                    <Button Content="Yenile"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Background="#475569"
-                            Click="BtnReload_Click"/>
-
-                    <Button Content="Kaydet"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Click="BtnSave_Click"/>
-                </StackPanel>
+                <TextBlock x:Name="txtSettingCount"
+                           Grid.Column="1"
+                           Style="{StaticResource CountBadgeStyle}"
+                           VerticalAlignment="Center"/>
             </Grid>
 
             <Border Grid.Row="2"
@@ -228,38 +206,24 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Text="Servis Bilgileri"
-                                               Style="{StaticResource SectionTitleTextStyle}"/>
-
-                                    <TextBlock x:Name="txtServiceSettingCount"
-                                               Grid.Column="1"
-                                               Style="{StaticResource CountBadgeStyle}"/>
-                                </Grid>
-
                                 <Border Style="{StaticResource SectionBorderStyle}"
-                                        Padding="0">
-                                    <DataGrid x:Name="dgServiceSettings"
-                                              Style="{StaticResource SettingsDataGridStyle}"
-                                              MaxHeight="260">
-                                        <DataGrid.Columns>
-                                            <DataGridTextColumn Header="Anahtar"
-                                                                Binding="{Binding Key}"
-                                                                IsReadOnly="True"
-                                                                Width="240"
-                                                                ElementStyle="{StaticResource WrappedCellTextStyle}"/>
+                                        Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,12">
+                                            <TextBlock x:Name="txtServiceSettingCount"
+                                                       DockPanel.Dock="Right"
+                                                       Style="{StaticResource CountBadgeStyle}"/>
 
-                                            <DataGridTextColumn Header="Deger"
-                                                                Binding="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                Width="*"
-                                                                ElementStyle="{StaticResource WrappedCellTextStyle}"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
+                                            <TextBlock Text="Servis Bilgileri"
+                                                       Style="{StaticResource SectionTitleTextStyle}"/>
+                                        </DockPanel>
+
+                                        <TextBlock Text="ApiBaseUrl"
+                                                   Style="{StaticResource FieldLabelTextStyle}"/>
+
+                                        <TextBox x:Name="txtApiBaseUrl"
+                                                 Style="{StaticResource SettingsTextBoxStyle}"/>
+                                    </StackPanel>
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
@@ -276,6 +240,20 @@
                     </Grid>
                 </DockPanel>
             </Border>
+
+            <StackPanel Grid.Row="4"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Content="Yenile"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Background="#475569"
+                        Visibility="Hidden"
+                        Click="BtnReload_Click"/>
+
+                <Button Content="Kaydet"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Click="BtnSave_Click"/>
+            </StackPanel>
         </Grid>
     </Border>
 </UserControl>

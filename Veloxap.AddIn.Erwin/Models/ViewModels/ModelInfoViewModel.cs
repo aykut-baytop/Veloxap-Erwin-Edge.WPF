@@ -430,7 +430,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
 
             //string lockId = ResolveUnlockLockId();
             IsUnlockingCatalog = true;
-            UnlockCatalogMessage = "Lock kaldiriliyor...";
+            UnlockCatalogMessage = "Versiyon siliniyor...";
 
             try
             {

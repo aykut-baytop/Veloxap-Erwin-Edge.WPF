@@ -14,9 +14,11 @@ namespace Veloxap.AddIn.Erwin.Pages
     /// </summary>
     public partial class SettingsView : UserControl
     {
+        private const string ApiBaseUrlKey = "ApiBaseUrl";
         private const string AuthUsernameKey = "AuthUsername";
         private const string AuthPasswordKey = "AuthPassword";
         private const string MissingAuthCredentialsMessage = "Kullanici adi ve parola bilgilerini doldurun.";
+        private const int VisibleServiceSettingCount = 1;
 
         private List<AppConfigSetting> currentUserSettings;
         private List<AppConfigSetting> currentServiceSettings;
@@ -51,10 +53,10 @@ namespace Veloxap.AddIn.Erwin.Pages
                     .ToList();
 
                 LoadCredentialFields();
-                dgServiceSettings.ItemsSource = currentServiceSettings;
+                LoadServiceFields();
                 txtUserSettingCount.Text = currentUserSettings.Count + " ayar";
-                txtServiceSettingCount.Text = currentServiceSettings.Count + " ayar";
-                txtSettingCount.Text = settings.Count + " ayar";
+                txtServiceSettingCount.Text = VisibleServiceSettingCount + " ayar";
+                txtSettingCount.Text = currentUserSettings.Count + VisibleServiceSettingCount + " ayar";
                 txtConfigSource.Text = "";
                 emptyState.Visibility = settings.Count == 0
                     ? Visibility.Visible
@@ -67,7 +69,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 currentUserSettings = new List<AppConfigSetting>();
                 currentServiceSettings = new List<AppConfigSetting>();
                 LoadCredentialFields();
-                dgServiceSettings.ItemsSource = currentServiceSettings;
+                LoadServiceFields();
                 txtUserSettingCount.Text = "0 ayar";
                 txtServiceSettingCount.Text = "0 ayar";
                 txtSettingCount.Text = "0 ayar";
@@ -82,7 +84,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             try
             {
                 UpdateUserSettingsFromCredentialFields();
-                CommitSettingsGrid(dgServiceSettings);
+                UpdateServiceSettingsFromFields();
 
                 Configuration config = OpenAssemblyConfiguration();
                 KeyValueConfigurationCollection appSettings = config.AppSettings.Settings;
@@ -116,9 +118,22 @@ namespace Veloxap.AddIn.Erwin.Pages
             pwdAuthPassword.Password = GetPasswordForInput(GetUserSettingValue(AuthPasswordKey));
         }
 
+        private void LoadServiceFields()
+        {
+            txtApiBaseUrl.Text = GetServiceSettingValue(ApiBaseUrlKey);
+        }
+
         private string GetUserSettingValue(string key)
         {
             AppConfigSetting setting = FindUserSetting(key);
+            return setting == null
+                ? string.Empty
+                : setting.Value ?? string.Empty;
+        }
+
+        private string GetServiceSettingValue(string key)
+        {
+            AppConfigSetting setting = FindServiceSetting(key);
             return setting == null
                 ? string.Empty
                 : setting.Value ?? string.Empty;
@@ -128,6 +143,11 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             SetUserSettingValue(AuthUsernameKey, txtAuthUsername.Text);
             SetUserSettingValue(AuthPasswordKey, CryptoHelper.Encrypt(pwdAuthPassword.Password));
+        }
+
+        private void UpdateServiceSettingsFromFields()
+        {
+            SetServiceSettingValue(ApiBaseUrlKey, txtApiBaseUrl.Text.Trim());
         }
 
         private void SetUserSettingValue(string key, string value)
@@ -146,12 +166,38 @@ namespace Veloxap.AddIn.Erwin.Pages
             setting.Value = value ?? string.Empty;
         }
 
+        private void SetServiceSettingValue(string key, string value)
+        {
+            AppConfigSetting setting = FindServiceSetting(key);
+            if (setting == null)
+            {
+                setting = new AppConfigSetting(key, string.Empty);
+
+                if (currentServiceSettings == null)
+                    currentServiceSettings = new List<AppConfigSetting>();
+
+                currentServiceSettings.Add(setting);
+            }
+
+            setting.Value = value ?? string.Empty;
+        }
+
         private AppConfigSetting FindUserSetting(string key)
         {
             if (currentUserSettings == null)
                 return null;
 
             return currentUserSettings.FirstOrDefault(
+                setting => setting != null
+                    && string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private AppConfigSetting FindServiceSetting(string key)
+        {
+            if (currentServiceSettings == null)
+                return null;
+
+            return currentServiceSettings.FirstOrDefault(
                 setting => setting != null
                     && string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase));
         }
@@ -165,12 +211,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             return CryptoHelper.TryDecrypt(storedPassword, out plainPassword)
                 ? plainPassword
                 : storedPassword;
-        }
-
-        private static void CommitSettingsGrid(DataGrid dataGrid)
-        {
-            dataGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-            dataGrid.CommitEdit(DataGridEditingUnit.Row, true);
         }
 
         private IEnumerable<AppConfigSetting> GetCurrentSettings()
