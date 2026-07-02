@@ -412,6 +412,51 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             }
         }
 
+        internal async Task DeleteCatalog(
+    RuleService ruleService,
+    string catalogName,
+    string catalogLongId)
+        {
+            if (ruleService == null)
+            {
+                UnlockCatalogMessage = "Servis baglantisi hazir degil.";
+                return;
+            }
+
+            UpdateCanUnlockCatalog();
+
+            if (!CanUnlockCatalog)
+                return;
+
+            //string lockId = ResolveUnlockLockId();
+            IsUnlockingCatalog = true;
+            UnlockCatalogMessage = "Lock kaldiriliyor...";
+
+            try
+            {
+                string unlockMessage = await ruleService.DeleteCatalogAsync(
+                    RuleApiSettings.GetCatalogDeleteUrl(),
+                    catalogName,
+                    catalogLongId
+                    //,lockId
+                    );
+
+                UnlockCatalogMessage = string.IsNullOrWhiteSpace(unlockMessage)
+                    ? "Versiyon silindi."
+                    : unlockMessage;
+                await LoadLockStatusAsync(ruleService, catalogName, catalogLongId);
+            }
+            catch (Exception ex)
+            {
+                UnlockCatalogMessage = "Versiyon silinemedi: " + ex.Message;
+            }
+            finally
+            {
+                IsUnlockingCatalog = false;
+                UpdateCanUnlockCatalog();
+            }
+        }
+
         private void UpdateCanUnlockCatalog()
         {
             CanUnlockCatalog =

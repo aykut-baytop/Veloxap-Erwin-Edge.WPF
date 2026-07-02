@@ -130,7 +130,7 @@
                         <TextBlock Text="Kaynak Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbSourceVersion"
                                   Style="{StaticResource VersionComboBoxStyle}"
-                                  IsEnabled="True"
+                                  IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
                                   SelectionChanged="VersionSelection_Changed"/>
                     </StackPanel>
@@ -148,7 +148,7 @@
                         <TextBlock Text="Hedef Versiyon" Style="{StaticResource FieldLabelStyle}"/>
                         <ComboBox x:Name="cmbTargetVersion"
                                   Style="{StaticResource VersionComboBoxStyle}"
-                                  IsEnabled="True"
+                                  IsEnabled="False"
                                   DisplayMemberPath="DisplayName"
                                   SelectionChanged="VersionSelection_Changed"/>
                     </StackPanel>
@@ -216,8 +216,8 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*" MinWidth="220"/>
-                        <ColumnDefinition Width="6"/>
-                        <ColumnDefinition Width="2*" MinWidth="190"/>
+                        <!--<ColumnDefinition Width="6"/>-->
+                        <!--<ColumnDefinition  Width="2*" MinWidth="190"/>-->
                     </Grid.ColumnDefinitions>
 
                     <Border BorderBrush="#E5E7EB"
@@ -244,13 +244,6 @@
                                      Padding="10"/>
                         </DockPanel>
                     </Border>
-
-                    <GridSplitter Grid.Column="1"
-                                  Width="6"
-                                  HorizontalAlignment="Stretch"
-                                  VerticalAlignment="Stretch"
-                                  Background="#E5E7EB"
-                                  ShowsPreview="True"/>
                 </Grid>
             </TabItem>
             <TabItem x:Name="tabValidationRules" Header="Validasyon Kurallari">

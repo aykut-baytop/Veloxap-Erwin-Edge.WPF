@@ -116,5 +116,17 @@ namespace Veloxap.AddIn.Erwin.Pages
                 catalogName,
                 catalogLongId);
         }
+
+        private async void BtnDeleteCatalog_Click(object sender, RoutedEventArgs e)
+        {
+            var viewModel = DataContext as ModelInfoViewModel;
+            if (viewModel == null)
+                return;
+
+            await viewModel.DeleteCatalog(
+                catalogRuleService,
+                catalogName,
+                catalogLongId);
+        }
     }
 }

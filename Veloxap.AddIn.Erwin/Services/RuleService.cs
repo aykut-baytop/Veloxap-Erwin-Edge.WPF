@@ -268,6 +268,59 @@ namespace Veloxap.AddIn.Erwin.Services
             }
         }
 
+        public async Task<string> DeleteCatalogAsync(
+    string serviceUrl,
+    string cName,
+    string cLongId)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Catalog delete servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            var serializer = new JavaScriptSerializer
+            {
+                MaxJsonLength = int.MaxValue
+            };
+
+            string payload = serializer.Serialize(new Dictionary<string, object>
+            {
+                { "cName", cName ?? string.Empty },
+                { "cLongId", cLongId ?? string.Empty },
+                { "itemType", "V" },
+                { "itemName", "V" +  cName.Split(' ')[1].Trim() + " - " + cName}
+            });
+
+            ApiTraceLogger.Info(
+                "CATALOG delete REQUEST" + Environment.NewLine +
+                "Url: " + serviceUrl + Environment.NewLine +
+                "Body: " + payload);
+
+            using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
+            {
+                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "CATALOG delete RESPONSE" + Environment.NewLine +
+                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                string message = ExtractResponseMessage(json);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorMessage = string.IsNullOrWhiteSpace(message)
+                        ? "Catalog delete servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                        : message;
+
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                return message ?? string.Empty;
+            }
+        }
+
         public async Task<CatalogApprovalStatus> GetApprovalStatusByCatalogAsync(
             string serviceUrl,
             string cName,
