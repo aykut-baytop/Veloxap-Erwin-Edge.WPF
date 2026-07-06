@@ -39,6 +39,10 @@ namespace Veloxap.AddIn.Erwin
         private string selectedModelVersionNo;
         private List<(int key, string val)> selectedModelAllVersions;
         private ModelInfo currentModelInfo;
+        private ModelInfo currentTableUdpModelInfo;
+        private string loadedSummaryModelKey;
+        private string loadedDetailedModelKey;
+        private string loadedTableUdpModelKey;
         private string loadedRulesModelKey;
         private string lastRuleRequestTrace;
         private TableUdpStartupApplyResult tableUdpStartupResult;
@@ -91,14 +95,7 @@ namespace Veloxap.AddIn.Erwin
         {
             if (sender == rbModelInfo)
             {
-                MainContent.Content = new ModelInfoView(
-                    currentModelInfo,
-                    oApp,
-                    GetCurrentPersistenceUnit(),
-                    false,
-                    GetCatalogOverviewRuleService(),
-                    selectedModelName,
-                    selectedModelLongId);
+                ShowModelInfoView(true);
             }
 
             else if (sender == rbCompare)
@@ -111,14 +108,7 @@ namespace Veloxap.AddIn.Erwin
 
             else if (sender == rbTableUdps)
             {
-                MainContent.Content = new ModelInfoView(
-                    currentModelInfo,
-                    oApp,
-                    GetCurrentPersistenceUnit(),
-                    true,
-                    GetCatalogOverviewRuleService(),
-                    selectedModelName,
-                    selectedModelLongId);
+                ShowModelInfoView(true);
             }
 
             else if (sender == rbValidation)
@@ -126,6 +116,7 @@ namespace Veloxap.AddIn.Erwin
                 if (!EnsureAuthCredentialsConfigured(showMessage: true))
                     return;
 
+                EnsureSelectedModelLoaded(ModelLoadPurpose.Full);
                 await LoadValidationRulesForSelectedModelAsync(showErrors: true);
                 MainContent.Content = new ModelValidationView(
                     currentModelInfo,
@@ -200,14 +191,7 @@ namespace Veloxap.AddIn.Erwin
 
         private void ModelInfo_Checked(object sender, RoutedEventArgs e)
         {
-            MainContent.Content = new ModelInfoView(
-                currentModelInfo,
-                oApp,
-                GetCurrentPersistenceUnit(),
-                false,
-                GetCatalogOverviewRuleService(),
-                selectedModelName,
-                selectedModelLongId);
+            ShowModelInfoView(true);
         }
 
         //private void ModelValidation_Checked(object sender, RoutedEventArgs e)
@@ -267,31 +251,15 @@ namespace Veloxap.AddIn.Erwin
             SetSelectedModelRuleParameters(selectedModel.Name);
             ClearValidationRules();
 
-            currentModelInfo = veloxapEDGErwinLib.loadModelObject(
-                selectedModel.ObjectId,
-                selectedModel.PersistenceObjectId);
+            LoadSelectedModelSummary(selectedModel);
 
             if (rbModelInfo.IsChecked == true)
             {
-                MainContent.Content = new ModelInfoView(
-                    currentModelInfo,
-                    oApp,
-                    GetCurrentPersistenceUnit(),
-                    false,
-                    GetCatalogOverviewRuleService(),
-                    selectedModelName,
-                    selectedModelLongId);
+                ShowModelInfoView(true);
             }
             else if (rbTableUdps.IsChecked == true)
             {
-                MainContent.Content = new ModelInfoView(
-                    currentModelInfo,
-                    oApp,
-                    GetCurrentPersistenceUnit(),
-                    true,
-                    GetCatalogOverviewRuleService(),
-                    selectedModelName,
-                    selectedModelLongId);
+                ShowModelInfoView(true);
             }
             //else if (rbRules.IsChecked == true)
             //{
@@ -313,6 +281,7 @@ namespace Veloxap.AddIn.Erwin
                 if (!EnsureAuthCredentialsConfigured(showMessage: true))
                     return;
 
+                EnsureSelectedModelLoaded(ModelLoadPurpose.Full);
                 await LoadValidationRulesForSelectedModelAsync(showErrors: true);
                 MainContent.Content = new ModelValidationView(
                     currentModelInfo,
@@ -325,6 +294,114 @@ namespace Veloxap.AddIn.Erwin
                     tableUdpStartupResult,
                     isStartupTableUdpApplyRunning);
             }
+        }
+
+        private void ShowModelInfoView(bool showTableUdpTab)
+        {
+            ModelInfo modelInfo = EnsureSelectedModelLoaded(ModelLoadPurpose.Summary);
+
+            MainContent.Content = new ModelInfoView(
+                modelInfo,
+                oApp,
+                GetCurrentPersistenceUnit(),
+                showTableUdpTab,
+                GetCatalogOverviewRuleService(),
+                selectedModelName,
+                selectedModelLongId);
+        }
+
+        private ModelInfo EnsureSelectedModelLoaded(ModelLoadPurpose purpose)
+        {
+            var selectedModel = cmbMainModel == null
+                ? null
+                : cmbMainModel.SelectedItem as ModelSelection;
+
+            if (veloxapEDGErwinLib == null || selectedModel == null)
+                return currentModelInfo;
+
+            string modelKey = BuildModelKey(selectedModel);
+
+            if (purpose == ModelLoadPurpose.Summary)
+            {
+                if (!string.Equals(loadedSummaryModelKey, modelKey, StringComparison.Ordinal))
+                    LoadSelectedModelSummary(selectedModel);
+
+                return currentModelInfo;
+            }
+
+            if (purpose == ModelLoadPurpose.TableUdpsOnly)
+            {
+                if (string.Equals(loadedDetailedModelKey, modelKey, StringComparison.Ordinal))
+                    return currentModelInfo;
+
+                if (string.Equals(loadedTableUdpModelKey, modelKey, StringComparison.Ordinal))
+                    return currentTableUdpModelInfo;
+
+                currentTableUdpModelInfo = LoadModelWithBusyCursor(() =>
+                    veloxapEDGErwinLib.loadTableUdpModelObject(
+                        selectedModel.ObjectId,
+                        selectedModel.PersistenceObjectId));
+                loadedTableUdpModelKey = modelKey;
+                return currentTableUdpModelInfo;
+            }
+
+            if (string.Equals(loadedDetailedModelKey, modelKey, StringComparison.Ordinal))
+                return currentModelInfo;
+
+            currentModelInfo = LoadModelWithBusyCursor(() =>
+                veloxapEDGErwinLib.loadModelObject(
+                    selectedModel.ObjectId,
+                    selectedModel.PersistenceObjectId));
+            loadedDetailedModelKey = modelKey;
+            loadedSummaryModelKey = modelKey;
+            return currentModelInfo;
+        }
+
+        private void LoadSelectedModelSummary(ModelSelection selectedModel)
+        {
+            if (veloxapEDGErwinLib == null || selectedModel == null)
+                return;
+
+            string modelKey = BuildModelKey(selectedModel);
+            if (string.Equals(loadedSummaryModelKey, modelKey, StringComparison.Ordinal))
+                return;
+
+            currentModelInfo = LoadModelWithBusyCursor(() =>
+                veloxapEDGErwinLib.loadModelSummary(
+                    selectedModel.ObjectId,
+                    selectedModel.PersistenceObjectId));
+
+            loadedSummaryModelKey = modelKey;
+            loadedDetailedModelKey = null;
+            loadedTableUdpModelKey = null;
+            currentTableUdpModelInfo = null;
+        }
+
+        private static ModelInfo LoadModelWithBusyCursor(Func<ModelInfo> loadModel)
+        {
+            Cursor previousCursor = Mouse.OverrideCursor;
+            Mouse.OverrideCursor = Cursors.Wait;
+
+            try
+            {
+                return loadModel == null
+                    ? null
+                    : loadModel();
+            }
+            finally
+            {
+                Mouse.OverrideCursor = previousCursor;
+            }
+        }
+
+        private static string BuildModelKey(ModelSelection selectedModel)
+        {
+            if (selectedModel == null)
+                return string.Empty;
+
+            return (selectedModel.ObjectId ?? string.Empty) +
+                   "|" +
+                   (selectedModel.PersistenceObjectId ?? string.Empty);
         }
 
         private async Task ApplyTableUdpsOnStartupAsync(
@@ -665,6 +742,13 @@ namespace Veloxap.AddIn.Erwin
                 return name.Trim();
 
             return name.Substring(0, parenIndex).TrimEnd();
+        }
+
+        private enum ModelLoadPurpose
+        {
+            Summary,
+            TableUdpsOnly,
+            Full
         }
 
         private sealed class ModelSelection

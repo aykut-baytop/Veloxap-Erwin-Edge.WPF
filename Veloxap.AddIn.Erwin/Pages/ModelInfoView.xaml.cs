@@ -59,8 +59,16 @@ namespace Veloxap.AddIn.Erwin.Pages
                 ? new ModelInfoViewModel()
                 : new ModelInfoViewModel(modelInfo);
 
-            tabModelSections.SelectedItem = tabTableUdps;
-            EnsureTableUdpViewLoaded();
+            if (showTableUdpTab)
+            {
+                tabTableUdps.Visibility = Visibility.Visible;
+                tabModelSections.SelectedItem = tabTableUdps;
+                EnsureTableUdpViewLoaded();
+            }
+            else
+            {
+                tabTableUdps.Visibility = Visibility.Collapsed;
+            }
         }
 
         private async void ModelInfoView_Loaded(object sender, RoutedEventArgs e)

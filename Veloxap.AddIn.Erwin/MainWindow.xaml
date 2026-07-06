@@ -148,7 +148,7 @@
                                    Foreground="White"
                                    FontSize="19"
                                    FontWeight="SemiBold"/>
-                        <TextBlock Text="Erwin Add-In v1"
+                        <TextBlock Text="Erwin Add-In v2"
                                    Foreground="{StaticResource MenuMutedForegroundBrush}"
                                    FontSize="12"
                                    Margin="0,2,0,0"/>

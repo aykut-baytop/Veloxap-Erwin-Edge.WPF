@@ -61,6 +61,26 @@ namespace VeloxapEDGErwinTools.AddIn
             }
         }
 
+        public ModelInfo loadModelSummary(string objectId, string pobjectId)
+        {
+            SCAPI.PersistenceUnit oPersistenceUnit = findPersistenceUnit(pobjectId);
+            if (oPersistenceUnit == null)
+                return new ModelInfo();
+
+            ModelLoad mLoad = new ModelLoad(ref oApplication);
+            return mLoad.loadModelSummary(oPersistenceUnit);
+        }
+
+        public ModelInfo loadTableUdpModelObject(string objectId, string pobjectId)
+        {
+            SCAPI.PersistenceUnit oPersistenceUnit = findPersistenceUnit(pobjectId);
+            if (oPersistenceUnit == null)
+                return new ModelInfo();
+
+            ModelLoad mLoad = new ModelLoad(ref oApplication);
+            return mLoad.loadTableUdpModel(oPersistenceUnit);
+        }
+
         public List<(string, string,string)> getModelsNamePath()
         {
 
@@ -219,6 +239,20 @@ namespace VeloxapEDGErwinTools.AddIn
                */
             }
             return mModel;
+        }
+
+        private SCAPI.PersistenceUnit findPersistenceUnit(string pobjectId)
+        {
+            if (oApplication == null || oApplication.PersistenceUnits == null)
+                return null;
+
+            foreach (SCAPI.PersistenceUnit oUnit in oApplication.PersistenceUnits)
+            {
+                if (oUnit.ObjectId == pobjectId)
+                    return oUnit;
+            }
+
+            return null;
         }
         public List<Veloxap.AddIn.Erwin.Models.ModelObject> loadSubModelObject(string objectId, SCAPI.PersistenceUnit oPersistenceUnit)
         {

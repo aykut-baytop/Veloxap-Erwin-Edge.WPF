@@ -77,6 +77,14 @@
             </StackPanel>
         </Grid>
 
+        <ProgressBar x:Name="busyBar"
+                     Grid.Row="1"
+                     Height="3"
+                     IsIndeterminate="True"
+                     Visibility="Collapsed"
+                     Foreground="#2563EB"
+                     Background="#E5E7EB"/>
+
         <Border Grid.Row="2"
                 Background="#F8FAFC"
                 BorderBrush="#E5E7EB"
