@@ -67,6 +67,7 @@
     <Compile Include="Models\ModelInfo.cs" />
     <Compile Include="Models\ModelLoad.cs" />
     <Compile Include="Models\ModelObject.cs" />
+    <Compile Include="Models\MainModelSelectionInfo.cs" />
     <Compile Include="Models\ObjectProperty.cs" />
     <Compile Include="Models\Integrate\ModelObjectComparer.cs" />
     <Compile Include="Models\Rule.cs" />
@@ -75,6 +76,9 @@
     <Compile Include="Models\ViewModels\ModelInfoViewModel.cs" />
     <Compile Include="Pages\ModelInfoView.xaml.cs">
       <DependentUpon>ModelInfoView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Pages\MainModelTestView.xaml.cs">
+      <DependentUpon>MainModelTestView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Pages\ModelComparisonView.xaml.cs">
       <DependentUpon>ModelComparisonView.xaml</DependentUpon>
@@ -104,6 +108,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
     <Page Include="Pages\ModelInfoView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Pages\MainModelTestView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

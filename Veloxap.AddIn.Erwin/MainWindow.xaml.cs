@@ -38,6 +38,7 @@ namespace Veloxap.AddIn.Erwin
         private string selectedModelName;
         private string selectedModelVersionNo;
         private List<(int key, string val)> selectedModelAllVersions;
+        private MainModelSelectionInfo selectedMainModelInfo = MainModelSelectionInfo.Empty;
         private ModelInfo currentModelInfo;
         private ModelInfo currentTableUdpModelInfo;
         private string loadedSummaryModelKey;
@@ -51,6 +52,13 @@ namespace Veloxap.AddIn.Erwin
         private bool isValidationOk;
         private bool hasStartedStartupTableUdpApply;
         private bool isStartupTableUdpApplyRunning;
+
+        internal event EventHandler<MainModelSelectionChangedEventArgs> SelectedMainModelInfoChanged;
+
+        internal MainModelSelectionInfo CurrentSelectedMainModelInfo
+        {
+            get { return selectedMainModelInfo ?? MainModelSelectionInfo.Empty; }
+        }
 
         public Window1()
         {
@@ -67,6 +75,7 @@ namespace Veloxap.AddIn.Erwin
             }
             rbTableUdps.Checked += Menu_Checked;
             rbValidation.Checked += Menu_Checked;
+            rbTest.Checked += Menu_Checked;
             //rbRules.Checked += Menu_Checked;
             //rbRules.Visibility = Visibility.Collapsed;
             cmbMainModel.SelectionChanged += CmbMainModel_SelectionChanged;
@@ -130,6 +139,11 @@ namespace Veloxap.AddIn.Erwin
                     isStartupTableUdpApplyRunning);
             }
 
+            else if (sender == rbTest)
+            {
+                ShowMainModelTestView();
+            }
+
             //else if (sender == rbRules)
             //{
             //    if (!EnsureAuthCredentialsConfigured(showMessage: true))
@@ -160,6 +174,7 @@ namespace Veloxap.AddIn.Erwin
             rbCompare.IsChecked = false;
             rbTableUdps.IsChecked = false;
             rbValidation.IsChecked = false;
+            rbTest.IsChecked = false;
             //rbRules.IsChecked = false;
         }
 
@@ -223,7 +238,10 @@ namespace Veloxap.AddIn.Erwin
             if (modelItems.Count > 0)
                 cmbMainModel.SelectedIndex = 0;
             else
+            {
+                UpdateSelectedMainModelInfo(null);
                 MainContent.Content = new ModelInfoView();
+            }
             //comboBox1.Items.Clear();
             //models = veloxapEDGErwinLib.getModelsNamePath();
 
@@ -243,13 +261,24 @@ namespace Veloxap.AddIn.Erwin
         private async void CmbMainModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var selectedModel = cmbMainModel.SelectedItem as ModelSelection;
-            if (veloxapEDGErwinLib == null || selectedModel == null)
+            if (selectedModel == null)
+            {
+                selectedModelName = null;
+                selectedModelLongId = null;
+                selectedModelVersionNo = null;
+                UpdateSelectedMainModelInfo(null);
+                ClearValidationRules();
                 return;
+            }
 
             selectedModelName = selectedModel.Name;
             selectedModelLongId = selectedModel.ObjectId;
             SetSelectedModelRuleParameters(selectedModel.Name);
+            UpdateSelectedMainModelInfo(selectedModel);
             ClearValidationRules();
+
+            if (veloxapEDGErwinLib == null)
+                return;
 
             LoadSelectedModelSummary(selectedModel);
 
@@ -294,6 +323,38 @@ namespace Veloxap.AddIn.Erwin
                     tableUdpStartupResult,
                     isStartupTableUdpApplyRunning);
             }
+        }
+
+        private void ShowMainModelTestView()
+        {
+            MainContent.Content = new MainModelTestView(
+                this,
+                CurrentSelectedMainModelInfo, oApp);
+        }
+
+        private void UpdateSelectedMainModelInfo(ModelSelection selectedModel)
+        {
+            selectedMainModelInfo = selectedModel == null
+                ? MainModelSelectionInfo.Empty
+                : new MainModelSelectionInfo(
+                    selectedModel.Name,
+                    selectedModel.DisplayName,
+                    selectedModel.ObjectId,
+                    selectedModel.PersistenceObjectId,
+                    selectedModelName,
+                    selectedModelLongId,
+                    selectedModelVersionNo,
+                    cmbMainModel == null ? -1 : cmbMainModel.SelectedIndex,
+                    DateTime.Now);
+
+            OnSelectedMainModelInfoChanged();
+        }
+
+        private void OnSelectedMainModelInfoChanged()
+        {
+            var handler = SelectedMainModelInfoChanged;
+            if (handler != null)
+                handler(this, new MainModelSelectionChangedEventArgs(CurrentSelectedMainModelInfo));
         }
 
         private void ShowModelInfoView(bool showTableUdpTab)

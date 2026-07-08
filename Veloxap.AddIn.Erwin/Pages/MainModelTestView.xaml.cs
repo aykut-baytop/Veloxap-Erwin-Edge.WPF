@@ -1,0 +1,257 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using Veloxap.AddIn.Erwin.Models;
+using VeloxapEDGErwinTools.AddIn;
+
+namespace Veloxap.AddIn.Erwin.Pages
+{
+    public partial class MainModelTestView : UserControl
+    {
+        private readonly Window1 owner;
+        private MainModelSelectionInfo selectedMainModelInfo;
+        private bool isSubscribed;
+        private int detectedChangeCount;
+        private VeloxapEDGErwinLib veloxapEDGErwinLib;
+
+        public MainModelTestView()
+        {
+            InitializeComponent();
+            SetSelectedMainModelInfo(MainModelSelectionInfo.Empty, false);
+        }
+
+        internal MainModelTestView(
+            Window1 owner,
+            MainModelSelectionInfo selectedMainModelInfo,
+            SCAPI.Application oApp)
+            : this()
+        {
+            this.owner = owner;
+            veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref oApp);
+            SetSelectedMainModelInfo(selectedMainModelInfo, false);
+            Loaded += MainModelTestView_Loaded;
+            Unloaded += MainModelTestView_Unloaded;
+        }
+
+        private void MainModelTestView_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (owner == null || isSubscribed)
+                return;
+
+            owner.SelectedMainModelInfoChanged += Owner_SelectedMainModelInfoChanged;
+            isSubscribed = true;
+        }
+
+        private void MainModelTestView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (owner == null || !isSubscribed)
+                return;
+
+            owner.SelectedMainModelInfoChanged -= Owner_SelectedMainModelInfoChanged;
+            isSubscribed = false;
+        }
+
+        private void Owner_SelectedMainModelInfoChanged(
+            object sender,
+            MainModelSelectionChangedEventArgs e)
+        {
+            SetSelectedMainModelInfo(e.SelectionInfo, true);
+        }
+
+        private void SetSelectedMainModelInfo(
+            MainModelSelectionInfo selectionInfo,
+            bool countAsDetectedChange)
+        {
+            selectedMainModelInfo = selectionInfo ?? MainModelSelectionInfo.Empty;
+
+            if (countAsDetectedChange)
+                detectedChangeCount++;
+
+            getTree(selectionInfo);
+        }
+
+        private void getTree(MainModelSelectionInfo selectionInfo)
+        {
+            try
+            {
+                ResetTreeAndDetails();
+
+                if (selectionInfo == null || !selectionInfo.HasSelection)
+                    return;
+
+                if (veloxapEDGErwinLib == null || selectionInfo.SelectedIndex < 0)
+                {
+                    return;
+                }
+
+                List<(string, string, string)> modelObjectsList =
+                    veloxapEDGErwinLib.getModelObjects(
+                        selectionInfo.ObjectId,
+                        selectionInfo.SelectedIndex) ??
+                    new List<(string, string, string)>();
+
+                string rootName = string.IsNullOrWhiteSpace(selectionInfo.DisplayName)
+                    ? selectionInfo.RawName
+                    : selectionInfo.DisplayName;
+
+                var root = new ModelObjectTreeNode(
+                    "Model",
+                    rootName,
+                    selectionInfo.ObjectId,
+                    null,
+                    true);
+
+                root.IsExpanded = true;
+
+                foreach (var modelObject in modelObjectsList)
+                {
+                    root.Children.Add(new ModelObjectTreeNode(
+                        modelObject.Item1,
+                        modelObject.Item2,
+                        modelObject.Item3,
+                        selectionInfo.ObjectId,
+                        false));
+                }
+
+                treeModelObjects.ItemsSource = new List<ModelObjectTreeNode> { root };
+                ShowNodeDetails(root);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Hata: " + ex.Message, "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void TreeModelObjects_SelectedItemChanged(
+            object sender,
+            RoutedPropertyChangedEventArgs<object> e)
+        {
+            ShowNodeDetails(e.NewValue as ModelObjectTreeNode);
+        }
+
+        private void ShowNodeDetails(ModelObjectTreeNode node)
+        {
+            if (node == null)
+            {
+                dgObjectDetails.ItemsSource = null;
+                return;
+            }
+
+            
+            List<ObjectPropertyDetail> details = LoadNodeDetails(node);
+            dgObjectDetails.ItemsSource = details;
+        }
+
+        private List<ObjectPropertyDetail> LoadNodeDetails(ModelObjectTreeNode node)
+        {
+            if (node == null ||
+                selectedMainModelInfo == null ||
+                selectedMainModelInfo.SelectedIndex < 0 ||
+                veloxapEDGErwinLib == null)
+            {
+                return new List<ObjectPropertyDetail>();
+            }
+
+            List<(string, string, string, string)> properties =
+                veloxapEDGErwinLib.getObjectProperities(
+                    node.IsRoot,
+                    node.ObjectId,
+                    node.ParentObjectId,
+                    selectedMainModelInfo.SelectedIndex) ??
+                new List<(string, string, string, string)>();
+
+            return properties
+                .Select(property => new ObjectPropertyDetail(
+                    property.Item1,
+                    property.Item2,
+                    property.Item3,
+                    property.Item4))
+                .ToList();
+        }
+
+        private void ResetTreeAndDetails()
+        {
+            treeModelObjects.ItemsSource = null;
+            dgObjectDetails.ItemsSource = null;
+        }
+
+        private string BuildChangeStatusText(bool countAsDetectedChange)
+        {
+            if (!selectedMainModelInfo.HasSelection)
+                return "Secim bekleniyor.";
+
+            if (!countAsDetectedChange && detectedChangeCount == 0)
+                return "Ilk secili ana model degiskeni ekrana yazildi. Change event bekleniyor.";
+
+            return "Ana model change event'i algilandi. Son algilama: " +
+                   DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        }
+
+        private sealed class ModelObjectTreeNode
+        {
+            public ModelObjectTreeNode(
+                string className,
+                string name,
+                string objectId,
+                string parentObjectId,
+                bool isRoot)
+            {
+                ClassName = className ?? string.Empty;
+                Name = name ?? string.Empty;
+                ObjectId = objectId ?? string.Empty;
+                ParentObjectId = parentObjectId;
+                IsRoot = isRoot;
+                Children = new List<ModelObjectTreeNode>();
+            }
+
+            public string Header
+            {
+                get { return "(" + ClassName + ") " + Name; }
+            }
+
+            public string ClassName { get; private set; }
+
+            public string Name { get; private set; }
+
+            public string ObjectId { get; private set; }
+
+            public string ParentObjectId { get; private set; }
+
+            public bool IsRoot { get; private set; }
+
+            public bool IsExpanded { get; set; }
+
+            public List<ModelObjectTreeNode> Children { get; private set; }
+        }
+
+        private sealed class ObjectPropertyDetail
+        {
+            public ObjectPropertyDetail(
+                string propertyName,
+                string propertyType,
+                string format,
+                string value)
+            {
+                PropertyName = propertyName ?? string.Empty;
+                PropertyType = propertyType ?? string.Empty;
+                Format = format ?? string.Empty;
+                Value = value ?? string.Empty;
+            }
+
+            public string PropertyName { get; private set; }
+
+            public string PropertyType { get; private set; }
+
+            public string Format { get; private set; }
+
+            public string Value { get; private set; }
+        }
+
+        private void dgObjectDetails_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+
+        }
+    }
+}

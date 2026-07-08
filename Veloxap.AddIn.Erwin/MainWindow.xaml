@@ -148,7 +148,7 @@
                                    Foreground="White"
                                    FontSize="19"
                                    FontWeight="SemiBold"/>
-                        <TextBlock Text="Erwin Add-In v2"
+                        <TextBlock Text="Erwin Add-In v3"
                                    Foreground="{StaticResource MenuMutedForegroundBrush}"
                                    FontSize="12"
                                    Margin="0,2,0,0"/>
@@ -222,6 +222,14 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE73E;" Style="{StaticResource SideMenuIconStyle}"/>
                         <TextBlock Text="Model Validasyon" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton x:Name="rbTest"
+             GroupName="MainMenu"
+             Style="{StaticResource SideMenuButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE721;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Test Ekrani" Style="{StaticResource SideMenuTextStyle}"/>
                     </StackPanel>
                 </RadioButton>
                 <RadioButton x:Name="rbTableUdps"
