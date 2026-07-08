@@ -203,7 +203,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             catalogLocks = new List<CatalogLockInfo>();
             LockStatusText = "Kontrol edilmedi";
             LockDetailText = "Lock servisi henuz sorgulanmadi.";
-            VersionOwnerText = ResolveModelOwnerText();
+            //VersionOwnerText = ResolveModelOwnerText();
             ApprovalStatusText = "Kontrol edilmedi";
             CatalogOverviewMessage = string.Empty;
             UnlockCatalogMessage = string.Empty;
@@ -215,7 +215,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             string catalogName,
             string catalogLongId)
         {
-            string fallbackOwner = ResolveModelOwnerText();
+            string fallbackOwner = ""; //ResolveModelOwnerText();
             VersionOwnerText = "Kontrol ediliyor...";
             ApprovalSteps.Clear();
             ApprovalStatusText = "Kontrol ediliyor...";
@@ -232,7 +232,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             {
                 LockStatusText = "Bilinmiyor";
                 LockDetailText = "Servis baglantisi hazir degil.";
-                VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "Servis baglantisi hazir degil." : fallbackOwner;
+                //VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "Servis baglantisi hazir degil." : fallbackOwner;
                 ApprovalStatusText = "Servis baglantisi hazir degil.";
                 UpdateCanUnlockCatalog();
                 return;
@@ -242,14 +242,19 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             {
                 LockStatusText = "Bilinmiyor";
                 LockDetailText = "cName veya cLongId okunamadi.";
-                VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "cLongId okunamadi." : fallbackOwner;
+                //VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) ? "cLongId okunamadi." : fallbackOwner;
                 ApprovalStatusText = "cName veya cLongId okunamadi.";
                 UpdateCanUnlockCatalog();
                 return;
             }
 
-            await LoadVersionOwnerAsync(ruleService, catalogName, catalogLongId, fallbackOwner);
             bool shouldLoadApprovalStatus = await LoadLockStatusAsync(ruleService, catalogName, catalogLongId);
+            if (shouldLoadApprovalStatus && IsLocked)
+            {
+                await LoadVersionOwnerAsync(ruleService, catalogName, catalogLongId, fallbackOwner);
+                LockDetailText = BuildLockDetailText(catalogLocks, VersionOwnerText);
+            }
+
             if (shouldLoadApprovalStatus)
                 await LoadApprovalStatusAsync(ruleService, catalogName, catalogLongId);
         }
@@ -266,21 +271,20 @@ namespace Veloxap.AddIn.Erwin.ViewModels
                 string versionNumber = ResolveVersionNumber(catalogName);
 
                 CatalogVersionOwnerInfo ownerInfo = await ruleService.GetCatalogVersionOwnerAsync(
-                    RuleApiSettings.GetMartCatalogsUrl(),
+                    //RuleApiSettings.GetMartCatalogsUrl(),
                     RuleApiSettings.GetMartCatalogVersionsUrlTemplate(),
-                    RuleApiSettings.GetAuthUsername(),
                     catalogLongId,
                     versionName,
                     versionNumber);
 
                 VersionOwnerText = ownerInfo == null || string.IsNullOrWhiteSpace(ownerInfo.CreatedBy)
-                    ? "Bulunamadi"
+                    ? "Neden olan kullanıcı bulunamadı"
                     : ownerInfo.CreatedBy;
             }
             catch (Exception ex)
             {
-                VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) || string.Equals(fallbackOwner, "Bulunamadi", StringComparison.OrdinalIgnoreCase)
-                    ? "Okunamadi: " + ex.Message
+                VersionOwnerText = string.IsNullOrWhiteSpace(fallbackOwner) || string.Equals(fallbackOwner, "Hata oluştu", StringComparison.OrdinalIgnoreCase)
+                    ? "Versiyon sahibi Okunamadi: " + ex.Message
                     : fallbackOwner;
             }
         }
@@ -687,26 +691,26 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             return step.StepNumber + ". " + stepName + group + ": " + approver;
         }
 
-        private string ResolveModelOwnerText()
-        {
-            if (modelInfo == null)
-                return "Model bilgisi yok.";
+        //private string ResolveModelOwnerText()
+        //{
+        //    if (modelInfo == null)
+        //        return "Model bilgisi yok.";
 
-            string owner = FindPropertyValue(
-                modelInfo.getoObjectProperty(),
-                "version owner",
-                "owner",
-                "created by",
-                "createdby",
-                "creator",
-                "created user",
-                "modified by",
-                "modifiedby");
+        //    string owner = FindPropertyValue(
+        //        modelInfo.getoObjectProperty(),
+        //        "version owner",
+        //        "owner",
+        //        "created by",
+        //        "createdby",
+        //        "creator",
+        //        "created user",
+        //        "modified by",
+        //        "modifiedby");
 
-            return string.IsNullOrWhiteSpace(owner)
-                ? "Bulunamadi"
-                : owner;
-        }
+        //    return string.IsNullOrWhiteSpace(owner)
+        //        ? "Bulunamadi"
+        //        : owner;
+        //}
 
         private string ResolveVersionName(string catalogName)
         {

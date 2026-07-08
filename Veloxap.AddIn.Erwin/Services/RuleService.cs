@@ -359,58 +359,57 @@ namespace Veloxap.AddIn.Erwin.Services
         }
 
         public async Task<CatalogVersionOwnerInfo> GetCatalogVersionOwnerAsync(
-            string catalogsUrl,
+            //string catalogsUrl,
             string catalogVersionsUrl,
-            string username,
             string cLongId,
             string versionName,
             string versionNumber)
         {
-            if (string.IsNullOrWhiteSpace(catalogsUrl))
-                throw new ArgumentException("Mart catalog servis URL'i bos olamaz.", nameof(catalogsUrl));
+            //if (string.IsNullOrWhiteSpace(catalogsUrl))
+            //    throw new ArgumentException("Mart catalog servis URL'i bos olamaz.", nameof(catalogsUrl));
 
             if (string.IsNullOrWhiteSpace(catalogVersionsUrl))
                 throw new ArgumentException("Mart catalog version servis URL'i bos olamaz.", nameof(catalogVersionsUrl));
 
-            if (string.IsNullOrWhiteSpace(username))
-                throw new ArgumentException("Mart catalog kullanici adi bos olamaz.", nameof(username));
+            //if (string.IsNullOrWhiteSpace(username))
+            //    throw new ArgumentException("Mart catalog kullanici adi bos olamaz.", nameof(username));
 
             if (string.IsNullOrWhiteSpace(cLongId))
                 throw new ArgumentException("cLongId bos olamaz.", nameof(cLongId));
 
-            string catalogsRequestUrl = BuildSingleQueryUrl(catalogsUrl, "username", username);
+            //string catalogsRequestUrl = BuildSingleQueryUrl(catalogsUrl, "username", username);
 
-            ApiTraceLogger.Info(
-                "MART CATALOGS REQUEST" + Environment.NewLine +
-                "Url: " + catalogsRequestUrl);
+            //ApiTraceLogger.Info(
+            //    "MART CATALOGS REQUEST" + Environment.NewLine +
+            //    "Url: " + catalogsRequestUrl);
 
-            var catalogsResponse = await httpClient.GetAsync(catalogsRequestUrl).ConfigureAwait(false);
-            string catalogsJson = await catalogsResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+            //var catalogsResponse = await httpClient.GetAsync(catalogsRequestUrl).ConfigureAwait(false);
+            //string catalogsJson = await catalogsResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-            ApiTraceLogger.Info(
-                "MART CATALOGS RESPONSE" + Environment.NewLine +
-                "Url: " + catalogsRequestUrl + Environment.NewLine +
-                "Status: " + (int)catalogsResponse.StatusCode + " " + catalogsResponse.ReasonPhrase + Environment.NewLine +
-                "BodyLength: " + (catalogsJson == null ? 0 : catalogsJson.Length) + Environment.NewLine +
-                "BodyPreview: " + ApiTraceLogger.Truncate(catalogsJson, 2000));
+            //ApiTraceLogger.Info(
+            //    "MART CATALOGS RESPONSE" + Environment.NewLine +
+            //    "Url: " + catalogsRequestUrl + Environment.NewLine +
+            //    "Status: " + (int)catalogsResponse.StatusCode + " " + catalogsResponse.ReasonPhrase + Environment.NewLine +
+            //    "BodyLength: " + (catalogsJson == null ? 0 : catalogsJson.Length) + Environment.NewLine +
+            //    "BodyPreview: " + ApiTraceLogger.Truncate(catalogsJson, 2000));
 
-            catalogsResponse.EnsureSuccessStatusCode();
+            //catalogsResponse.EnsureSuccessStatusCode();
 
-            CatalogItem catalog = FindCatalogByLongId(DeserializeJson(catalogsJson), cLongId);
-            if (catalog == null || string.IsNullOrWhiteSpace(catalog.Id))
-                throw new InvalidOperationException("Secili cLongId ile eslesen mart catalog bulunamadi.");
+            //CatalogItem catalog = FindCatalogByLongId(DeserializeJson(catalogsJson), cLongId);
+            //if (catalog == null || string.IsNullOrWhiteSpace(catalog.Id))
+            //    throw new InvalidOperationException("Secili cLongId ile eslesen mart catalog bulunamadi.");
 
-            ApiTraceLogger.Info(
-                "MART CATALOG MATCH" + Environment.NewLine +
-                "CatalogId: " + catalog.Id + Environment.NewLine +
-                "CatalogName: " + (catalog.Name ?? string.Empty));
+            //ApiTraceLogger.Info(
+            //    "MART CATALOG MATCH" + Environment.NewLine +
+            //    "CatalogId: " + catalog.Id + Environment.NewLine +
+            //    "CatalogName: " + (catalog.Name ?? string.Empty));
 
-            string versionsRequestUrl = BuildCatalogVersionsUrl(catalogVersionsUrl, catalog.Id);
+            string versionsRequestUrl = BuildCatalogVersionsUrl(catalogVersionsUrl, cLongId);
 
-            ApiTraceLogger.Info(
-                "MART CATALOG VERSIONS REQUEST" + Environment.NewLine +
-                "CatalogId: " + catalog.Id + Environment.NewLine +
-                "Url: " + versionsRequestUrl);
+            //ApiTraceLogger.Info(
+            //    "MART CATALOG VERSIONS REQUEST" + Environment.NewLine +
+            //    "CatalogId: " + catalog.Id + Environment.NewLine +
+            //    "Url: " + versionsRequestUrl);
 
             var versionsResponse = await httpClient.GetAsync(versionsRequestUrl).ConfigureAwait(false);
             string versionsJson = await versionsResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -431,15 +430,15 @@ namespace Veloxap.AddIn.Erwin.Services
 
             ApiTraceLogger.Info(
                 "MART CATALOG VERSION OWNER PARSE" + Environment.NewLine +
-                "CatalogId: " + catalog.Id + Environment.NewLine +
+                //"CatalogId: " + catalog.Id + Environment.NewLine +
                 "VersionId: " + (version.Id ?? string.Empty) + Environment.NewLine +
                 "VersionName: " + (version.Name ?? string.Empty) + Environment.NewLine +
                 "CreatedBy: " + (version.CreatedBy ?? string.Empty));
 
             return new CatalogVersionOwnerInfo
             {
-                CatalogId = catalog.Id,
-                CatalogName = catalog.Name,
+                //CatalogId = catalog.Id,
+                //CatalogName = catalog.Name,
                 VersionId = version.Id,
                 VersionName = version.Name,
                 VersionNumber = version.VersionNumber,
@@ -475,13 +474,31 @@ namespace Veloxap.AddIn.Erwin.Services
                 + Uri.EscapeDataString(value ?? string.Empty);
         }
 
-        private static string BuildCatalogVersionsUrl(string catalogVersionsUrl, string catalogId)
+        private static string BuildCatalogVersionsUrl(string catalogVersionsUrl, string cLongId)
         {
-            string safeCatalogId = (catalogId ?? string.Empty).Trim();
+            string baseUrl = (catalogVersionsUrl ?? string.Empty).Trim();
+            string safeLongId = (cLongId ?? string.Empty).Trim();
+            string encodedLongId = Uri.EscapeDataString(safeLongId);
 
-            return (catalogVersionsUrl ?? string.Empty)
-                .Replace("{catalogId}", safeCatalogId)
-                .Replace("{0}", safeCatalogId);
+            if (baseUrl.Contains("{cLongId}") ||
+                baseUrl.Contains("{catalogId}") ||
+                baseUrl.Contains("{0}"))
+            {
+                return baseUrl
+                    .Replace("{cLongId}", encodedLongId)
+                    .Replace("{catalogId}", encodedLongId)
+                    .Replace("{0}", encodedLongId);
+            }
+
+            if (baseUrl.EndsWith("=", StringComparison.Ordinal))
+                return baseUrl + encodedLongId;
+
+            if (baseUrl.EndsWith("&", StringComparison.Ordinal) ||
+                baseUrl.EndsWith("?", StringComparison.Ordinal))
+                return baseUrl + "cLongId=" + encodedLongId;
+
+            string separator = baseUrl.Contains("?") ? "&" : "?";
+            return baseUrl + separator + "cLongId=" + encodedLongId;
         }
 
         private static string ExtractDdl(string json)
