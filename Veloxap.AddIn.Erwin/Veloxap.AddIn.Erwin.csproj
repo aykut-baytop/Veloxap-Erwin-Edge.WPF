@@ -65,6 +65,7 @@
   <ItemGroup>
     <Compile Include="Models\CrossRuleValidationEngine.cs" />
     <Compile Include="Models\ModelInfo.cs" />
+    <Compile Include="Models\ModelLoad_old.cs" />
     <Compile Include="Models\ModelLoad.cs" />
     <Compile Include="Models\ModelObject.cs" />
     <Compile Include="Models\ObjectProperty.cs" />

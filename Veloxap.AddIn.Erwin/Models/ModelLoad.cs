@@ -28,10 +28,10 @@ namespace Veloxap.AddIn.Erwin.Models
             oApplication = oApp;
         }
 
-        public ModelLoad()
-        {
-            oApplication = new SCAPI.Application();
-        }
+        //public ModelLoad()
+        //{
+        //    oApplication = new SCAPI.Application();
+        //}
 
         public List<ModelObject> loadTableSummaries(SCAPI.PersistenceUnit oPersistenceUnit)
         {

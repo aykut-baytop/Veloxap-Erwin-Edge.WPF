@@ -60,21 +60,7 @@
                 <ColumnDefinition Width="260"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="1">
-                <TextBlock Text="Arama"
-                           Style="{StaticResource MutedTextStyle}"
-                           Margin="0,0,0,4"/>
-                <TextBox x:Name="txtSearch"
-                         Height="34"
-                         Padding="10,7"
-                         VerticalContentAlignment="Center"
-                         BorderBrush="#CBD5E1"
-                         BorderThickness="1"
-                         Background="White"
-                         Foreground="#111827"
-                         TextChanged="TxtSearch_TextChanged"
-                         ToolTip="En az 3 karakterle tablo, UDP veya deger ara"/>
-            </StackPanel>
+            <StackPanel Grid.Column="1"/>
         </Grid>
 
         <ProgressBar x:Name="busyBar"
@@ -84,62 +70,6 @@
                      Visibility="Collapsed"
                      Foreground="#2563EB"
                      Background="#E5E7EB"/>
-
-        <Border Grid.Row="2"
-                Background="#F8FAFC"
-                BorderBrush="#E5E7EB"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12"
-                MaxHeight="70">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="1.4*"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="Tablo Sayisi"
-                               Style="{StaticResource MutedTextStyle}"/>
-                    <TextBlock x:Name="txtTableCount"
-                               Text="0"
-                               Style="{StaticResource SummaryValueStyle}"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1"
-                            Margin="18,0,0,0">
-                    <TextBlock Text="UDP Sayisi"
-                               Style="{StaticResource MutedTextStyle}"/>
-                    <TextBlock x:Name="txtUdpCount"
-                               Text="0"
-                               Style="{StaticResource SummaryValueStyle}"
-                               Foreground="#0F766E"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="2"
-                            Margin="18,0,0,0">
-                    <TextBlock Text="Listelenen"
-                               Style="{StaticResource MutedTextStyle}"/>
-                    <TextBlock x:Name="txtVisibleCount"
-                               Text="0"
-                               Style="{StaticResource SummaryValueStyle}"
-                               Foreground="#2563EB"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="3"
-                            Margin="18,0,0,0">
-                    <TextBlock Text="Durum"
-                               Style="{StaticResource MutedTextStyle}"/>
-                    <TextBlock x:Name="txtStatus"
-                               Text="Hazir"
-                               Margin="0,4,0,0"
-                               Foreground="#374151"
-                               TextWrapping="Wrap"/>
-                </StackPanel>
-            </Grid>
-        </Border>
 
         <Border Grid.Row="4"
                 Background="White">

@@ -28,7 +28,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         private readonly ObservableCollection<UdpDetailRow> selectedDetails;
         private readonly DispatcherTimer searchTimer;
 
-        private int tableCount;
+        private int tableCount = 0;
         private string lastAppliedFilter;
         private bool isLoading;
         private bool hasStartedLoading;
@@ -65,18 +65,18 @@ namespace Veloxap.AddIn.Erwin.Pages
             allRows = new List<UdpRow>();
             tableNodes = new List<UdpTreeNode>();
             selectedDetails = new ObservableCollection<UdpDetailRow>();
-            searchTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(SearchDelayMilliseconds)
-            };
-            searchTimer.Tick += SearchTimer_Tick;
+            //searchTimer = new DispatcherTimer
+            //{
+            //    Interval = TimeSpan.FromMilliseconds(SearchDelayMilliseconds)
+            //};
+            //searchTimer.Tick += SearchTimer_Tick;
 
             InitializeComponent();
 
             treeUdp.ItemsSource = tableNodes;
             gridUdpDetails.ItemsSource = selectedDetails;
 
-            UpdateSummaryCounts();
+            //UpdateSummaryCounts();
             ShowDetails(null);
             SetStatus(CanUseLazyScapi()
                 ? "Tablolar yukleniyor..."
@@ -100,26 +100,26 @@ namespace Veloxap.AddIn.Erwin.Pages
             await ReloadRowsAsync("Tablolar yukleniyor...", false);
         }
 
-        private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (isLoading)
-                return;
+        //private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
+        //{
+        //    if (isLoading)
+        //        return;
 
-            if (searchTimer == null)
-            {
-                ApplyFilter();
-                return;
-            }
+        //    if (searchTimer == null)
+        //    {
+        //        ApplyFilter();
+        //        return;
+        //    }
 
-            searchTimer.Stop();
-            searchTimer.Start();
-        }
+        //    searchTimer.Stop();
+        //    searchTimer.Start();
+        //}
 
-        private void SearchTimer_Tick(object sender, EventArgs e)
-        {
-            searchTimer.Stop();
-            ApplyFilter();
-        }
+        //private void SearchTimer_Tick(object sender, EventArgs e)
+        //{
+        //    searchTimer.Stop();
+        //    ApplyFilter();
+        //}
 
         private async void TreeUdp_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
@@ -156,164 +156,164 @@ namespace Veloxap.AddIn.Erwin.Pages
             await LoadTableNodeAsync(node);
         }
 
-        private void ApplyFilter()
-        {
-            ApplyFilter(null, false);
-        }
+        //private void ApplyFilter()
+        //{
+        //    ApplyFilter(null, false);
+        //}
 
-        private void ApplyFilter(TreeState treeState, bool preserveSelection)
-        {
-            string filter = txtSearch == null
-                ? string.Empty
-                : (txtSearch.Text ?? string.Empty).Trim();
+        //private void ApplyFilter(TreeState treeState, bool preserveSelection)
+        //{
+        //    string filter = txtSearch == null
+        //        ? string.Empty
+        //        : (txtSearch.Text ?? string.Empty).Trim();
 
-            bool hasShortSearch = filter.Length > 0 && filter.Length < MinimumSearchLength;
-            string activeFilter = filter.Length >= MinimumSearchLength
-                ? filter
-                : string.Empty;
+        //    bool hasShortSearch = filter.Length > 0 && filter.Length < MinimumSearchLength;
+        //    string activeFilter = filter.Length >= MinimumSearchLength
+        //        ? filter
+        //        : string.Empty;
 
-            if (CanUseLazyScapi())
-            {
-                ApplyLazyFilter(activeFilter, hasShortSearch);
-                lastAppliedFilter = activeFilter;
-                return;
-            }
+        //    if (CanUseLazyScapi())
+        //    {
+        //        ApplyLazyFilter(activeFilter, hasShortSearch);
+        //        lastAppliedFilter = activeFilter;
+        //        return;
+        //    }
 
-            if (hasShortSearch &&
-                string.Equals(activeFilter, lastAppliedFilter, StringComparison.OrdinalIgnoreCase))
-            {
-                UpdateFilterStatus(allRows.Count, activeFilter, hasShortSearch);
-                return;
-            }
+        //    if (hasShortSearch &&
+        //        string.Equals(activeFilter, lastAppliedFilter, StringComparison.OrdinalIgnoreCase))
+        //    {
+        //        UpdateFilterStatus(allRows.Count, activeFilter, hasShortSearch);
+        //        return;
+        //    }
 
-            IList<UdpRow> filteredRows = allRows;
-            if (!string.IsNullOrWhiteSpace(activeFilter))
-            {
-                filteredRows = allRows
-                    .Where(row => Contains(row.SearchText, activeFilter))
-                    .ToList();
-            }
+        //    IList<UdpRow> filteredRows = allRows;
+        //    if (!string.IsNullOrWhiteSpace(activeFilter))
+        //    {
+        //        filteredRows = allRows
+        //            .Where(row => Contains(row.SearchText, activeFilter))
+        //            .ToList();
+        //    }
 
-            bool expandSearchResults = !string.IsNullOrWhiteSpace(activeFilter);
-            var treeNodes = BuildTree(filteredRows, treeState, expandSearchResults);
-            treeUdp.ItemsSource = treeNodes;
+        //    bool expandSearchResults = !string.IsNullOrWhiteSpace(activeFilter);
+        //    var treeNodes = BuildTree(filteredRows, treeState, expandSearchResults);
+        //    treeUdp.ItemsSource = treeNodes;
 
-            RestoreSelectionDetails(treeState, treeNodes, filteredRows, preserveSelection);
+        //    RestoreSelectionDetails(treeState, treeNodes, filteredRows, preserveSelection);
 
-            UpdateFilterStatus(filteredRows.Count, activeFilter, hasShortSearch);
-            lastAppliedFilter = activeFilter;
-        }
+        //    UpdateFilterStatus(filteredRows.Count, activeFilter, hasShortSearch);
+        //    lastAppliedFilter = activeFilter;
+        //}
 
-        private void ApplyLazyFilter(string activeFilter, bool hasShortSearch)
-        {
-            if (string.IsNullOrWhiteSpace(activeFilter))
-            {
-                treeUdp.ItemsSource = tableNodes;
-                UpdateLazyFilterStatus(tableNodes.Count, hasShortSearch, activeFilter);
-                return;
-            }
+        //private void ApplyLazyFilter(string activeFilter, bool hasShortSearch)
+        //{
+        //    if (string.IsNullOrWhiteSpace(activeFilter))
+        //    {
+        //        treeUdp.ItemsSource = tableNodes;
+        //        UpdateLazyFilterStatus(tableNodes.Count, hasShortSearch, activeFilter);
+        //        return;
+        //    }
 
-            var filteredNodes = new List<UdpTreeNode>();
-            foreach (var tableNode in tableNodes)
-            {
-                if (Contains(tableNode.TableName, activeFilter))
-                {
-                    filteredNodes.Add(tableNode);
-                    continue;
-                }
+        //    var filteredNodes = new List<UdpTreeNode>();
+        //    foreach (var tableNode in tableNodes)
+        //    {
+        //        if (Contains(tableNode.TableName, activeFilter))
+        //        {
+        //            filteredNodes.Add(tableNode);
+        //            continue;
+        //        }
 
-                var matchingRows = allRows
-                    .Where(row =>
-                        string.Equals(row.TableObjectId, tableNode.TableObjectId, StringComparison.OrdinalIgnoreCase) &&
-                        Contains(row.SearchText, activeFilter))
-                    .ToList();
+        //        var matchingRows = allRows
+        //            .Where(row =>
+        //                string.Equals(row.TableObjectId, tableNode.TableObjectId, StringComparison.OrdinalIgnoreCase) &&
+        //                Contains(row.SearchText, activeFilter))
+        //            .ToList();
 
-                if (matchingRows.Count == 0)
-                    continue;
+        //        if (matchingRows.Count == 0)
+        //            continue;
 
-                filteredNodes.Add(UdpTreeNode.CreateGroup(
-                    tableNode.TableName + " (" + matchingRows.Count + ")",
-                    0,
-                    "Tablo",
-                    tableNode.TableName,
-                    tableNode.TableObjectId,
-                    string.Join(", ", matchingRows.Select(row => row.DisplayUdpName)),
-                    matchingRows.Count,
-                    tableNode.NodeKey,
-                    true,
-                    false,
-                    () => BuildUdpLeafNodes(matchingRows, null)));
-            }
+        //        filteredNodes.Add(UdpTreeNode.CreateGroup(
+        //            tableNode.TableName + " (" + matchingRows.Count + ")",
+        //            0,
+        //            "Tablo",
+        //            tableNode.TableName,
+        //            tableNode.TableObjectId,
+        //            string.Join(", ", matchingRows.Select(row => row.DisplayUdpName)),
+        //            matchingRows.Count,
+        //            tableNode.NodeKey,
+        //            true,
+        //            false,
+        //            () => BuildUdpLeafNodes(matchingRows, null)));
+        //    }
 
-            treeUdp.ItemsSource = filteredNodes;
-            UpdateLazyFilterStatus(filteredNodes.Count, hasShortSearch, activeFilter);
-        }
+        //    treeUdp.ItemsSource = filteredNodes;
+        //    UpdateLazyFilterStatus(filteredNodes.Count, hasShortSearch, activeFilter);
+        //}
 
-        private void UpdateLazyFilterStatus(int visibleTables, bool hasShortSearch, string activeFilter)
-        {
-            txtVisibleCount.Text = visibleTables.ToString();
-            emptyState.Visibility = visibleTables == 0
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+        //private void UpdateLazyFilterStatus(int visibleTables, bool hasShortSearch, string activeFilter)
+        //{
+        //    txtVisibleCount.Text = "0";
+        //    emptyState.Visibility = visibleTables == 0
+        //        ? Visibility.Visible
+        //        : Visibility.Collapsed;
 
-            txtEmpty.Text = tableNodes.Count == 0
-                ? "Secili modelde tablo bulunamadi."
-                : "Arama kriterine uygun tablo veya yuklenmis UDP bulunamadi.";
+        //    txtEmpty.Text = tableNodes.Count == 0
+        //        ? "Secili modelde tablo bulunamadi."
+        //        : "Arama kriterine uygun tablo veya yuklenmis UDP bulunamadi.";
 
-            if (hasShortSearch)
-            {
-                SetStatus(
-                    "Arama icin en az " + MinimumSearchLength +
-                    " karakter girin. " + visibleTables + " tablo listeleniyor.",
-                    false);
-                return;
-            }
+        //    if (hasShortSearch)
+        //    {
+        //        SetStatus(
+        //            "Arama icin en az " + MinimumSearchLength +
+        //            " karakter girin. " + visibleTables + " tablo listeleniyor.",
+        //            false);
+        //        return;
+        //    }
 
-            if (string.IsNullOrWhiteSpace(activeFilter))
-            {
-                SetStatus(
-                    tableCount + " tablo listeleniyor. UDP detaylari tablo acildikca yuklenecek.",
-                    false);
-                return;
-            }
+        //    if (string.IsNullOrWhiteSpace(activeFilter))
+        //    {
+        //        SetStatus(
+        //            tableCount + " tablo listeleniyor. UDP detaylari tablo acildikca yuklenecek.",
+        //            false);
+        //        return;
+        //    }
 
-            SetStatus(visibleTables + " tablo/sonuc bulundu.", false);
-        }
+        //    SetStatus(visibleTables + " tablo/sonuc bulundu.", false);
+        //}
 
-        private void UpdateFilterStatus(int filteredCount, string activeFilter, bool hasShortSearch)
-        {
-            txtVisibleCount.Text = filteredCount.ToString();
+        //private void UpdateFilterStatus(int filteredCount, string activeFilter, bool hasShortSearch)
+        //{
+        //    txtVisibleCount.Text = "0";
 
-            bool isEmpty = filteredCount == 0;
-            emptyState.Visibility = isEmpty
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+        //    bool isEmpty = filteredCount == 0;
+        //    emptyState.Visibility = isEmpty
+        //        ? Visibility.Visible
+        //        : Visibility.Collapsed;
 
-            txtEmpty.Text = allRows.Count == 0
-                ? "Secili model tablolarinda UDP bulunamadi."
-                : "Arama kriterine uygun UDP bulunamadi.";
+        //    txtEmpty.Text = allRows.Count == 0
+        //        ? "Secili model tablolarinda UDP bulunamadi."
+        //        : "Arama kriterine uygun UDP bulunamadi.";
 
-            if (allRows.Count == 0)
-            {
-                SetStatus("UDP bulunamadi.", false);
-                return;
-            }
+        //    if (allRows.Count == 0)
+        //    {
+        //        SetStatus("UDP bulunamadi.", false);
+        //        return;
+        //    }
 
-            if (hasShortSearch)
-            {
-                SetStatus(
-                    "Arama icin en az " + MinimumSearchLength +
-                    " karakter girin. " + filteredCount + " UDP listeleniyor.",
-                    false);
-                return;
-            }
+        //    if (hasShortSearch)
+        //    {
+        //        SetStatus(
+        //            "Arama icin en az " + MinimumSearchLength +
+        //            " karakter girin. " + filteredCount + " UDP listeleniyor.",
+        //            false);
+        //        return;
+        //    }
 
-            SetStatus(
-                string.IsNullOrWhiteSpace(activeFilter)
-                    ? filteredCount + " UDP listeleniyor."
-                    : filteredCount + " UDP bulundu.",
-                false);
-        }
+        //    SetStatus(
+        //        string.IsNullOrWhiteSpace(activeFilter)
+        //            ? filteredCount + " UDP listeleniyor."
+        //            : filteredCount + " UDP bulundu.",
+        //        false);
+        //}
 
         private void RestoreSelectionDetails(
             TreeState treeState,
@@ -596,7 +596,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 node.TableModelObject = table;
                 node.SetChildren(BuildUdpLeafNodes(tableRows, null));
 
-                UpdateSummaryCounts();
+                //UpdateSummaryCounts();
                 ShowDetails(node);
                 SetStatus(node.TableName + " icin " + tableRows.Count + " UDP yuklendi.", false);
             }
@@ -740,7 +740,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 allRows.Clear();
                 tableNodes.Clear();
                 tableCount = 0;
-                UpdateSummaryCounts();
+                //UpdateSummaryCounts();
                 treeUdp.ItemsSource = new List<UdpTreeNode>();
                 ShowDetails(null);
                 SetStatus("UDP listesi yuklenemedi: " + ex.Message, true);
@@ -779,11 +779,11 @@ namespace Veloxap.AddIn.Erwin.Pages
                     false));
             }
 
-            tableCount = tableNodes.Count;
+            //tableCount = tableNodes.Count;
             treeUdp.ItemsSource = tableNodes;
-            UpdateSummaryCounts();
+            //UpdateSummaryCounts();
             ShowDetails(null);
-            UpdateLazyFilterStatus(tableNodes.Count, false, string.Empty);
+            //UpdateLazyFilterStatus(tableNodes.Count, false, string.Empty);
         }
 
         private async Task ReloadRowsFromModelInfoAsync(
@@ -794,8 +794,8 @@ namespace Veloxap.AddIn.Erwin.Pages
             {
                 allRows.Clear();
                 tableCount = 0;
-                UpdateSummaryCounts();
-                ApplyFilter(treeState, preserveTreeState);
+                //UpdateSummaryCounts();
+                //ApplyFilter(treeState, preserveTreeState);
                 return;
             }
 
@@ -803,30 +803,30 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             allRows.Clear();
             allRows.AddRange(result.Rows);
-            tableCount = result.TableCount;
+            //tableCount = result.TableCount;
 
-            UpdateSummaryCounts();
-            ApplyFilter(treeState, preserveTreeState);
+            //UpdateSummaryCounts();
+            //ApplyFilter(treeState, preserveTreeState);
         }
 
-        private void UpdateSummaryCounts()
-        {
-            if (txtTableCount != null)
-                txtTableCount.Text = tableCount.ToString();
+        //private void UpdateSummaryCounts()
+        //{
+        //    if (txtTableCount != null)
+        //        txtTableCount.Text = "0";
 
-            if (txtUdpCount != null)
-                txtUdpCount.Text = allRows.Count.ToString();
-        }
+        //    if (txtUdpCount != null)
+        //        txtUdpCount.Text = "0";
+        //}
 
         private void SetLoading(bool value)
         {
-            isLoading = value;
+            //isLoading = value;
 
-            if (txtSearch != null)
-                txtSearch.IsEnabled = !value;
+            //if (txtSearch != null)
+            //    txtSearch.IsEnabled = !value;
 
-            if (treeUdp != null)
-                treeUdp.IsEnabled = !value;
+            //if (treeUdp != null)
+            //    treeUdp.IsEnabled = !value;
 
             SetBusyIndicator(value);
         }
@@ -841,10 +841,10 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private void SetStatus(string message, bool isError)
         {
-            txtStatus.Text = message;
-            txtStatus.Foreground = isError
-                ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
-                : new SolidColorBrush(Color.FromRgb(55, 65, 81));
+            //txtStatus.Text = message;
+            //txtStatus.Foreground = isError
+            //    ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
+            //    : new SolidColorBrush(Color.FromRgb(55, 65, 81));
         }
 
         private static UdpRowsBuildResult BuildRows(ModelInfo modelInfo)
@@ -861,11 +861,11 @@ namespace Veloxap.AddIn.Erwin.Pages
             foreach (var table in EnumerateTables(objects))
                 result.Rows.AddRange(BuildRowsForTable(table));
 
-            result.TableCount = result.Rows
-                .Select(row => row.TableName)
-                .Where(tableName => !string.IsNullOrWhiteSpace(tableName))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count();
+            //result.TableCount = result.Rows
+            //    .Select(row => row.TableName)
+            //    .Where(tableName => !string.IsNullOrWhiteSpace(tableName))
+            //    .Distinct(StringComparer.OrdinalIgnoreCase)
+            //    .Count();
 
             result.Rows = result.Rows
                 .OrderBy(row => row.TableName, StringComparer.OrdinalIgnoreCase)
