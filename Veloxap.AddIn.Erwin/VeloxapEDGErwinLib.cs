@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Xml.Linq;
 using Veloxap.AddIn.Erwin.Models;
 using static System.Net.Mime.MediaTypeNames;
@@ -347,6 +348,7 @@ namespace VeloxapEDGErwinTools.AddIn
 
         public List<(string, string, string)> getModelObjects(string objectId, int selectedModelIndex)
         {
+            //MessageBox.Show("getModelObjects");
             List<(string, string, string)> modelObjectsList = new List<(string, string, string)>();
 
             SCAPI.ModelObjects oSelectedCollection;
@@ -364,23 +366,27 @@ namespace VeloxapEDGErwinTools.AddIn
 
             oSession.Open(oPersistenceUnit, eLevel);
 
-            var objectlist = new[] { "Entity", "Relationship", "Attribute", "Sequence", "Key_Group", "Key_Group_Member" };
+            var objectlist = new[] { "Entity", "Attribute" };
             oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
             //modelObjectsList.Add(("Model", oPersistenceUnit.Name, oPersistenceUnit.ObjectId));
 
             foreach (SCAPI.ModelObject oObject in oSelectedCollection)
             {
-                if (objectlist.Contains(oObject.ClassName)   )
+                if (objectlist.Contains(oObject.ClassName))
                     modelObjectsList.Add((oObject.ClassName, oObject.Name, oObject.ObjectId));
 
 
             }
             oApplication.Sessions.Clear();
+            //MessageBox.Show("getModelObjects END");
+
             return modelObjectsList;
         }
 
         public List<(string, string, string, string)> getObjectProperities(bool isRoot, object objectId, object parentObjectId, int selectedModelIndex)
         {
+            //MessageBox.Show("getObjectProperities");
+
             List<(string, string, string, string)> objectProperities = new List<(string, string, string, string)>();
             SCAPI.Session oSession;
             SCAPI.ModelObject oRootObject;
@@ -433,6 +439,8 @@ namespace VeloxapEDGErwinTools.AddIn
 
             }
             oApplication.Sessions.Clear();
+            //MessageBox.Show("getObjectProperities END");
+
             return objectProperities;
         }
 

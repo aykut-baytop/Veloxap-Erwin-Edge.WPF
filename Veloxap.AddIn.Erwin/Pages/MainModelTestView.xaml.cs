@@ -142,7 +142,9 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             List<ObjectPropertyDetail> details = LoadNodeDetails(node)
                             .Where(n =>
-                    n.PropertyName.Trim().StartsWith("Entity.Physical")
+                    n.PropertyName.Trim() == ("Entity.Physical.Veri_Degeri") ||
+                    n.PropertyName.Trim() == ("Entity.Physical.Banka_Gorece_Degeri") ||
+                    n.PropertyName.Trim() == ("Entity.Physical.Guvenlik_Sinifi_Degeri")
             //n.PropertyName.Equals("Entity.Physical.Veri_Degeri") ||
             //n.PropertyName.Equals("Entity.Physical.Is_Sureci")
             ).ToList();
