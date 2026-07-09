@@ -11,6 +11,7 @@
         Width="1100"
         MinHeight="600"
         MinWidth="950"
+        ShowActivated="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>

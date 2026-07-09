@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Veloxap.AddIn.Erwin;
 
 namespace Veloxap.AddIn.Erwin.Models
 {
@@ -16,6 +17,20 @@ namespace Veloxap.AddIn.Erwin.Models
             "Key_Group_Member"
         };
 
+        private static readonly HashSet<string> TableUdpPropertyNames =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "erisilebilirlik",
+                "butunluk",
+                "gizlilikseviyesi",
+                "veridegeri",
+                "issureciseviyesi",
+                "bankagorecedegeri",
+                "kisiselverimi",
+                "hassasverimi",
+                "guvenliksinifidegeri"
+            };
+
         private readonly SCAPI.Application oApplication;
 
         public ModelLoad(ref SCAPI.Application oApp)
@@ -30,7 +45,7 @@ namespace Veloxap.AddIn.Erwin.Models
 
         public ModelLoad()
         {
-            oApplication = new SCAPI.Application();
+            oApplication = ScapiApplicationProvider.GetApplication();
         }
 
         public List<ModelObject> loadTableSummaries(SCAPI.PersistenceUnit oPersistenceUnit)
@@ -85,8 +100,13 @@ namespace Veloxap.AddIn.Erwin.Models
                     return null;
 
                 ModelObject table = CreateModelObject(entity);
-                table.setoObjectProperty(ReadObjectProperties(entity));
-                table.setoModelObjects(LoadChildObjects(session, entity, new[] { "Attribute" }, 1));
+                table.setoObjectProperty(ReadObjectProperties(entity, IsTableUdpProperty));
+                table.setoModelObjects(LoadChildObjects(
+                    session,
+                    entity,
+                    new[] { "Attribute" },
+                    1,
+                    IsTableUdpProperty));
 
                 return table;
             }
@@ -166,8 +186,13 @@ namespace Veloxap.AddIn.Erwin.Models
             foreach (SCAPI.ModelObject entity in Collect(session, root, "Entity"))
             {
                 ModelObject table = CreateModelObject(entity);
-                table.setoObjectProperty(ReadObjectProperties(entity));
-                table.setoModelObjects(LoadChildObjects(session, entity, new[] { "Attribute" }, 1));
+                table.setoObjectProperty(ReadObjectProperties(entity, IsTableUdpProperty));
+                table.setoModelObjects(LoadChildObjects(
+                    session,
+                    entity,
+                    new[] { "Attribute" },
+                    1,
+                    IsTableUdpProperty));
                 tables.Add(table);
             }
 
@@ -178,7 +203,8 @@ namespace Veloxap.AddIn.Erwin.Models
             SCAPI.Session session,
             SCAPI.ModelObject parent,
             string[] allowedClasses,
-            int remainingDepth)
+            int remainingDepth,
+            Predicate<string> propertyFilter = null)
         {
             var modelObjects = new List<ModelObject>();
 
@@ -191,12 +217,13 @@ namespace Veloxap.AddIn.Erwin.Models
                     continue;
 
                 ModelObject modelObject = CreateModelObject(scapiObject);
-                modelObject.setoObjectProperty(ReadObjectProperties(scapiObject));
+                modelObject.setoObjectProperty(ReadObjectProperties(scapiObject, propertyFilter));
                 modelObject.setoModelObjects(LoadChildObjects(
                     session,
                     scapiObject,
                     allowedClasses,
-                    remainingDepth - 1));
+                    remainingDepth - 1,
+                    propertyFilter));
                 modelObjects.Add(modelObject);
             }
 
@@ -301,6 +328,13 @@ namespace Veloxap.AddIn.Erwin.Models
 
         private static List<ObjectProperty> ReadObjectProperties(SCAPI.ModelObject scapiObject)
         {
+            return ReadObjectProperties(scapiObject, null);
+        }
+
+        private static List<ObjectProperty> ReadObjectProperties(
+            SCAPI.ModelObject scapiObject,
+            Predicate<string> propertyFilter)
+        {
             var properties = new List<ObjectProperty>();
 
             if (scapiObject == null)
@@ -312,9 +346,13 @@ namespace Veloxap.AddIn.Erwin.Models
                 {
                     try
                     {
+                        string propertyClassName = GetPropertyClassName(scapiProperty);
+                        if (propertyFilter != null && !propertyFilter(propertyClassName))
+                            continue;
+
                         var property = new ObjectProperty();
                         property.setoPropertyClassID(scapiProperty.ClassId);
-                        property.setoPropertyClassName(scapiProperty.ClassName);
+                        property.setoPropertyClassName(propertyClassName);
                         property.setoPropertyType(PropertyDataType(scapiProperty));
                         property.setoPropertyValue(RetrieveValue(scapiProperty));
                         property.setoPropertyFormatAsString(scapiProperty.FormatAsString());
@@ -330,6 +368,93 @@ namespace Veloxap.AddIn.Erwin.Models
             }
 
             return properties;
+        }
+
+        private static string GetPropertyClassName(SCAPI.ModelProperty property)
+        {
+            try
+            {
+                return property == null || property.ClassName == null
+                    ? string.Empty
+                    : property.ClassName.ToString();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static bool IsTableUdpProperty(string propertyName)
+        {
+            string normalizedName = NormalizePropertyName(propertyName);
+            if (string.IsNullOrWhiteSpace(normalizedName))
+                return false;
+
+            if (normalizedName.EndsWith(
+                "sirkapsamindakiveridegeri",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            foreach (string tableUdpPropertyName in TableUdpPropertyNames)
+            {
+                if (normalizedName.EndsWith(
+                    tableUdpPropertyName,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string NormalizePropertyName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            int dotIndex = value.LastIndexOf('.');
+            if (dotIndex >= 0 && dotIndex < value.Length - 1)
+                value = value.Substring(dotIndex + 1);
+
+            var builder = new System.Text.StringBuilder(value.Length);
+            foreach (char valueChar in value)
+            {
+                char c = FoldTurkishCharacter(char.ToLowerInvariant(valueChar));
+                if (char.IsLetterOrDigit(c))
+                    builder.Append(c);
+            }
+
+            return builder.ToString();
+        }
+
+        private static char FoldTurkishCharacter(char c)
+        {
+            switch (c)
+            {
+                case '\u0130':
+                case '\u0131':
+                    return 'i';
+                case '\u011e':
+                case '\u011f':
+                    return 'g';
+                case '\u015e':
+                case '\u015f':
+                    return 's';
+                case '\u00c7':
+                case '\u00e7':
+                    return 'c';
+                case '\u00d6':
+                case '\u00f6':
+                    return 'o';
+                case '\u00dc':
+                case '\u00fc':
+                    return 'u';
+                default:
+                    return c;
+            }
         }
 
         private static string ReadLocation(SCAPI.PersistenceUnit persistenceUnit)

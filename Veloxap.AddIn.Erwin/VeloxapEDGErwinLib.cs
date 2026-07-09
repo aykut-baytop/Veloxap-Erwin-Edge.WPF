@@ -89,8 +89,6 @@ namespace VeloxapEDGErwinTools.AddIn
             List<(string value,string key1, string key2 )> oModelsName = new List<(string, string,string)>();
 
             SCAPI.PropertyBag oBag;
-            SCAPI.Session oSession;
-            SCAPI.ModelObject oRoot;
             String sTitle;
             String sLocation;
             String sObjectId;
@@ -98,18 +96,15 @@ namespace VeloxapEDGErwinTools.AddIn
 
             foreach (PersistenceUnit oUnit in oApplication.PersistenceUnits)
             {
-
-
-                oSession = oApplication.Sessions.Add();
-                oSession.Open(oUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
-                oRoot = oSession.ModelObjects.Root;
-                pObjectId = oUnit.ObjectId;
-                sTitle = oRoot.Name;
-                sObjectId = oRoot.ObjectId;
-                oBag = oUnit.PropertyBag["Locator;Hidden_Model"];
-
                 try
                 {
+                    pObjectId = oUnit.ObjectId;
+                    sTitle = string.IsNullOrWhiteSpace(oUnit.Name)
+                        ? pObjectId
+                        : oUnit.Name;
+                    sObjectId = string.Empty;
+                    oBag = oUnit.PropertyBag["Locator;Hidden_Model"];
+
                     sLocation = oBag.Value["Locator"]; //Get the location
                     if (sLocation.Length > 0)
                         sTitle = sTitle + " (" + sLocation + ")";
@@ -118,18 +113,16 @@ namespace VeloxapEDGErwinTools.AddIn
                         sTitle = sTitle + " [Hidden]"; //Check if the persistence unit is hidden
 
                     oBag.ClearAll();
+
+                    oModelsName.Add((sTitle,sObjectId, pObjectId ));
                 }
-                catch (Exception e)
+                catch
                 {
-                    oApplication.Sessions.Clear();
                     //MessageBox.Show(e.ToString());
                     // uyari
 
                     return null;
                 }
-                oApplication.Sessions.Clear();
-
-                oModelsName.Add((sTitle,sObjectId, pObjectId ));
             }
 
             return oModelsName;
@@ -137,108 +130,12 @@ namespace VeloxapEDGErwinTools.AddIn
         }
         public ModelInfo loadModelObject(string objectId, string pobjectId)
         {
-            ModelInfo mModel = new ModelInfo();
-             
+            SCAPI.PersistenceUnit oPersistenceUnit = findPersistenceUnit(pobjectId);
+            if (oPersistenceUnit == null)
+                return new ModelInfo();
 
-            SCAPI.ModelObjects oSelectedCollection;
-            SCAPI.Session oSession;
-
-            SCAPI.PersistenceUnit oPersistenceUnit;
-            SCAPI.PersistenceUnits oPersistenceUnits;
-            SCAPI.SC_SessionLevel eLevel;
-
-
-            oPersistenceUnits = oApplication.PersistenceUnits;
-            int index = -1;
-            bool isPersistenceUnitFound = false;
-            foreach (SCAPI.PersistenceUnit oUnit in oPersistenceUnits)
-            {
-                index++;
-                if (oUnit.ObjectId == pobjectId){
-                    isPersistenceUnitFound = true;
-                    break;
-                }
-                
-
-            } 
-            if(isPersistenceUnitFound && index >= 0)
-            { 
-
-                //
-                /*
-                 *  Filtrelerde kullanilan properitiesleri listeye ekleyerek sadece 
-                 *  onlari yukleyecegiz.
-                 *  
-                 *  
-                 *  
-                 */
-             //   eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-              //  oSession = oApplication.Sessions.Add();
-
-                oPersistenceUnit = oApplication.PersistenceUnits[index]; // combo box level
-                ModelLoad mLoad = new ModelLoad(ref oApplication);
-
-                mModel = mLoad.loadModel(oPersistenceUnit);
-
-
-               // oSession.Open(oPersistenceUnit, eLevel);
-               /*
-                var objectlist = new[] { "Entity", "Relationship", "Attribute","Sequence", "Key_Group", "Key_Group_Member" };
-                oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
-            
-                // Model genel bilgileri
-                mModel.setoName(oPersistenceUnit.Name);
-                mModel.setoObjectId(oSession.ModelObjects.Root.ObjectId);
-                mModel.setoLocation(oPersistenceUnit.PropertyBag["Locator"].Value["Locator"]);
-
-                
-                // Model Object Property
-                List<ObjectProperty> mObjectProperties = loadObjectProperities(true, oSession.ModelObjects.Root.ObjectId, null, oPersistenceUnit);
-                mModel.setoObjectProperty(mObjectProperties);
-
-
-                List<ModelObject > mModelObjects = new List<ModelObject>();
-
-
-                foreach (SCAPI.ModelObject oObject in oSelectedCollection)
-                {
-                    ModelObject mModelObject = new ModelObject();
-
-                    if (objectlist.Contains(oObject.ClassName)  )
-                    {
-                        mModelObject.setoObjectId(oObject.ObjectId);
-                        mModelObject.setoClassName(oObject.ClassName);
-                        mModelObject.setoName(oObject.Name);
-
-
-                        // Model Object main properities (etc: D_Arac ve D_Arac ozellikleri)
-                        List<ObjectProperty> mObjectProperty = loadObjectProperities(false, oObject.ObjectId, oSession.ModelObjects.Root.ObjectId, oPersistenceUnit);
-
-
-                        // D_Arac tablosunun sutunlari ve sutunlarin ozellikleri
-                        mModelObject.setoModelObjects(loadSubModelObject(oObject.ObjectId, oPersistenceUnit));
-
-                        
-                        
-                        mModelObject.setoObjectProperty(mObjectProperty);
-
-                        
-                        mModelObjects.Add(mModelObject);
-
-                   
-
-                    }
-
-                
-                }
-
-                // Model Object
-                mModel.setoModelObject(mModelObjects);
-
-                oApplication.Sessions.Clear();
-               */
-            }
-            return mModel;
+            ModelLoad mLoad = new ModelLoad(ref oApplication);
+            return mLoad.loadModel(oPersistenceUnit);
         }
 
         private SCAPI.PersistenceUnit findPersistenceUnit(string pobjectId)
@@ -260,43 +157,48 @@ namespace VeloxapEDGErwinTools.AddIn
 
 
             SCAPI.ModelObjects oSelectedCollection;
-            SCAPI.Session oSession;
+            SCAPI.Session oSession = null;
 
             SCAPI.SC_SessionLevel eLevel;
 
 
 
-            eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-            oSession = oApplication.Sessions.Add();
-
-            oSession.Open(oPersistenceUnit, eLevel);
-
-            var objectlist = new[] { "Entity", "Relationship", "Attribute", "Sequence", "Key_Group", "Key_Group_Member" };
-            oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
-
-
-
-           
-            foreach (SCAPI.ModelObject oObject in oSelectedCollection)
+            try
             {
-                Veloxap.AddIn.Erwin.Models.ModelObject mModelObject = new Veloxap.AddIn.Erwin.Models.ModelObject();
-                
-                if (objectlist.Contains(oObject.ClassName) )
+                eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
+                oSession = oApplication.Sessions.Add();
+
+                oSession.Open(oPersistenceUnit, eLevel);
+
+                var objectlist = new[] { "Entity", "Relationship", "Attribute", "Sequence", "Key_Group", "Key_Group_Member" };
+                if (string.IsNullOrWhiteSpace(objectId))
+                    objectId = oSession.ModelObjects.Root.ObjectId;
+
+                oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
+
+                foreach (SCAPI.ModelObject oObject in oSelectedCollection)
                 {
-                    mModelObject.setoObjectId(oObject.ObjectId);
-                    mModelObject.setoClassName(oObject.ClassName);
-                    mModelObject.setoName(oObject.Name);
+                    Veloxap.AddIn.Erwin.Models.ModelObject mModelObject = new Veloxap.AddIn.Erwin.Models.ModelObject();
 
-                    
-                    List<ObjectProperty> mObjectProperty = loadObjectProperities(false, oObject.ObjectId, oSession.ModelObjects.Root.ObjectId, oPersistenceUnit);
-                    mModelObject.setoObjectProperty(mObjectProperty);
-                    mModelObjects.Add(mModelObject);
+                    if (objectlist.Contains(oObject.ClassName))
+                    {
+                        mModelObject.setoObjectId(oObject.ObjectId);
+                        mModelObject.setoClassName(oObject.ClassName);
+                        mModelObject.setoName(oObject.Name);
 
-                   
+                        List<ObjectProperty> mObjectProperty = ReadObjectProperties(oObject);
+                        mModelObject.setoObjectProperty(mObjectProperty);
+                        mModelObjects.Add(mModelObject);
+                    }
 
                 }
-
-
+            }
+            catch
+            {
+            }
+            finally
+            {
+                CloseSession(oSession);
             }
 
 
@@ -307,66 +209,85 @@ namespace VeloxapEDGErwinTools.AddIn
 
             List<ObjectProperty> mObjectProperties = new List<ObjectProperty>();
 
-            SCAPI.Session oSession;
+            SCAPI.Session oSession = null;
             SCAPI.ModelObject oRootObject;
             SCAPI.ModelObject oObject;
 
             SCAPI.SC_SessionLevel eLevel;
 
-            eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-            oSession = oApplication.Sessions.Add();
-
             try
-            { 
+            {
+                eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
+                oSession = oApplication.Sessions.Add();
                 oSession.Open(oPersistenceUnit, eLevel);
                
 
                 if (isRoot)
-                    oRootObject = oSession.ModelObjects.Root;
+                    oObject = oSession.ModelObjects.Root;
                 else
-                    oRootObject = oSession.ModelObjects[parentObjectId];
-
-                 
-
-                oObject = oSession.ModelObjects.Collect(oRootObject)[objectId];
-
-                
-                if (oObject != null)
                 {
-                    foreach (SCAPI.ModelProperty oProperty in oObject.Properties)
+                    try
                     {
-                        ObjectProperty mObjectProperty = new ObjectProperty();
-                        try
-                        {
-
-                            string type = PropertyDataType(oProperty);
-                            string format = oProperty.FormatAsString();
-                            string val = RetrieveValue(oProperty);
-
-                           
-                            mObjectProperty.setoPropertyClassID(oProperty.ClassId);
-                            mObjectProperty.setoPropertyClassName(oProperty.ClassName);
-                            mObjectProperty.setoPropertyType(type);
-                            mObjectProperty.setoPropertyValue(val);
-                            mObjectProperty.setoPropertyFormatAsString(format);
-
-                            mObjectProperties.Add(mObjectProperty);
-
-
-                        }
-                        catch (Exception e) { }
-
-
+                        oObject = oSession.ModelObjects[objectId];
                     }
-
-
-
+                    catch
+                    {
+                        oRootObject = oSession.ModelObjects[parentObjectId];
+                        oObject = oSession.ModelObjects.Collect(oRootObject)[objectId];
+                    }
                 }
+
+                if (oObject != null)
+                    mObjectProperties.AddRange(ReadObjectProperties(oObject));
             }
-            catch (Exception e)
+            catch
             {
 
             }
+            finally
+            {
+                CloseSession(oSession);
+            }
+
+            return mObjectProperties;
+        }
+
+        private List<ObjectProperty> ReadObjectProperties(SCAPI.ModelObject oObject)
+        {
+            List<ObjectProperty> mObjectProperties = new List<ObjectProperty>();
+
+            if (oObject == null)
+                return mObjectProperties;
+
+            try
+            {
+                foreach (SCAPI.ModelProperty oProperty in oObject.Properties)
+                {
+                    try
+                    {
+                        ObjectProperty mObjectProperty = new ObjectProperty();
+
+                        string type = PropertyDataType(oProperty);
+                        string format = oProperty.FormatAsString();
+                        string val = RetrieveValue(oProperty);
+
+                        mObjectProperty.setoPropertyClassID(oProperty.ClassId);
+                        mObjectProperty.setoPropertyClassName(oProperty.ClassName);
+                        mObjectProperty.setoPropertyType(type);
+                        mObjectProperty.setoPropertyValue(val);
+                        mObjectProperty.setoPropertyFormatAsString(format);
+
+                        mObjectProperties.Add(mObjectProperty);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch
+            {
+            }
+
             return mObjectProperties;
         }
 
@@ -375,39 +296,55 @@ namespace VeloxapEDGErwinTools.AddIn
             List<(string, string, string)> modelObjectsList = new List<(string, string, string)>();
 
             SCAPI.ModelObjects oSelectedCollection;
-            SCAPI.Session oSession;
+            SCAPI.Session oSession = null;
 
             SCAPI.PersistenceUnit oPersistenceUnit;
             SCAPI.SC_SessionLevel eLevel;
 
 
 
-            eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-            oSession = oApplication.Sessions.Add();
-
-            oPersistenceUnit = oApplication.PersistenceUnits[selectedModelIndex]; // combo box level
-
-            oSession.Open(oPersistenceUnit, eLevel);
-
-            var objectlist = new[] { "Entity", "Relationship", "Attribute", "Sequence", "Key_Group", "Key_Group_Member" };
-            oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
-            //modelObjectsList.Add(("Model", oPersistenceUnit.Name, oPersistenceUnit.ObjectId));
-
-            foreach (SCAPI.ModelObject oObject in oSelectedCollection)
+            try
             {
-                if (objectlist.Contains(oObject.ClassName)   )
-                    modelObjectsList.Add((oObject.ClassName, oObject.Name, oObject.ObjectId));
+                if (oApplication == null ||
+                    oApplication.PersistenceUnits == null ||
+                    selectedModelIndex < 0 ||
+                    selectedModelIndex >= oApplication.PersistenceUnits.Count)
+                {
+                    return modelObjectsList;
+                }
 
+                eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
+                oSession = oApplication.Sessions.Add();
 
+                oPersistenceUnit = oApplication.PersistenceUnits[selectedModelIndex]; // combo box level
+
+                oSession.Open(oPersistenceUnit, eLevel);
+
+                var objectlist = new[] { "Entity", "Relationship", "Attribute", "Sequence", "Key_Group", "Key_Group_Member" };
+                oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
+                //modelObjectsList.Add(("Model", oPersistenceUnit.Name, oPersistenceUnit.ObjectId));
+
+                foreach (SCAPI.ModelObject oObject in oSelectedCollection)
+                {
+                    if (objectlist.Contains(oObject.ClassName))
+                        modelObjectsList.Add((oObject.ClassName, oObject.Name, oObject.ObjectId));
+                }
             }
-            oApplication.Sessions.Clear();
+            catch
+            {
+            }
+            finally
+            {
+                CloseSession(oSession);
+            }
+
             return modelObjectsList;
         }
 
         public List<(string, string, string, string)> getObjectProperities(bool isRoot, object objectId, object parentObjectId, int selectedModelIndex)
         {
             List<(string, string, string, string)> objectProperities = new List<(string, string, string, string)>();
-            SCAPI.Session oSession;
+            SCAPI.Session oSession = null;
             SCAPI.ModelObject oRootObject;
             SCAPI.ModelObject oObject;
 
@@ -415,19 +352,37 @@ namespace VeloxapEDGErwinTools.AddIn
             SCAPI.SC_SessionLevel eLevel;
 
             eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-            oSession = oApplication.Sessions.Add();
             
             try
             {
+                if (oApplication == null ||
+                    oApplication.PersistenceUnits == null ||
+                    selectedModelIndex < 0 ||
+                    selectedModelIndex >= oApplication.PersistenceUnits.Count)
+                {
+                    return objectProperities;
+                }
+
+                oSession = oApplication.Sessions.Add();
                 oPersistenceUnit = oApplication.PersistenceUnits[selectedModelIndex];
                 oSession.Open(oPersistenceUnit, eLevel);
 
                 if (isRoot)
-                    oRootObject = oSession.ModelObjects.Root;
+                {
+                    oObject = oSession.ModelObjects.Root;
+                }
                 else
-                    oRootObject = oSession.ModelObjects[parentObjectId];
-
-                oObject = oSession.ModelObjects.Collect(oRootObject)[objectId];
+                {
+                    try
+                    {
+                        oObject = oSession.ModelObjects[objectId];
+                    }
+                    catch
+                    {
+                        oRootObject = oSession.ModelObjects[parentObjectId];
+                        oObject = oSession.ModelObjects.Collect(oRootObject)[objectId];
+                    }
+                }
 
                 if (oObject != null)
                 {
@@ -444,7 +399,7 @@ namespace VeloxapEDGErwinTools.AddIn
 
 
                         }
-                        catch (Exception e) { }
+                    catch { }
 
 
                     }
@@ -453,12 +408,41 @@ namespace VeloxapEDGErwinTools.AddIn
 
                 }
             }
-            catch (Exception e)
+            catch
             {
 
             }
-            oApplication.Sessions.Clear();
+            finally
+            {
+                CloseSession(oSession);
+            }
+
             return objectProperities;
+        }
+
+        private void CloseSession(SCAPI.Session session)
+        {
+            if (session == null)
+                return;
+
+            try
+            {
+                session.Close();
+            }
+            catch
+            {
+            }
+
+            if (oApplication == null || oApplication.Sessions == null)
+                return;
+
+            try
+            {
+                oApplication.Sessions.Remove(session);
+            }
+            catch
+            {
+            }
         }
 
         private string RetrieveValue(SCAPI.ModelProperty oProperty, int nIndex = -1)
@@ -527,7 +511,7 @@ namespace VeloxapEDGErwinTools.AddIn
                         return "";// $"<error: variant type - {value?.GetType().Name ?? "<null>"} SCAPI type - {(int)valueType}>";
                 }
             }
-            catch (Exception ex)
+            catch
             {
                 string className;
                 try
@@ -574,7 +558,7 @@ namespace VeloxapEDGErwinTools.AddIn
 
 
             }
-            catch (Exception ex)
+            catch
             {
                 string className;
                 try

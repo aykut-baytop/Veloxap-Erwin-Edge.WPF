@@ -103,6 +103,7 @@
     <Compile Include="Services\RuleApiSettings.cs" />
     <Compile Include="Services\RuleService.cs" />
     <Compile Include="Services\TableUdpSecurityService.cs" />
+    <Compile Include="ScapiApplicationProvider.cs" />
     <Compile Include="VeloxapEDGErwinLib.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

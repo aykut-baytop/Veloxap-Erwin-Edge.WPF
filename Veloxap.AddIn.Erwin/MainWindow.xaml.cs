@@ -52,6 +52,7 @@ namespace Veloxap.AddIn.Erwin
         private bool isValidationOk;
         private bool hasStartedStartupTableUdpApply;
         private bool isStartupTableUdpApplyRunning;
+        private bool isPopulatingModels;
 
         internal event EventHandler<MainModelSelectionChangedEventArgs> SelectedMainModelInfoChanged;
 
@@ -95,8 +96,6 @@ namespace Veloxap.AddIn.Erwin
             ruleService = new RuleService(CreateAuthorizedHttpClient(authTokenProvider, apiCookieContainer));
             isValidationActive = true;
             isValidationOk = false;
-            if (EnsureAuthCredentialsConfigured(showMessage: true))
-                _ = InitializeAuthenticationAsync();
             PopulateModels();
         }
 
@@ -227,21 +226,37 @@ namespace Veloxap.AddIn.Erwin
 
         public void PopulateModels()
         {
+            isPopulatingModels = true;
             models = veloxapEDGErwinLib.getModelsNamePath() ?? new List<(string value, string key1, string key2)>();
 
             var modelItems = models
                 .Select(model => new ModelSelection(model.value, model.key1, model.key2))
                 .ToList();
 
-            cmbMainModel.ItemsSource = modelItems;
-
-            if (modelItems.Count > 0)
-                cmbMainModel.SelectedIndex = 0;
-            else
+            try
             {
-                UpdateSelectedMainModelInfo(null);
-                MainContent.Content = new ModelInfoView();
+                cmbMainModel.ItemsSource = modelItems;
+
+                if (modelItems.Count > 0)
+                    cmbMainModel.SelectedIndex = 0;
+                else
+                {
+                    UpdateSelectedMainModelInfo(null);
+                    MainContent.Content = new ModelInfoView();
+                }
             }
+            finally
+            {
+                isPopulatingModels = false;
+            }
+
+            var selectedModel = cmbMainModel == null
+                ? null
+                : cmbMainModel.SelectedItem as ModelSelection;
+
+            if (selectedModel != null)
+                ApplySelectedModelMetadata(selectedModel);
+
             //comboBox1.Items.Clear();
             //models = veloxapEDGErwinLib.getModelsNamePath();
 
@@ -271,13 +286,13 @@ namespace Veloxap.AddIn.Erwin
                 return;
             }
 
-            selectedModelName = selectedModel.Name;
-            selectedModelLongId = selectedModel.ObjectId;
-            SetSelectedModelRuleParameters(selectedModel.Name);
-            UpdateSelectedMainModelInfo(selectedModel);
+            ApplySelectedModelMetadata(selectedModel);
             ClearValidationRules();
 
             if (veloxapEDGErwinLib == null)
+                return;
+
+            if (isPopulatingModels)
                 return;
 
             LoadSelectedModelSummary(selectedModel);
@@ -323,6 +338,17 @@ namespace Veloxap.AddIn.Erwin
                     tableUdpStartupResult,
                     isStartupTableUdpApplyRunning);
             }
+        }
+
+        private void ApplySelectedModelMetadata(ModelSelection selectedModel)
+        {
+            if (selectedModel == null)
+                return;
+
+            selectedModelName = selectedModel.Name;
+            selectedModelLongId = selectedModel.ObjectId;
+            SetSelectedModelRuleParameters(selectedModel.Name);
+            UpdateSelectedMainModelInfo(selectedModel);
         }
 
         private void ShowMainModelTestView()
@@ -402,6 +428,7 @@ namespace Veloxap.AddIn.Erwin
                     veloxapEDGErwinLib.loadTableUdpModelObject(
                         selectedModel.ObjectId,
                         selectedModel.PersistenceObjectId));
+                UpdateSelectedModelLongIdFromLoadedModel(currentTableUdpModelInfo);
                 loadedTableUdpModelKey = modelKey;
                 return currentTableUdpModelInfo;
             }
@@ -413,6 +440,7 @@ namespace Veloxap.AddIn.Erwin
                 veloxapEDGErwinLib.loadModelObject(
                     selectedModel.ObjectId,
                     selectedModel.PersistenceObjectId));
+            UpdateSelectedModelLongIdFromLoadedModel(currentModelInfo);
             loadedDetailedModelKey = modelKey;
             loadedSummaryModelKey = modelKey;
             return currentModelInfo;
@@ -431,11 +459,20 @@ namespace Veloxap.AddIn.Erwin
                 veloxapEDGErwinLib.loadModelSummary(
                     selectedModel.ObjectId,
                     selectedModel.PersistenceObjectId));
+            UpdateSelectedModelLongIdFromLoadedModel(currentModelInfo);
 
             loadedSummaryModelKey = modelKey;
             loadedDetailedModelKey = null;
             loadedTableUdpModelKey = null;
             currentTableUdpModelInfo = null;
+        }
+
+        private void UpdateSelectedModelLongIdFromLoadedModel(ModelInfo modelInfo)
+        {
+            if (modelInfo == null || string.IsNullOrWhiteSpace(modelInfo.getoObjectId()))
+                return;
+
+            selectedModelLongId = modelInfo.getoObjectId();
         }
 
         private static ModelInfo LoadModelWithBusyCursor(Func<ModelInfo> loadModel)

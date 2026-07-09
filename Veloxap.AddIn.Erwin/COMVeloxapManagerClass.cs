@@ -1,14 +1,10 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Interop;
+using System.Windows.Threading;
 using Veloxap.AddIn.Erwin;
 
 namespace Veloxap.AddIn
@@ -19,78 +15,91 @@ namespace Veloxap.AddIn
     [ClassInterface(ClassInterfaceType.None)]
     public class COMVeloxapManagerClass : IErwinAddIn
     {
+        private static readonly object OpenWindowsLock = new object();
+        private static readonly List<Window1> OpenWindows = new List<Window1>();
+
         public COMVeloxapManagerClass() { }
 
         public void Run()
         {
-            IntPtr ownerHandle = GetHostOwnerHandle();
-
             if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
             {
-                RunWindow(ownerHandle);
+                ShowWindow(shutdownDispatcherOnClose: false);
                 return;
             }
 
             Exception startupError = null;
+            bool windowStarted = false;
+            var startupCompleted = new ManualResetEventSlim(false);
+
             var uiThread = new Thread(() =>
             {
                 try
                 {
-                    RunWindow(ownerHandle);
+                    ShowWindow(shutdownDispatcherOnClose: true);
+                    windowStarted = true;
                 }
                 catch (Exception ex)
                 {
                     startupError = ex;
                 }
+                finally
+                {
+                    startupCompleted.Set();
+                }
+
+                if (windowStarted)
+                    Dispatcher.Run();
             });
 
             uiThread.SetApartmentState(ApartmentState.STA);
-            uiThread.IsBackground = false;
+            uiThread.IsBackground = true;
             uiThread.Start();
-            uiThread.Join();
+            startupCompleted.Wait();
 
             if (startupError != null)
                 throw new InvalidOperationException("Veloxap EDGE WPF add-in failed to start.", startupError);
         }
 
-        private static void RunWindow(IntPtr ownerHandle)
+        private static void ShowWindow(bool shutdownDispatcherOnClose)
         {
-            SCAPI.Application app = new SCAPI.Application();
+            SCAPI.Application app = ScapiApplicationProvider.GetApplication();
 
             Window1 mainForm = new Window1();
-            AssignOwner(mainForm, ownerHandle);
-            mainForm.Init(ref app);
-            mainForm.ShowDialog();
+            mainForm.ShowActivated = false;
+            mainForm.ShowInTaskbar = false;
+            mainForm.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            mainForm.Closed += (sender, args) =>
+            {
+                lock (OpenWindowsLock)
+                {
+                    OpenWindows.Remove(mainForm);
+                }
+
+                if (shutdownDispatcherOnClose)
+                    mainForm.Dispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+            };
+
+            lock (OpenWindowsLock)
+            {
+                OpenWindows.Add(mainForm);
+            }
+
+            try
+            {
+                mainForm.Init(ref app);
+                mainForm.Show();
+            }
+            catch
+            {
+                lock (OpenWindowsLock)
+                {
+                    OpenWindows.Remove(mainForm);
+                }
+
+                throw;
+            }
         }
-
-        private static void AssignOwner(Window window, IntPtr ownerHandle)
-        {
-            if (window == null || ownerHandle == IntPtr.Zero)
-                return;
-
-            new WindowInteropHelper(window).Owner = ownerHandle;
-            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        }
-
-        private static IntPtr GetHostOwnerHandle()
-        {
-            IntPtr foregroundWindow = GetForegroundWindow();
-            if (foregroundWindow == IntPtr.Zero)
-                return IntPtr.Zero;
-
-            uint windowProcessId;
-            GetWindowThreadProcessId(foregroundWindow, out windowProcessId);
-
-            return windowProcessId == (uint)Process.GetCurrentProcess().Id
-                ? foregroundWindow
-                : IntPtr.Zero;
-        }
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
         [ComRegisterFunction]
         public static void Register(Type t)
