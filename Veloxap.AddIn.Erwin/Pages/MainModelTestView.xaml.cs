@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Web.ApplicationServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,20 +21,22 @@ namespace Veloxap.AddIn.Erwin.Pages
         private VeloxapEDGErwinLib veloxapEDGErwinLib;
 
         private readonly RuleService catalogRuleService;
-        private readonly string catalogName;
-        private readonly string catalogLongId;
-        private bool hasLoadedCatalogOverview;
+        private string currentCatalogName;
+        private string currentCatalogLongId;
+        private string loadedCatalogOverviewKey;
 
 
         public MainModelTestView()
         {
             InitializeComponent();
+            DataContext = new ModelInfoViewModel();
             SetSelectedMainModelInfo(MainModelSelectionInfo.Empty, false);
         }
 
         internal MainModelTestView(
             Window1 owner,
             MainModelSelectionInfo selectedMainModelInfo,
+            ModelInfo modelInfo,
             SCAPI.Application oApp,
             RuleService ruleService, 
             string catalogName,
@@ -42,36 +45,27 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             this.owner = owner;
             veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref oApp);
+            catalogRuleService = ruleService;
+            currentCatalogName = catalogName;
+            currentCatalogLongId = catalogLongId;
+            DataContext = modelInfo == null
+                ? new ModelInfoViewModel()
+                : new ModelInfoViewModel(modelInfo);
+
             SetSelectedMainModelInfo(selectedMainModelInfo, false);
             Loaded += MainModelTestView_Loaded;
             Unloaded += MainModelTestView_Unloaded;
-
-            catalogRuleService = ruleService;
-            this.catalogName = catalogName;
-            this.catalogLongId = catalogLongId;
         }
 
-        private void MainModelTestView_Loaded(object sender, RoutedEventArgs e)
+        private async void MainModelTestView_Loaded(object sender, RoutedEventArgs e)
         {
-            if (owner == null || isSubscribed)
-                return;
+            if (owner != null && !isSubscribed)
+            {
+                owner.SelectedMainModelInfoChanged += Owner_SelectedMainModelInfoChanged;
+                isSubscribed = true;
+            }
 
-            owner.SelectedMainModelInfoChanged += Owner_SelectedMainModelInfoChanged;
-            isSubscribed = true;
-
-            if (hasLoadedCatalogOverview)
-                return;
-
-            hasLoadedCatalogOverview = true;
-
-            var viewModel = DataContext as ModelInfoViewModel;
-            if (viewModel == null)
-                return;
-
-            viewModel.LoadCatalogOverviewAsync(
-                catalogRuleService,
-                catalogName,
-                catalogLongId).Wait();
+            await LoadCatalogOverviewForCurrentModelAsync(false);
         }
 
         private void MainModelTestView_Unloaded(object sender, RoutedEventArgs e)
@@ -83,11 +77,12 @@ namespace Veloxap.AddIn.Erwin.Pages
             isSubscribed = false;
         }
 
-        private void Owner_SelectedMainModelInfoChanged(
+        private async void Owner_SelectedMainModelInfoChanged(
             object sender,
             MainModelSelectionChangedEventArgs e)
         {
             SetSelectedMainModelInfo(e.SelectionInfo, true);
+            await LoadCatalogOverviewForCurrentModelAsync(true);
         }
 
         private void SetSelectedMainModelInfo(
@@ -99,7 +94,49 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (countAsDetectedChange)
                 detectedChangeCount++;
 
+            UpdateCatalogContext(selectionInfo);
             getTree(selectionInfo);
+        }
+
+        private void UpdateCatalogContext(MainModelSelectionInfo selectionInfo)
+        {
+            if (selectionInfo == null || !selectionInfo.HasSelection)
+            {
+                currentCatalogName = string.Empty;
+                currentCatalogLongId = string.Empty;
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectionInfo.RuleModelName))
+                currentCatalogName = selectionInfo.RuleModelName;
+
+            if (!string.IsNullOrWhiteSpace(selectionInfo.RuleModelLongId))
+                currentCatalogLongId = selectionInfo.RuleModelLongId;
+        }
+
+        private async Task LoadCatalogOverviewForCurrentModelAsync(bool forceReload)
+        {
+            var viewModel = DataContext as ModelInfoViewModel;
+            if (viewModel == null)
+                return;
+
+            string catalogOverviewKey =
+                (currentCatalogName ?? string.Empty) +
+                "|" +
+                (currentCatalogLongId ?? string.Empty);
+
+            if (!forceReload &&
+                string.Equals(loadedCatalogOverviewKey, catalogOverviewKey, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            loadedCatalogOverviewKey = catalogOverviewKey;
+
+            await viewModel.LoadCatalogOverviewAsync(
+                catalogRuleService,
+                currentCatalogName,
+                currentCatalogLongId);
         }
 
         private void getTree(MainModelSelectionInfo selectionInfo)
@@ -298,8 +335,8 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             await viewModel.DeleteCatalog(
                 catalogRuleService,
-                catalogName,
-                catalogLongId);
+                currentCatalogName,
+                currentCatalogLongId);
         }
     }
 }

@@ -309,9 +309,14 @@ namespace Veloxap.AddIn.Erwin
 
         private void ShowMainModelTestView()
         {
+            ModelInfo modelInfo = EnsureSelectedModelLoaded(ModelLoadPurpose.Summary);
+            // kontrol et
             MainContent.Content = new MainModelTestView(
                 this,
-                CurrentSelectedMainModelInfo, oApp, GetCatalogOverviewRuleService(),
+                CurrentSelectedMainModelInfo,
+                modelInfo,
+                oApp,
+                GetCatalogOverviewRuleService(),
                 selectedModelName,
                 selectedModelLongId);
         }
