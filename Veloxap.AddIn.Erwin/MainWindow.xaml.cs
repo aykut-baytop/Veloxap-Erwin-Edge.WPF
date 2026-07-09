@@ -311,7 +311,9 @@ namespace Veloxap.AddIn.Erwin
         {
             MainContent.Content = new MainModelTestView(
                 this,
-                CurrentSelectedMainModelInfo, oApp);
+                CurrentSelectedMainModelInfo, oApp, GetCatalogOverviewRuleService(),
+                selectedModelName,
+                selectedModelLongId);
         }
 
         private void UpdateSelectedMainModelInfo(ModelSelection selectedModel)
@@ -445,64 +447,6 @@ namespace Veloxap.AddIn.Erwin
             return (selectedModel.ObjectId ?? string.Empty) +
                    "|" +
                    (selectedModel.PersistenceObjectId ?? string.Empty);
-        }
-
-        private async Task ApplyTableUdpsOnStartupAsync(
-            ModelInfo modelInfo,
-            SCAPI.PersistenceUnit persistenceUnit)
-        {
-            if (hasStartedStartupTableUdpApply)
-                return;
-
-            hasStartedStartupTableUdpApply = true;
-            isStartupTableUdpApplyRunning = true;
-            tableUdpStartupResult = null;
-            RefreshTableUdpStartupResultInValidationView();
-
-            await Task.Yield();
-
-            try
-            {
-                if (modelInfo == null || oApp == null || persistenceUnit == null)
-                    throw new InvalidOperationException("Tablo UDP islemleri icin secili erwin modeli hazir degil.");
-
-                var service = new TableUdpSecurityService(
-                    oApp,
-                    persistenceUnit);
-
-                tableUdpStartupResult = service.ApplyStartupCalculations(modelInfo);
-            }
-            catch (Exception ex)
-            {
-                var failedResult = new TableUdpStartupApplyResult(DateTime.Now);
-                failedResult.AddOperation(
-                    "Acilis",
-                    () =>
-                    {
-                        throw ex;
-                    });
-                failedResult.CompletedAt = DateTime.Now;
-                tableUdpStartupResult = failedResult;
-            }
-            finally
-            {
-                isStartupTableUdpApplyRunning = false;
-                RefreshTableUdpStartupResultInValidationView();
-            }
-        }
-
-        private void RefreshTableUdpStartupResultInValidationView()
-        {
-            var validationView = MainContent == null
-                ? null
-                : MainContent.Content as ModelValidationView;
-
-            if (validationView == null)
-                return;
-
-            validationView.SetTableUdpStartupResult(
-                tableUdpStartupResult,
-                isStartupTableUdpApplyRunning);
         }
 
         private async Task<bool> LoadValidationRulesForSelectedModelAsync(bool showErrors)

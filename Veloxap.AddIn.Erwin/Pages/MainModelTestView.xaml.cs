@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Web.ApplicationServices;
 using System.Windows;
 using System.Windows.Controls;
 using Veloxap.AddIn.Erwin.Models;
+using Veloxap.AddIn.Erwin.Services;
+using Veloxap.AddIn.Erwin.ViewModels;
 using VeloxapEDGErwinTools.AddIn;
 
 namespace Veloxap.AddIn.Erwin.Pages
@@ -16,6 +19,12 @@ namespace Veloxap.AddIn.Erwin.Pages
         private int detectedChangeCount;
         private VeloxapEDGErwinLib veloxapEDGErwinLib;
 
+        private readonly RuleService catalogRuleService;
+        private readonly string catalogName;
+        private readonly string catalogLongId;
+        private bool hasLoadedCatalogOverview;
+
+
         public MainModelTestView()
         {
             InitializeComponent();
@@ -25,7 +34,10 @@ namespace Veloxap.AddIn.Erwin.Pages
         internal MainModelTestView(
             Window1 owner,
             MainModelSelectionInfo selectedMainModelInfo,
-            SCAPI.Application oApp)
+            SCAPI.Application oApp,
+            RuleService ruleService, 
+            string catalogName,
+            string catalogLongId)
             : this()
         {
             this.owner = owner;
@@ -33,6 +45,10 @@ namespace Veloxap.AddIn.Erwin.Pages
             SetSelectedMainModelInfo(selectedMainModelInfo, false);
             Loaded += MainModelTestView_Loaded;
             Unloaded += MainModelTestView_Unloaded;
+
+            catalogRuleService = ruleService;
+            this.catalogName = catalogName;
+            this.catalogLongId = catalogLongId;
         }
 
         private void MainModelTestView_Loaded(object sender, RoutedEventArgs e)
@@ -42,6 +58,20 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             owner.SelectedMainModelInfoChanged += Owner_SelectedMainModelInfoChanged;
             isSubscribed = true;
+
+            if (hasLoadedCatalogOverview)
+                return;
+
+            hasLoadedCatalogOverview = true;
+
+            var viewModel = DataContext as ModelInfoViewModel;
+            if (viewModel == null)
+                return;
+
+            viewModel.LoadCatalogOverviewAsync(
+                catalogRuleService,
+                catalogName,
+                catalogLongId).Wait();
         }
 
         private void MainModelTestView_Unloaded(object sender, RoutedEventArgs e)
@@ -258,6 +288,18 @@ namespace Veloxap.AddIn.Erwin.Pages
             public string Format { get; private set; }
 
             public string Value { get; private set; }
+        }
+
+        private async void BtnDeleteCatalog_Click(object sender, RoutedEventArgs e)
+        {
+            var viewModel = DataContext as ModelInfoViewModel;
+            if (viewModel == null)
+                return;
+
+            await viewModel.DeleteCatalog(
+                catalogRuleService,
+                catalogName,
+                catalogLongId);
         }
     }
 }
