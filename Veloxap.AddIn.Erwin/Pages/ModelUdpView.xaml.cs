@@ -93,50 +93,76 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async void ModelUdpView_Loaded(object sender, RoutedEventArgs e)
         {
-            if (hasStartedLoading)
-                return;
+            try
+            {
+                if (hasStartedLoading)
+                    return;
 
-            hasStartedLoading = true;
-            await ReloadRowsAsync("Tablolar yukleniyor...", false);
+                hasStartedLoading = true;
+                await ReloadRowsAsync("Tablolar yukleniyor...", false);
+            }
+            catch (Exception)
+            {
+
+            }
         }
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (isLoading)
-                return;
-
-            if (searchTimer == null)
+            try
             {
-                ApplyFilter();
-                return;
-            }
+                if (isLoading)
+                    return;
 
-            searchTimer.Stop();
-            searchTimer.Start();
+                if (searchTimer == null)
+                {
+                    ApplyFilter();
+                    return;
+                }
+
+                searchTimer.Stop();
+                searchTimer.Start();
+            }
+            catch (Exception)
+            {
+
+            }
         }
 
         private void SearchTimer_Tick(object sender, EventArgs e)
         {
-            searchTimer.Stop();
-            ApplyFilter();
+            try
+            {
+                searchTimer.Stop();
+                ApplyFilter();
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private async void TreeUdp_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            var node = e.NewValue as UdpTreeNode;
-            if (node == null || node.IsPlaceholder)
-                return;
-
-            ShowDetails(node);
-
-            if (node.Row == null)
+            try
             {
-                await LoadTableNodeAsync(node);
-                ShowDetails(node);
-                return;
-            }
+                var node = e.NewValue as UdpTreeNode;
+                if (node == null || node.IsPlaceholder)
+                    return;
 
-            await PreviewSelectedUdpAsync(node.Row);
+                ShowDetails(node);
+
+                if (node.Row == null)
+                {
+                    await LoadTableNodeAsync(node);
+                    ShowDetails(node);
+                    return;
+                }
+
+                await PreviewSelectedUdpAsync(node.Row);
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private void TreeUdpItem_Loaded(object sender, RoutedEventArgs e)
@@ -145,15 +171,21 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async void TreeUdpItem_Expanded(object sender, RoutedEventArgs e)
         {
-            var item = e.OriginalSource as TreeViewItem;
-            if (item == null)
-                return;
+            try
+            {
+                var item = e.OriginalSource as TreeViewItem;
+                if (item == null)
+                    return;
 
-            var node = item.DataContext as UdpTreeNode;
-            if (node == null || node.IsPlaceholder || node.Row != null)
-                return;
+                var node = item.DataContext as UdpTreeNode;
+                if (node == null || node.IsPlaceholder || node.Row != null)
+                    return;
 
-            await LoadTableNodeAsync(node);
+                await LoadTableNodeAsync(node);
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private void ApplyFilter()
@@ -163,121 +195,141 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private void ApplyFilter(TreeState treeState, bool preserveSelection)
         {
-            string filter = txtSearch == null
-                ? string.Empty
-                : (txtSearch.Text ?? string.Empty).Trim();
-
-            bool hasShortSearch = filter.Length > 0 && filter.Length < MinimumSearchLength;
-            string activeFilter = filter.Length >= MinimumSearchLength
-                ? filter
-                : string.Empty;
-
-            if (CanUseLazyScapi())
+            try
             {
-                ApplyLazyFilter(activeFilter, hasShortSearch);
+                string filter = txtSearch == null
+    ? string.Empty
+    : (txtSearch.Text ?? string.Empty).Trim();
+
+                bool hasShortSearch = filter.Length > 0 && filter.Length < MinimumSearchLength;
+                string activeFilter = filter.Length >= MinimumSearchLength
+                    ? filter
+                    : string.Empty;
+
+                if (CanUseLazyScapi())
+                {
+                    ApplyLazyFilter(activeFilter, hasShortSearch);
+                    lastAppliedFilter = activeFilter;
+                    return;
+                }
+
+                if (hasShortSearch &&
+                    string.Equals(activeFilter, lastAppliedFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    UpdateFilterStatus(allRows.Count, activeFilter, hasShortSearch);
+                    return;
+                }
+
+                IList<UdpRow> filteredRows = allRows;
+                if (!string.IsNullOrWhiteSpace(activeFilter))
+                {
+                    filteredRows = allRows
+                        .Where(row => Contains(row.SearchText, activeFilter))
+                        .ToList();
+                }
+
+                bool expandSearchResults = !string.IsNullOrWhiteSpace(activeFilter);
+                var treeNodes = BuildTree(filteredRows, treeState, expandSearchResults);
+                treeUdp.ItemsSource = treeNodes;
+
+                RestoreSelectionDetails(treeState, treeNodes, filteredRows, preserveSelection);
+
+                UpdateFilterStatus(filteredRows.Count, activeFilter, hasShortSearch);
                 lastAppliedFilter = activeFilter;
-                return;
             }
-
-            if (hasShortSearch &&
-                string.Equals(activeFilter, lastAppliedFilter, StringComparison.OrdinalIgnoreCase))
+            catch (Exception)
             {
-                UpdateFilterStatus(allRows.Count, activeFilter, hasShortSearch);
-                return;
             }
-
-            IList<UdpRow> filteredRows = allRows;
-            if (!string.IsNullOrWhiteSpace(activeFilter))
-            {
-                filteredRows = allRows
-                    .Where(row => Contains(row.SearchText, activeFilter))
-                    .ToList();
-            }
-
-            bool expandSearchResults = !string.IsNullOrWhiteSpace(activeFilter);
-            var treeNodes = BuildTree(filteredRows, treeState, expandSearchResults);
-            treeUdp.ItemsSource = treeNodes;
-
-            RestoreSelectionDetails(treeState, treeNodes, filteredRows, preserveSelection);
-
-            UpdateFilterStatus(filteredRows.Count, activeFilter, hasShortSearch);
-            lastAppliedFilter = activeFilter;
         }
 
         private void ApplyLazyFilter(string activeFilter, bool hasShortSearch)
         {
-            if (string.IsNullOrWhiteSpace(activeFilter))
+            try
             {
-                treeUdp.ItemsSource = tableNodes;
-                UpdateLazyFilterStatus(tableNodes.Count, hasShortSearch, activeFilter);
-                return;
-            }
-
-            var filteredNodes = new List<UdpTreeNode>();
-            foreach (var tableNode in tableNodes)
-            {
-                if (Contains(tableNode.TableName, activeFilter))
+                if (string.IsNullOrWhiteSpace(activeFilter))
                 {
-                    filteredNodes.Add(tableNode);
-                    continue;
+                    treeUdp.ItemsSource = tableNodes;
+                    UpdateLazyFilterStatus(tableNodes.Count, hasShortSearch, activeFilter);
+                    return;
                 }
 
-                var matchingRows = allRows
-                    .Where(row =>
-                        string.Equals(row.TableObjectId, tableNode.TableObjectId, StringComparison.OrdinalIgnoreCase) &&
-                        Contains(row.SearchText, activeFilter))
-                    .ToList();
+                var filteredNodes = new List<UdpTreeNode>();
+                foreach (var tableNode in tableNodes)
+                {
+                    if (Contains(tableNode.TableName, activeFilter))
+                    {
+                        filteredNodes.Add(tableNode);
+                        continue;
+                    }
 
-                if (matchingRows.Count == 0)
-                    continue;
+                    var matchingRows = allRows
+                        .Where(row =>
+                            string.Equals(row.TableObjectId, tableNode.TableObjectId, StringComparison.OrdinalIgnoreCase) &&
+                            Contains(row.SearchText, activeFilter))
+                        .ToList();
 
-                filteredNodes.Add(UdpTreeNode.CreateGroup(
-                    tableNode.TableName + " (" + matchingRows.Count + ")",
-                    0,
-                    "Tablo",
-                    tableNode.TableName,
-                    tableNode.TableObjectId,
-                    string.Join(", ", matchingRows.Select(row => row.DisplayUdpName)),
-                    matchingRows.Count,
-                    tableNode.NodeKey,
-                    true,
-                    false,
-                    () => BuildUdpLeafNodes(matchingRows, null)));
+                    if (matchingRows.Count == 0)
+                        continue;
+
+                    filteredNodes.Add(UdpTreeNode.CreateGroup(
+                        tableNode.TableName + " (" + matchingRows.Count + ")",
+                        0,
+                        "Tablo",
+                        tableNode.TableName,
+                        tableNode.TableObjectId,
+                        string.Join(", ", matchingRows.Select(row => row.DisplayUdpName)),
+                        matchingRows.Count,
+                        tableNode.NodeKey,
+                        true,
+                        false,
+                        () => BuildUdpLeafNodes(matchingRows, null)));
+                }
+
+                treeUdp.ItemsSource = filteredNodes;
+                UpdateLazyFilterStatus(filteredNodes.Count, hasShortSearch, activeFilter);
             }
-
-            treeUdp.ItemsSource = filteredNodes;
-            UpdateLazyFilterStatus(filteredNodes.Count, hasShortSearch, activeFilter);
+            catch (Exception)
+            {
+            }
         }
 
         private void UpdateLazyFilterStatus(int visibleTables, bool hasShortSearch, string activeFilter)
         {
-            txtVisibleCount.Text = visibleTables.ToString();
-            emptyState.Visibility = visibleTables == 0
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-
-            txtEmpty.Text = tableNodes.Count == 0
-                ? "Secili modelde tablo bulunamadi."
-                : "Arama kriterine uygun tablo veya yuklenmis UDP bulunamadi.";
-
-            if (hasShortSearch)
+            try
             {
-                SetStatus(
-                    "Arama icin en az " + MinimumSearchLength +
-                    " karakter girin. " + visibleTables + " tablo listeleniyor.",
-                    false);
-                return;
-            }
 
-            if (string.IsNullOrWhiteSpace(activeFilter))
+                txtVisibleCount.Text = visibleTables.ToString();
+                emptyState.Visibility = visibleTables == 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+                txtEmpty.Text = tableNodes.Count == 0
+                    ? "Secili modelde tablo bulunamadi."
+                    : "Arama kriterine uygun tablo veya yuklenmis UDP bulunamadi.";
+
+                if (hasShortSearch)
+                {
+                    SetStatus(
+                        "Arama icin en az " + MinimumSearchLength +
+                        " karakter girin. " + visibleTables + " tablo listeleniyor.",
+                        false);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(activeFilter))
+                {
+                    SetStatus(
+                        tableCount + " tablo listeleniyor. UDP detaylari tablo acildikca yuklenecek.",
+                        false);
+                    return;
+                }
+
+                SetStatus(visibleTables + " tablo/sonuc bulundu.", false);
+            }
+            catch (Exception)
             {
-                SetStatus(
-                    tableCount + " tablo listeleniyor. UDP detaylari tablo acildikca yuklenecek.",
-                    false);
-                return;
-            }
 
-            SetStatus(visibleTables + " tablo/sonuc bulundu.", false);
+            }
         }
 
         private void UpdateFilterStatus(int filteredCount, string activeFilter, bool hasShortSearch)
@@ -321,57 +373,70 @@ namespace Veloxap.AddIn.Erwin.Pages
             IEnumerable<UdpRow> filteredRows,
             bool preserveSelection)
         {
-            if (!preserveSelection ||
-                treeState == null ||
-                string.IsNullOrWhiteSpace(treeState.SelectedNodeKey))
+            try
             {
-                ShowDetails(null);
-                return;
-            }
+                if (!preserveSelection ||
+    treeState == null ||
+    string.IsNullOrWhiteSpace(treeState.SelectedNodeKey))
+                {
+                    ShowDetails(null);
+                    return;
+                }
 
-            UdpTreeNode selectedNode = FindNodeByKey(treeNodes, treeState.SelectedNodeKey);
-            if (selectedNode != null)
+                UdpTreeNode selectedNode = FindNodeByKey(treeNodes, treeState.SelectedNodeKey);
+                if (selectedNode != null)
+                {
+                    selectedNode.IsSelected = true;
+                    ShowDetails(selectedNode);
+                    return;
+                }
+
+                UdpRow selectedRow = filteredRows == null
+                    ? null
+                    : filteredRows.FirstOrDefault(row =>
+                        string.Equals(
+                            BuildUdpNodeKey(row),
+                            treeState.SelectedNodeKey,
+                            StringComparison.Ordinal));
+
+                ShowDetails(selectedRow == null
+                    ? null
+                    : UdpTreeNode.CreateLeaf(
+                        selectedRow,
+                        BuildUdpNodeKey(selectedRow),
+                        true));
+            }
+            catch (Exception)
             {
-                selectedNode.IsSelected = true;
-                ShowDetails(selectedNode);
-                return;
             }
-
-            UdpRow selectedRow = filteredRows == null
-                ? null
-                : filteredRows.FirstOrDefault(row =>
-                    string.Equals(
-                        BuildUdpNodeKey(row),
-                        treeState.SelectedNodeKey,
-                        StringComparison.Ordinal));
-
-            ShowDetails(selectedRow == null
-                ? null
-                : UdpTreeNode.CreateLeaf(
-                    selectedRow,
-                    BuildUdpNodeKey(selectedRow),
-                    true));
         }
 
         private static UdpTreeNode FindNodeByKey(IEnumerable<UdpTreeNode> nodes, string nodeKey)
         {
-            if (nodes == null || string.IsNullOrWhiteSpace(nodeKey))
-                return null;
-
-            foreach (var node in nodes)
+            try
             {
-                if (node == null || node.IsPlaceholder)
-                    continue;
+                if (nodes == null || string.IsNullOrWhiteSpace(nodeKey))
+                    return null;
 
-                if (string.Equals(node.NodeKey, nodeKey, StringComparison.Ordinal))
-                    return node;
+                foreach (var node in nodes)
+                {
+                    if (node == null || node.IsPlaceholder)
+                        continue;
 
-                UdpTreeNode childNode = FindNodeByKey(node.Children, nodeKey);
-                if (childNode != null)
-                    return childNode;
+                    if (string.Equals(node.NodeKey, nodeKey, StringComparison.Ordinal))
+                        return node;
+
+                    UdpTreeNode childNode = FindNodeByKey(node.Children, nodeKey);
+                    if (childNode != null)
+                        return childNode;
+                }
+
+                return null;
             }
-
-            return null;
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         private static List<UdpTreeNode> BuildTree(
@@ -381,39 +446,47 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             var nodes = new List<UdpTreeNode>();
 
-            if (rows == null || rows.Count == 0)
-                return nodes;
-
-            foreach (var tableGroup in rows.GroupBy(row => row.TableName)
-                                           .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+            try
             {
-                List<UdpRow> tableRows = tableGroup.ToList();
-                string tableObjectId = tableRows
-                    .Select(row => row.TableObjectId)
-                    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-                string nodeKey = BuildTableNodeKey(tableObjectId, tableGroup.Key);
-                string udpNames = string.Join(
-                    ", ",
-                    tableRows
-                        .Select(row => row.DisplayUdpName)
-                        .Where(name => !string.IsNullOrWhiteSpace(name))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
 
-                var tableNode = UdpTreeNode.CreateGroup(
-                    tableGroup.Key + " (" + tableRows.Count + ")",
-                    0,
-                    "Tablo",
-                    tableGroup.Key,
-                    tableObjectId,
-                    udpNames,
-                    tableRows.Count,
-                    nodeKey,
-                    ShouldExpandNode(nodeKey, treeState, expandSearchResults),
-                    ShouldSelectNode(nodeKey, treeState),
-                    () => BuildUdpLeafNodes(tableRows, treeState));
+                if (rows == null || rows.Count == 0)
+                    return nodes;
 
-                nodes.Add(tableNode);
+                foreach (var tableGroup in rows.GroupBy(row => row.TableName)
+                                               .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    List<UdpRow> tableRows = tableGroup.ToList();
+                    string tableObjectId = tableRows
+                        .Select(row => row.TableObjectId)
+                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+                    string nodeKey = BuildTableNodeKey(tableObjectId, tableGroup.Key);
+                    string udpNames = string.Join(
+                        ", ",
+                        tableRows
+                            .Select(row => row.DisplayUdpName)
+                            .Where(name => !string.IsNullOrWhiteSpace(name))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+
+                    var tableNode = UdpTreeNode.CreateGroup(
+                        tableGroup.Key + " (" + tableRows.Count + ")",
+                        0,
+                        "Tablo",
+                        tableGroup.Key,
+                        tableObjectId,
+                        udpNames,
+                        tableRows.Count,
+                        nodeKey,
+                        ShouldExpandNode(nodeKey, treeState, expandSearchResults),
+                        ShouldSelectNode(nodeKey, treeState),
+                        () => BuildUdpLeafNodes(tableRows, treeState));
+
+                    nodes.Add(tableNode);
+                }
+            }
+            catch (Exception)
+            {
+
             }
 
             return nodes;
@@ -424,17 +497,24 @@ namespace Veloxap.AddIn.Erwin.Pages
             TreeState treeState)
         {
             var nodes = new List<UdpTreeNode>();
-
-            if (rows == null)
-                return nodes;
-
-            foreach (var row in rows.OrderBy(item => item.DisplayUdpName, StringComparer.OrdinalIgnoreCase))
+            try
             {
-                string nodeKey = BuildUdpNodeKey(row);
-                nodes.Add(UdpTreeNode.CreateLeaf(
-                    row,
-                    nodeKey,
-                    ShouldSelectNode(nodeKey, treeState)));
+
+                if (rows == null)
+                    return nodes;
+
+                foreach (var row in rows.OrderBy(item => item.DisplayUdpName, StringComparer.OrdinalIgnoreCase))
+                {
+                    string nodeKey = BuildUdpNodeKey(row);
+                    nodes.Add(UdpTreeNode.CreateLeaf(
+                        row,
+                        nodeKey,
+                        ShouldSelectNode(nodeKey, treeState)));
+                }
+            }
+            catch (Exception)
+            {
+
             }
 
             return nodes;
@@ -453,24 +533,31 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private static void CaptureTreeState(IEnumerable<UdpTreeNode> nodes, TreeState treeState)
         {
-            if (nodes == null || treeState == null)
-                return;
-
-            foreach (var node in nodes)
+            try
             {
-                if (node == null || node.IsPlaceholder)
-                    continue;
+                if (nodes == null || treeState == null)
+                    return;
 
-                if (!string.IsNullOrWhiteSpace(node.NodeKey))
+                foreach (var node in nodes)
                 {
-                    if (node.IsExpanded)
-                        treeState.ExpandedNodeKeys.Add(node.NodeKey);
+                    if (node == null || node.IsPlaceholder)
+                        continue;
 
-                    if (node.IsSelected)
-                        treeState.SelectedNodeKey = node.NodeKey;
+                    if (!string.IsNullOrWhiteSpace(node.NodeKey))
+                    {
+                        if (node.IsExpanded)
+                            treeState.ExpandedNodeKeys.Add(node.NodeKey);
+
+                        if (node.IsSelected)
+                            treeState.SelectedNodeKey = node.NodeKey;
+                    }
+
+                    CaptureTreeState(node.Children, treeState);
                 }
+            }
+            catch (Exception)
+            {
 
-                CaptureTreeState(node.Children, treeState);
             }
         }
 
@@ -516,38 +603,46 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private void ShowDetails(UdpTreeNode node)
         {
-            selectedDetails.Clear();
-
-            if (node == null)
+            try
             {
-                txtDetailTitle.Text = "UDP Detaylari";
-                AddDetail("Secim", "Soldaki agactan bir tablo veya UDP secin.");
-                return;
-            }
+                selectedDetails.Clear();
 
-            txtDetailTitle.Text = node.Row == null
-                ? node.TableName
-                : node.Title;
-
-            if (node.Row == null)
-            {
-                AddDetail("Tablo", node.TableName);
-
-                if (!node.ChildrenLoaded)
+                if (node == null)
                 {
-                    AddDetail("Durum", "UDP detaylari henuz yuklenmedi.");
-                    AddDetail("Islem", "Tabloyu acinca veya secince detaylar yuklenir.");
+                    txtDetailTitle.Text = "UDP Detaylari";
+                    AddDetail("Secim", "Soldaki agactan bir tablo veya UDP secin.");
                     return;
                 }
 
-                AddDetail("UDP Sayisi", node.Count.ToString());
-                AddDetail("UDP'ler", node.UdpNames);
-                return;
-            }
+                txtDetailTitle.Text = node.Row == null
+                    ? node.TableName
+                    : node.Title;
 
-            AddDetail("Tablo", node.Row.TableName);
-            AddDetail("UDP", node.Row.DisplayUdpName);
-            AddDetail("Deger", node.Row.Value);
+                if (node.Row == null)
+                {
+                    AddDetail("Tablo", node.TableName);
+
+                    if (!node.ChildrenLoaded)
+                    {
+                        AddDetail("Durum", "UDP detaylari henuz yuklenmedi.");
+                        AddDetail("Islem", "Tabloyu acinca veya secince detaylar yuklenir.");
+                        return;
+                    }
+
+                    AddDetail("UDP Sayisi", node.Count.ToString());
+                    AddDetail("UDP'ler", node.UdpNames);
+                    return;
+                }
+
+                AddDetail("Tablo", node.Row.TableName);
+                AddDetail("UDP", node.Row.DisplayUdpName);
+                AddDetail("Deger", node.Row.Value);
+
+            }
+            catch (Exception)
+            {
+
+            }
         }
 
         private async Task LoadTableNodeAsync(UdpTreeNode node)
