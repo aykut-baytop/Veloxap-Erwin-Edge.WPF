@@ -1,3 +1,9 @@
-﻿<Solution>
-  <Project Path="Veloxap.AddIn.Erwin/Veloxap.AddIn.Erwin.csproj" Id="29622238-9c29-4f4f-9807-09a418b6708f" />
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="Veloxap.AddIn.Erwin/Veloxap.AddIn.Erwin.csproj" Id="29622238-9c29-4f4f-9807-09a418b6708f">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
 </Solution>

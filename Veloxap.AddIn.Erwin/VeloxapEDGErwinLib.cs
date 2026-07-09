@@ -6,8 +6,10 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Xml.Linq;
 using Veloxap.AddIn.Erwin.Models;
+using Veloxap.AddIn.Erwin.Services;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace VeloxapEDGErwinTools.AddIn
@@ -27,66 +29,262 @@ namespace VeloxapEDGErwinTools.AddIn
 
         public int getNumberOfModels()
         {
-            if (oApplication == null || oApplication.PersistenceUnits == null)
-                return 0;
+            using (var trace = PerformanceTraceLogger.Start("VeloxapEDGErwinLib.getNumberOfModels"))
+            {
+                if (oApplication == null || oApplication.PersistenceUnits == null)
+                {
+                    trace.SetResult("ModelCount=0; Reason=ApplicationOrPersistenceUnitsNull");
+                    return 0;
+                }
 
-            return oApplication.PersistenceUnits.Count;
+                int count = oApplication.PersistenceUnits.Count;
+                trace.SetResult("ModelCount=" + count);
+                return count;
+            }
         }
 
         public SCAPI.PersistenceUnit getPersistenceUnit(int modelIndex)
         {
-            if (oApplication == null || oApplication.PersistenceUnits == null)
-                return null;
+            using (var trace = PerformanceTraceLogger.Start(
+                "VeloxapEDGErwinLib.getPersistenceUnit",
+                "ModelIndex=" + modelIndex))
+            {
+                if (oApplication == null || oApplication.PersistenceUnits == null)
+                {
+                    trace.SetResult("Found=False; Reason=ApplicationOrPersistenceUnitsNull");
+                    return null;
+                }
 
-            if (modelIndex < 0 || modelIndex >= oApplication.PersistenceUnits.Count)
-                return null;
+                if (modelIndex < 0 || modelIndex >= oApplication.PersistenceUnits.Count)
+                {
+                    trace.SetResult(
+                        "Found=False; Reason=IndexOutOfRange; ModelCount=" + oApplication.PersistenceUnits.Count);
+                    return null;
+                }
 
-            return oApplication.PersistenceUnits[modelIndex];
+                SCAPI.PersistenceUnit unit = oApplication.PersistenceUnits[modelIndex];
+                trace.SetResult("Found=True; " + DescribePersistenceUnit(unit));
+                return unit;
+            }
         }
 
         public ModelInfo loadModelObjectForIntegrate(int modelIndex)
         {
-            try
+            using (var trace = PerformanceTraceLogger.Start(
+                "VeloxapEDGErwinLib.loadModelObjectForIntegrate",
+                "ModelIndex=" + modelIndex))
             {
-                SCAPI.PersistenceUnit oPersistenceUnit = getPersistenceUnit(modelIndex);
-                if (oPersistenceUnit == null)
-                    return null;
+                try
+                {
+                    SCAPI.PersistenceUnit oPersistenceUnit = getPersistenceUnit(modelIndex);
+                    if (oPersistenceUnit == null)
+                    {
+                        trace.SetResult("PersistenceUnitFound=False");
+                        return null;
+                    }
 
-                ModelLoad mLoad = new ModelLoad(ref oApplication);
-                return mLoad.loadModel(oPersistenceUnit);
-            }
-            catch
-            {
-                return null;
+                    ModelLoad mLoad = new ModelLoad(ref oApplication);
+                    ModelInfo model = mLoad.loadModel(oPersistenceUnit);
+                    trace.SetResult("PersistenceUnitFound=True; ModelLoaded=" + (model != null));
+                    return model;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error(
+                        "VeloxapEDGErwinLib.loadModelObjectForIntegrate",
+                        "ModelIndex=" + modelIndex,
+                        ex);
+                    return null;
+                }
             }
         }
 
         public ModelInfo loadModelSummary(string objectId, string pobjectId)
         {
-            SCAPI.PersistenceUnit oPersistenceUnit = findPersistenceUnit(pobjectId);
-            if (oPersistenceUnit == null)
-                return new ModelInfo();
+            using (var trace = PerformanceTraceLogger.Start(
+                "VeloxapEDGErwinLib.loadModelSummary",
+                "ObjectId=" + CleanLogValue(objectId) +
+                "; PersistenceObjectId=" + CleanLogValue(pobjectId)))
+            {
+                SCAPI.PersistenceUnit oPersistenceUnit = findPersistenceUnit(pobjectId);
+                if (oPersistenceUnit == null)
+                {
+                    trace.SetResult("PersistenceUnitFound=False");
+                    return new ModelInfo();
+                }
 
-            ModelLoad mLoad = new ModelLoad(ref oApplication);
-            return mLoad.loadModelSummary(oPersistenceUnit);
+                ModelLoad mLoad = new ModelLoad(ref oApplication);
+                ModelInfo model = mLoad.loadModelSummary(oPersistenceUnit);
+                trace.SetResult("PersistenceUnitFound=True; ModelLoaded=" + (model != null));
+                return model;
+            }
         }
 
         public ModelInfo loadTableUdpModelObject(string objectId, string pobjectId)
         {
-            SCAPI.PersistenceUnit oPersistenceUnit = findPersistenceUnit(pobjectId);
-            if (oPersistenceUnit == null)
-                return new ModelInfo();
+            using (var trace = PerformanceTraceLogger.Start(
+                "VeloxapEDGErwinLib.loadTableUdpModelObject",
+                "ObjectId=" + CleanLogValue(objectId) +
+                "; PersistenceObjectId=" + CleanLogValue(pobjectId)))
+            {
+                SCAPI.PersistenceUnit oPersistenceUnit = findPersistenceUnit(pobjectId);
+                if (oPersistenceUnit == null)
+                {
+                    trace.SetResult("PersistenceUnitFound=False");
+                    return new ModelInfo();
+                }
 
-            ModelLoad mLoad = new ModelLoad(ref oApplication);
-            return mLoad.loadTableUdpModel(oPersistenceUnit);
+                ModelLoad mLoad = new ModelLoad(ref oApplication);
+                ModelInfo model = mLoad.loadTableUdpModel(oPersistenceUnit);
+                trace.SetResult("PersistenceUnitFound=True; ModelLoaded=" + (model != null));
+                return model;
+            }
         }
 
-        public List<(string, string,string)> getModelsNamePath()
+        //public List<(string, string,string)> getModelsNamePath()
+        //{
+        //    using (var trace = PerformanceTraceLogger.Start("VeloxapEDGErwinLib.getModelsNamePath"))
+        //    {
+        //        if (oApplication == null)
+        //        {
+        //            trace.SetResult("ModelCount=0; Reason=ApplicationNull");
+        //            return null;
+        //        }
+
+        //        List<(string value,string key1, string key2 )> oModelsName = new List<(string, string,string)>();
+
+        //        SCAPI.PropertyBag oBag;
+        //        SCAPI.Session oSession;
+        //        SCAPI.ModelObject oRoot;
+        //        String sTitle;
+        //        String sLocation;
+        //        String sObjectId;
+        //        String pObjectId;
+        //        int unitIndex = -1;
+
+        //        foreach (PersistenceUnit oUnit in oApplication.PersistenceUnits)
+        //        {
+        //            unitIndex++;
+        //            oSession = null;
+
+        //            using (var unitTrace = PerformanceTraceLogger.Start(
+        //                "VeloxapEDGErwinLib.getModelsNamePath.Unit",
+        //                "Index=" + unitIndex + "; " + DescribePersistenceUnit(oUnit)))
+        //            {
+        //                try
+        //                {
+        //                    using (var addTrace = PerformanceTraceLogger.Start(
+        //                        "VeloxapEDGErwinLib.getModelsNamePath.SessionAdd",
+        //                        "Index=" + unitIndex))
+        //                    {
+        //                        oSession = oApplication.Sessions.Add();
+        //                        addTrace.SetResult("SessionCreated=True");
+        //                    }
+
+        //                    using (var openTrace = PerformanceTraceLogger.Start(
+        //                        "VeloxapEDGErwinLib.getModelsNamePath.SessionOpen",
+        //                        "Index=" + unitIndex + "; " + DescribePersistenceUnit(oUnit)))
+        //                    {
+        //                        oSession.Open(oUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
+        //                        openTrace.SetResult("Opened=True; Level=SCD_SL_M0");
+        //                    }
+
+        //                    using (var rootTrace = PerformanceTraceLogger.Start(
+        //                        "VeloxapEDGErwinLib.getModelsNamePath.ReadRoot",
+        //                        "Index=" + unitIndex))
+        //                    {
+        //                        oRoot = oSession.ModelObjects.Root;
+        //                        rootTrace.SetResult(
+        //                            "RootName=" + CleanLogValue(SafeGetString(() => oRoot.Name)) +
+        //                            "; RootObjectId=" + CleanLogValue(SafeGetString(() => oRoot.ObjectId)));
+        //                    }
+
+        //                    pObjectId = oUnit.ObjectId;
+        //                    sTitle = oRoot.Name;
+        //                    sObjectId = oRoot.ObjectId;
+
+        //                    using (var bagTrace = PerformanceTraceLogger.Start(
+        //                        "VeloxapEDGErwinLib.getModelsNamePath.ReadPropertyBag",
+        //                        "Index=" + unitIndex + "; " + DescribePersistenceUnit(oUnit)))
+        //                    {
+        //                        oBag = oUnit.PropertyBag["Locator;Hidden_Model"];
+        //                        sLocation = oBag.Value["Locator"]; //Get the location
+        //                        if (sLocation.Length > 0)
+        //                            sTitle = sTitle + " (" + sLocation + ")";
+
+        //                        if (oBag.Value["Hidden_Model"])
+        //                            sTitle = sTitle + " [Hidden]"; //Check if the persistence unit is hidden
+
+        //                        oBag.ClearAll();
+        //                        bagTrace.SetResult(
+        //                            "HasLocation=" + !string.IsNullOrWhiteSpace(sLocation) +
+        //                            "; HiddenChecked=True");
+        //                    }
+
+        //                    oModelsName.Add((sTitle,sObjectId, pObjectId ));
+        //                    unitTrace.SetResult(
+        //                        "Added=True; Title=" + CleanLogValue(sTitle) +
+        //                        "; RootObjectId=" + CleanLogValue(sObjectId));
+        //                }
+        //                catch (Exception e)
+        //                {
+        //                    unitTrace.Fail(e);
+        //                    trace.Fail(e);
+        //                    PerformanceTraceLogger.Error(
+        //                        "VeloxapEDGErwinLib.getModelsNamePath.Unit",
+        //                        "Index=" + unitIndex + "; " + DescribePersistenceUnit(oUnit),
+        //                        e);
+
+        //                    using (var clearTrace = PerformanceTraceLogger.Start(
+        //                        "VeloxapEDGErwinLib.getModelsNamePath.SessionsClearOnError",
+        //                        "Index=" + unitIndex))
+        //                    {
+        //                        oApplication.Sessions.Clear();
+        //                        clearTrace.SetResult("Cleared=True");
+        //                    }
+
+        //                    //MessageBox.Show(e.ToString());
+        //                    // uyari
+
+        //                    return null;
+        //                }
+        //                finally
+        //                {
+        //                    using (var clearTrace = PerformanceTraceLogger.Start(
+        //                        "VeloxapEDGErwinLib.getModelsNamePath.SessionsClear",
+        //                        "Index=" + unitIndex))
+        //                    {
+        //                        try
+        //                        {
+        //                            oApplication.Sessions.Clear();
+        //                            clearTrace.SetResult("Cleared=True");
+        //                        }
+        //                        catch (Exception ex)
+        //                        {
+        //                            clearTrace.Fail(ex);
+        //                            PerformanceTraceLogger.Error(
+        //                                "VeloxapEDGErwinLib.getModelsNamePath.SessionsClear",
+        //                                "Index=" + unitIndex,
+        //                                ex);
+        //                        }
+        //                    }
+        //                }
+        //            }
+        //        }
+
+        //        trace.SetResult("ModelCount=" + oModelsName.Count);
+        //        return oModelsName;
+        //    }
+
+        //}
+
+        public List<(string, string, string)> getModelsNamePath()
         {
 
             if (oApplication == null) return null;
 
-            List<(string value,string key1, string key2 )> oModelsName = new List<(string, string,string)>();
+            List<(string value, string key1, string key2)> oModelsName = new List<(string, string, string)>();
 
             SCAPI.PropertyBag oBag;
             SCAPI.Session oSession;
@@ -122,14 +320,13 @@ namespace VeloxapEDGErwinTools.AddIn
                 catch (Exception e)
                 {
                     oApplication.Sessions.Clear();
-                    //MessageBox.Show(e.ToString());
-                    // uyari
+                    MessageBox.Show(e.ToString());
 
                     return null;
                 }
                 oApplication.Sessions.Clear();
 
-                oModelsName.Add((sTitle,sObjectId, pObjectId ));
+                oModelsName.Add((sTitle, sObjectId, pObjectId));
             }
 
             return oModelsName;
@@ -137,52 +334,59 @@ namespace VeloxapEDGErwinTools.AddIn
         }
         public ModelInfo loadModelObject(string objectId, string pobjectId)
         {
-            ModelInfo mModel = new ModelInfo();
-             
-
-            SCAPI.ModelObjects oSelectedCollection;
-            SCAPI.Session oSession;
-
-            SCAPI.PersistenceUnit oPersistenceUnit;
-            SCAPI.PersistenceUnits oPersistenceUnits;
-            SCAPI.SC_SessionLevel eLevel;
-
-
-            oPersistenceUnits = oApplication.PersistenceUnits;
-            int index = -1;
-            bool isPersistenceUnitFound = false;
-            foreach (SCAPI.PersistenceUnit oUnit in oPersistenceUnits)
+            using (var trace = PerformanceTraceLogger.Start(
+                "VeloxapEDGErwinLib.loadModelObject",
+                "ObjectId=" + CleanLogValue(objectId) +
+                "; PersistenceObjectId=" + CleanLogValue(pobjectId)))
             {
-                index++;
-                if (oUnit.ObjectId == pobjectId){
-                    isPersistenceUnitFound = true;
-                    break;
-                }
-                
-
-            } 
-            if(isPersistenceUnitFound && index >= 0)
-            { 
-
-                //
-                /*
-                 *  Filtrelerde kullanilan properitiesleri listeye ekleyerek sadece 
-                 *  onlari yukleyecegiz.
-                 *  
-                 *  
-                 *  
-                 */
-             //   eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-              //  oSession = oApplication.Sessions.Add();
-
-                oPersistenceUnit = oApplication.PersistenceUnits[index]; // combo box level
-                ModelLoad mLoad = new ModelLoad(ref oApplication);
-
-                mModel = mLoad.loadModel(oPersistenceUnit);
+                try
+                {
+                    ModelInfo mModel = new ModelInfo();
 
 
-               // oSession.Open(oPersistenceUnit, eLevel);
-               /*
+                    SCAPI.ModelObjects oSelectedCollection;
+                    SCAPI.Session oSession;
+
+                    SCAPI.PersistenceUnit oPersistenceUnit;
+                    SCAPI.PersistenceUnits oPersistenceUnits;
+                    SCAPI.SC_SessionLevel eLevel;
+
+
+                    oPersistenceUnits = oApplication.PersistenceUnits;
+                    int index = -1;
+                    bool isPersistenceUnitFound = false;
+                    foreach (SCAPI.PersistenceUnit oUnit in oPersistenceUnits)
+                    {
+                        index++;
+                        if (oUnit.ObjectId == pobjectId){
+                            isPersistenceUnitFound = true;
+                            break;
+                        }
+
+
+                    }
+                    if(isPersistenceUnitFound && index >= 0)
+                    {
+
+                        //
+                        /*
+                         *  Filtrelerde kullanilan properitiesleri listeye ekleyerek sadece
+                         *  onlari yukleyecegiz.
+                         *
+                         *
+                         *
+                         */
+                     //   eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
+                      //  oSession = oApplication.Sessions.Add();
+
+                        oPersistenceUnit = oApplication.PersistenceUnits[index]; // combo box level
+                        ModelLoad mLoad = new ModelLoad(ref oApplication);
+
+                        mModel = mLoad.loadModel(oPersistenceUnit);
+
+
+                       // oSession.Open(oPersistenceUnit, eLevel);
+                       /*
                 var objectlist = new[] { "Entity", "Relationship", "Attribute","Sequence", "Key_Group", "Key_Group_Member" };
                 oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
             
@@ -237,22 +441,53 @@ namespace VeloxapEDGErwinTools.AddIn
 
                 oApplication.Sessions.Clear();
                */
+                    }
+
+                    trace.SetResult(
+                        "PersistenceUnitFound=" + isPersistenceUnitFound +
+                        "; PersistenceUnitIndex=" + index +
+                        "; ModelLoaded=" + (mModel != null));
+                    return mModel;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error(
+                        "VeloxapEDGErwinLib.loadModelObject",
+                        "ObjectId=" + CleanLogValue(objectId) +
+                        "; PersistenceObjectId=" + CleanLogValue(pobjectId),
+                        ex);
+                    throw;
+                }
             }
-            return mModel;
         }
 
         private SCAPI.PersistenceUnit findPersistenceUnit(string pobjectId)
         {
-            if (oApplication == null || oApplication.PersistenceUnits == null)
-                return null;
-
-            foreach (SCAPI.PersistenceUnit oUnit in oApplication.PersistenceUnits)
+            using (var trace = PerformanceTraceLogger.Start(
+                "VeloxapEDGErwinLib.findPersistenceUnit",
+                "PersistenceObjectId=" + CleanLogValue(pobjectId)))
             {
-                if (oUnit.ObjectId == pobjectId)
-                    return oUnit;
-            }
+                if (oApplication == null || oApplication.PersistenceUnits == null)
+                {
+                    trace.SetResult("Found=False; Reason=ApplicationOrPersistenceUnitsNull");
+                    return null;
+                }
 
-            return null;
+                int index = -1;
+                foreach (SCAPI.PersistenceUnit oUnit in oApplication.PersistenceUnits)
+                {
+                    index++;
+                    if (oUnit.ObjectId == pobjectId)
+                    {
+                        trace.SetResult("Found=True; Index=" + index + "; " + DescribePersistenceUnit(oUnit));
+                        return oUnit;
+                    }
+                }
+
+                trace.SetResult("Found=False; CheckedCount=" + (index + 1));
+                return null;
+            }
         }
         public List<Veloxap.AddIn.Erwin.Models.ModelObject> loadSubModelObject(string objectId, SCAPI.PersistenceUnit oPersistenceUnit)
         {
@@ -589,6 +824,39 @@ namespace VeloxapEDGErwinTools.AddIn
                 //return  $"Failed to collect flags for a property of {className} class with error {ex.Message}";
             }
             return dataType;
+        }
+
+        private static string DescribePersistenceUnit(SCAPI.PersistenceUnit persistenceUnit)
+        {
+            if (persistenceUnit == null)
+                return "PersistenceUnit=<null>";
+
+            return "PersistenceUnitName=" + CleanLogValue(SafeGetString(() => persistenceUnit.Name)) +
+                   "; PersistenceUnitObjectId=" + CleanLogValue(SafeGetString(() => persistenceUnit.ObjectId));
+        }
+
+        private static string SafeGetString(Func<string> getter)
+        {
+            try
+            {
+                return getter == null
+                    ? string.Empty
+                    : getter() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                return "<error: " + CleanLogValue(ex.Message) + ">";
+            }
+        }
+
+        private static string CleanLogValue(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            return PerformanceTraceLogger.Truncate(
+                value.Replace("\r", " ").Replace("\n", " "),
+                500);
         }
     }
 }

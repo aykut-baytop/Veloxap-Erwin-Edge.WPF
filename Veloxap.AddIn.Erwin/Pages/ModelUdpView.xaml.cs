@@ -93,11 +93,28 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async void ModelUdpView_Loaded(object sender, RoutedEventArgs e)
         {
-            if (hasStartedLoading)
-                return;
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.Loaded",
+                "CanUseLazyScapi=" + CanUseLazyScapi()))
+            {
+                if (hasStartedLoading)
+                {
+                    trace.SetResult("Skipped=True; Reason=AlreadyStarted");
+                    return;
+                }
 
-            hasStartedLoading = true;
-            await ReloadRowsAsync("Tablolar yukleniyor...", false);
+                try
+                {
+                    hasStartedLoading = true;
+                    await ReloadRowsAsync("Tablolar yukleniyor...", false);
+                    trace.SetResult("ReloadCompleted=True");
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    throw;
+                }
+            }
         }
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -552,62 +569,76 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async Task LoadTableNodeAsync(UdpTreeNode node)
         {
-            if (node == null ||
-                node.IsPlaceholder ||
-                node.Row != null ||
-                node.ChildrenLoaded ||
-                node.IsLoadingChildren ||
-                !CanUseLazyScapi())
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.LoadTableNodeAsync",
+                BuildTableNodeLogDetail(node)))
             {
-                return;
-            }
+                if (node == null ||
+                    node.IsPlaceholder ||
+                    node.Row != null ||
+                    node.ChildrenLoaded ||
+                    node.IsLoadingChildren ||
+                    !CanUseLazyScapi())
+                {
+                    trace.SetResult(
+                        "Skipped=True; CanUseLazyScapi=" + CanUseLazyScapi() +
+                        "; NodeNull=" + (node == null));
+                    return;
+                }
 
-            node.SetLoadingChildren();
-            SetBusyIndicator(true);
-            SetStatus(node.TableName + " UDP detaylari yukleniyor...", false);
-            await Task.Yield();
+                node.SetLoadingChildren();
+                SetBusyIndicator(true);
+                SetStatus(node.TableName + " UDP detaylari yukleniyor...", false);
+                await Task.Yield();
 
-            try
-            {
-                ModelObject table = await RunScapiAsync(() =>
-                    new ModelLoad(application).loadTableUdpObject(
-                        persistenceUnit,
-                        node.TableObjectId,
-                        node.TableName));
+                try
+                {
+                    ModelObject table = await RunScapiAsync(
+                        "ModelUdpView.LoadTableNodeAsync.loadTableUdpObject",
+                        BuildTableNodeLogDetail(node),
+                        () => new ModelLoad(application).loadTableUdpObject(
+                            persistenceUnit,
+                            node.TableObjectId,
+                            node.TableName));
 
-                List<UdpRow> tableRows = BuildRowsForTable(table);
-                foreach (var row in tableRows)
-                    row.TableModelObject = table;
+                    List<UdpRow> tableRows = BuildRowsForTable(table);
+                    foreach (var row in tableRows)
+                        row.TableModelObject = table;
 
-                allRows.RemoveAll(row =>
-                    string.Equals(row.TableObjectId, node.TableObjectId, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(row.TableName, node.TableName, StringComparison.OrdinalIgnoreCase));
-                allRows.AddRange(tableRows);
+                    allRows.RemoveAll(row =>
+                        string.Equals(row.TableObjectId, node.TableObjectId, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(row.TableName, node.TableName, StringComparison.OrdinalIgnoreCase));
+                    allRows.AddRange(tableRows);
 
-                node.Count = tableRows.Count;
-                node.UdpNames = string.Join(
-                    ", ",
-                    tableRows
-                        .Select(row => row.DisplayUdpName)
-                        .Where(name => !string.IsNullOrWhiteSpace(name))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
-                node.Title = node.TableName + " (" + tableRows.Count + ")";
-                node.TableModelObject = table;
-                node.SetChildren(BuildUdpLeafNodes(tableRows, null));
+                    node.Count = tableRows.Count;
+                    node.UdpNames = string.Join(
+                        ", ",
+                        tableRows
+                            .Select(row => row.DisplayUdpName)
+                            .Where(name => !string.IsNullOrWhiteSpace(name))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+                    node.Title = node.TableName + " (" + tableRows.Count + ")";
+                    node.TableModelObject = table;
+                    node.SetChildren(BuildUdpLeafNodes(tableRows, null));
 
-                UpdateSummaryCounts();
-                ShowDetails(node);
-                SetStatus(node.TableName + " icin " + tableRows.Count + " UDP yuklendi.", false);
-            }
-            catch (Exception ex)
-            {
-                node.SetChildren(new List<UdpTreeNode>());
-                SetStatus(node.TableName + " UDP detaylari yuklenemedi: " + ex.Message, true);
-            }
-            finally
-            {
-                SetBusyIndicator(false);
+                    UpdateSummaryCounts();
+                    ShowDetails(node);
+                    SetStatus(node.TableName + " icin " + tableRows.Count + " UDP yuklendi.", false);
+                    trace.SetResult(
+                        "UdpRowCount=" + tableRows.Count +
+                        "; AllRowsCount=" + allRows.Count);
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    node.SetChildren(new List<UdpTreeNode>());
+                    SetStatus(node.TableName + " UDP detaylari yuklenemedi: " + ex.Message, true);
+                }
+                finally
+                {
+                    SetBusyIndicator(false);
+                }
             }
         }
 
@@ -718,95 +749,127 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async Task ReloadRowsAsync(string loadingMessage, bool preserveTreeState)
         {
-            if (searchTimer != null)
-                searchTimer.Stop();
-
-            TreeState treeState = preserveTreeState
-                ? CaptureTreeState()
-                : null;
-
-            SetLoading(true);
-            SetStatus(loadingMessage, false);
-
-            try
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.ReloadRowsAsync",
+                "LoadingMessage=" + CleanLogValue(loadingMessage) +
+                "; PreserveTreeState=" + preserveTreeState +
+                "; CanUseLazyScapi=" + CanUseLazyScapi()))
             {
-                if (CanUseLazyScapi())
-                    await ReloadTableSummariesAsync();
-                else
-                    await ReloadRowsFromModelInfoAsync(treeState, preserveTreeState);
-            }
-            catch (Exception ex)
-            {
-                allRows.Clear();
-                tableNodes.Clear();
-                tableCount = 0;
-                UpdateSummaryCounts();
-                treeUdp.ItemsSource = new List<UdpTreeNode>();
-                ShowDetails(null);
-                SetStatus("UDP listesi yuklenemedi: " + ex.Message, true);
-            }
-            finally
-            {
-                SetLoading(false);
+                if (searchTimer != null)
+                    searchTimer.Stop();
+
+                TreeState treeState = preserveTreeState
+                    ? CaptureTreeState()
+                    : null;
+
+                SetLoading(true);
+                SetStatus(loadingMessage, false);
+
+                try
+                {
+                    if (CanUseLazyScapi())
+                        await ReloadTableSummariesAsync();
+                    else
+                        await ReloadRowsFromModelInfoAsync(treeState, preserveTreeState);
+
+                    trace.SetResult(
+                        "TableCount=" + tableCount +
+                        "; AllRowsCount=" + allRows.Count);
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    allRows.Clear();
+                    tableNodes.Clear();
+                    tableCount = 0;
+                    UpdateSummaryCounts();
+                    treeUdp.ItemsSource = new List<UdpTreeNode>();
+                    ShowDetails(null);
+                    SetStatus("UDP listesi yuklenemedi: " + ex.Message, true);
+                }
+                finally
+                {
+                    SetLoading(false);
+                }
             }
         }
 
         private async Task ReloadTableSummariesAsync()
         {
-            List<ModelObject> tables = await RunScapiAsync(() =>
-                new ModelLoad(application).loadTableSummaries(persistenceUnit));
-
-            allRows.Clear();
-            tableNodes.Clear();
-
-            foreach (var table in tables
-                .Where(item => item != null)
-                .OrderBy(item => item.getoName(), StringComparer.OrdinalIgnoreCase))
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.ReloadTableSummariesAsync",
+                "CanUseLazyScapi=" + CanUseLazyScapi()))
             {
-                string tableName = Safe(table.getoName(), "(adsiz tablo)");
-                string tableObjectId = Safe(table.getoObjectId(), string.Empty);
+                List<ModelObject> tables = await RunScapiAsync(
+                    "ModelUdpView.ReloadTableSummariesAsync.loadTableSummaries",
+                    "CanUseLazyScapi=" + CanUseLazyScapi(),
+                    () => new ModelLoad(application).loadTableSummaries(persistenceUnit));
 
-                tableNodes.Add(UdpTreeNode.CreateLazyGroup(
-                    tableName,
-                    0,
-                    "Tablo",
-                    tableName,
-                    tableObjectId,
-                    string.Empty,
-                    0,
-                    BuildTableNodeKey(tableObjectId, tableName),
-                    false,
-                    false));
+                allRows.Clear();
+                tableNodes.Clear();
+
+                foreach (var table in tables
+                    .Where(item => item != null)
+                    .OrderBy(item => item.getoName(), StringComparer.OrdinalIgnoreCase))
+                {
+                    string tableName = Safe(table.getoName(), "(adsiz tablo)");
+                    string tableObjectId = Safe(table.getoObjectId(), string.Empty);
+
+                    tableNodes.Add(UdpTreeNode.CreateLazyGroup(
+                        tableName,
+                        0,
+                        "Tablo",
+                        tableName,
+                        tableObjectId,
+                        string.Empty,
+                        0,
+                        BuildTableNodeKey(tableObjectId, tableName),
+                        false,
+                        false));
+                }
+
+                tableCount = tableNodes.Count;
+                treeUdp.ItemsSource = tableNodes;
+                UpdateSummaryCounts();
+                ShowDetails(null);
+                UpdateLazyFilterStatus(tableNodes.Count, false, string.Empty);
+                trace.SetResult(
+                    "RawTableCount=" + (tables == null ? 0 : tables.Count) +
+                    "; VisibleTableCount=" + tableNodes.Count);
             }
-
-            tableCount = tableNodes.Count;
-            treeUdp.ItemsSource = tableNodes;
-            UpdateSummaryCounts();
-            ShowDetails(null);
-            UpdateLazyFilterStatus(tableNodes.Count, false, string.Empty);
         }
 
         private async Task ReloadRowsFromModelInfoAsync(
             TreeState treeState,
             bool preserveTreeState)
         {
-            if (modelInfo == null)
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.ReloadRowsFromModelInfoAsync",
+                "PreserveTreeState=" + preserveTreeState +
+                "; ModelInfoNull=" + (modelInfo == null)))
             {
+                if (modelInfo == null)
+                {
+                    allRows.Clear();
+                    tableCount = 0;
+                    UpdateSummaryCounts();
+                    ApplyFilter(treeState, preserveTreeState);
+                    trace.SetResult("Skipped=True; Reason=ModelInfoNull");
+                    return;
+                }
+
+                UdpRowsBuildResult result = await Task.Run(() => BuildRows(modelInfo));
+
                 allRows.Clear();
-                tableCount = 0;
+                allRows.AddRange(result.Rows);
+                tableCount = result.TableCount;
+
                 UpdateSummaryCounts();
                 ApplyFilter(treeState, preserveTreeState);
-                return;
+                trace.SetResult(
+                    "TableCount=" + tableCount +
+                    "; RowCount=" + allRows.Count);
             }
-
-            UdpRowsBuildResult result = await Task.Run(() => BuildRows(modelInfo));
-
-            allRows.Clear();
-            allRows.AddRange(result.Rows);
-            tableCount = result.TableCount;
-
-            UpdateSummaryCounts();
-            ApplyFilter(treeState, preserveTreeState);
         }
 
         private void UpdateSummaryCounts()
@@ -849,61 +912,90 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private static UdpRowsBuildResult BuildRows(ModelInfo modelInfo)
         {
-            var result = new UdpRowsBuildResult();
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.BuildRows",
+                "ModelInfoNull=" + (modelInfo == null)))
+            {
+                var result = new UdpRowsBuildResult();
 
-            var objects = modelInfo == null
-                ? null
-                : modelInfo.getoModelObject();
+                var objects = modelInfo == null
+                    ? null
+                    : modelInfo.getoModelObject();
 
-            if (objects == null)
+                if (objects == null)
+                {
+                    trace.SetResult("ObjectCount=0; RowCount=0; TableCount=0");
+                    return result;
+                }
+
+                foreach (var table in EnumerateTables(objects))
+                    result.Rows.AddRange(BuildRowsForTable(table));
+
+                result.TableCount = result.Rows
+                    .Select(row => row.TableName)
+                    .Where(tableName => !string.IsNullOrWhiteSpace(tableName))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+
+                result.Rows = result.Rows
+                    .OrderBy(row => row.TableName, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(row => row.UdpName, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                trace.SetResult(
+                    "RootObjectCount=" + objects.Count +
+                    "; RowCount=" + result.Rows.Count +
+                    "; TableCount=" + result.TableCount);
                 return result;
-
-            foreach (var table in EnumerateTables(objects))
-                result.Rows.AddRange(BuildRowsForTable(table));
-
-            result.TableCount = result.Rows
-                .Select(row => row.TableName)
-                .Where(tableName => !string.IsNullOrWhiteSpace(tableName))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count();
-
-            result.Rows = result.Rows
-                .OrderBy(row => row.TableName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.UdpName, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            return result;
+            }
         }
 
         private static List<UdpRow> BuildRowsForTable(ModelObject table)
         {
-            var rows = new List<UdpRow>();
-
-            if (table == null)
-                return rows;
-
-            string tableName = Safe(table.getoName(), "(adsiz tablo)");
-            var properties = table.getoObjectProperty();
-
-            if (properties == null)
-                return rows;
-
-            foreach (var property in properties)
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.BuildRowsForTable",
+                BuildModelObjectLogDetail(table)))
             {
-                if (!IsUdpProperty(property))
-                    continue;
+                var rows = new List<UdpRow>();
 
-                rows.Add(CreateUdpRow(
-                    Safe(table.getoObjectId(), string.Empty),
-                    tableName,
-                    Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
-                    Safe(property.getoPropertyValue(), string.Empty),
-                    table));
+                if (table == null)
+                {
+                    trace.SetResult("Skipped=True; RowCount=0");
+                    return rows;
+                }
+
+                string tableName = Safe(table.getoName(), "(adsiz tablo)");
+                var properties = table.getoObjectProperty();
+
+                if (properties == null)
+                {
+                    trace.SetResult("PropertyCount=0; RowCount=0");
+                    return rows;
+                }
+
+                foreach (var property in properties)
+                {
+                    if (!IsUdpProperty(property))
+                        continue;
+
+                    rows.Add(CreateUdpRow(
+                        Safe(table.getoObjectId(), string.Empty),
+                        tableName,
+                        Safe(property.getoPropertyClassName(), "(adsiz UDP)"),
+                        Safe(property.getoPropertyValue(), string.Empty),
+                        table));
+                }
+
+                List<UdpRow> orderedRows = rows
+                    .OrderBy(row => row.DisplayUdpName, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                trace.SetResult(
+                    "TableName=" + CleanLogValue(tableName) +
+                    "; PropertyCount=" + properties.Count +
+                    "; RowCount=" + orderedRows.Count);
+                return orderedRows;
             }
-
-            return rows
-                .OrderBy(row => row.DisplayUdpName, StringComparer.OrdinalIgnoreCase)
-                .ToList();
         }
 
         private static UdpRow CreateUdpRow(
@@ -1017,24 +1109,75 @@ namespace Veloxap.AddIn.Erwin.Pages
                 : value;
         }
 
-        private static Task<T> RunScapiAsync<T>(Func<T> action)
+        private static string BuildTableNodeLogDetail(UdpTreeNode node)
+        {
+            if (node == null)
+                return "TableNode=<null>";
+
+            return "TableName=" + CleanLogValue(node.TableName) +
+                   "; TableObjectId=" + CleanLogValue(node.TableObjectId) +
+                   "; ChildrenLoaded=" + node.ChildrenLoaded +
+                   "; IsLoadingChildren=" + node.IsLoadingChildren +
+                   "; IsPlaceholder=" + node.IsPlaceholder +
+                   "; HasRow=" + (node.Row != null);
+        }
+
+        private static string BuildModelObjectLogDetail(ModelObject modelObject)
+        {
+            if (modelObject == null)
+                return "ModelObject=<null>";
+
+            return "ObjectClass=" + CleanLogValue(modelObject.getoClassName()) +
+                   "; ObjectName=" + CleanLogValue(modelObject.getoName()) +
+                   "; ObjectId=" + CleanLogValue(modelObject.getoObjectId());
+        }
+
+        private static string CleanLogValue(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            return PerformanceTraceLogger.Truncate(
+                value.Replace("\r", " ").Replace("\n", " "),
+                500);
+        }
+
+        private static Task<T> RunScapiAsync<T>(
+            string operation,
+            string detail,
+            Func<T> action)
         {
             var completion = new TaskCompletionSource<T>();
             var thread = new Thread(() =>
             {
-                try
+                using (var trace = PerformanceTraceLogger.Start(
+                    "ModelUdpView.RunScapiAsync.STA",
+                    "Operation=" + CleanLogValue(operation) + "; " + CleanLogValue(detail)))
                 {
-                    completion.SetResult(action == null ? default(T) : action());
-                }
-                catch (Exception ex)
-                {
-                    completion.SetException(ex);
+                    try
+                    {
+                        T result = action == null ? default(T) : action();
+                        trace.SetResult("Completed=True; ResultNull=" + ((object)result == null));
+                        completion.SetResult(result);
+                    }
+                    catch (Exception ex)
+                    {
+                        trace.Fail(ex);
+                        completion.SetException(ex);
+                    }
                 }
             });
 
             thread.SetApartmentState(ApartmentState.STA);
             thread.IsBackground = true;
-            thread.Start();
+
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelUdpView.RunScapiAsync.ThreadStart",
+                "Operation=" + CleanLogValue(operation) + "; " + CleanLogValue(detail)))
+            {
+                thread.Start();
+                trace.SetResult("Started=True; ApartmentState=STA");
+            }
 
             return completion.Task;
         }

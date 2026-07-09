@@ -72,49 +72,83 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private bool CompareModels(bool showMessages)
         {
-            if (!ValidateModelCount(showMessages))
-                return false;
-
-            SetBusy(true);
-            SetStatus("Modeller okunuyor...", false);
-
-            try
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelComparisonView.CompareModels",
+                "ShowMessages=" + showMessages +
+                "; LeftModelIndex=" + leftModelIndex +
+                "; RightModelIndex=" + rightModelIndex))
             {
-                ResolveModelSides();
-                UpdateModelLabels();
-
-                ModelInfo leftModel = erwinLib.loadModelObjectForIntegrate(leftModelIndex);
-                ModelInfo rightModel = erwinLib.loadModelObjectForIntegrate(rightModelIndex);
-
-                if (leftModel == null || rightModel == null)
-                    throw new InvalidOperationException("Modeller okunamadi.");
-
-                diff = ModelObjectComparer.Compare(leftModel, rightModel);
-                LoadDiffTrees();
-
-                SetStatus("Karsilastirma tamamlandi.", false);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                diff = null;
-                ClearDiffTrees();
-                SetStatus("Karsilastirma hatasi: " + ex.Message, true);
-
-                if (showMessages)
+                if (!ValidateModelCount(showMessages))
                 {
-                    MessageBox.Show(
-                        "Model Karsilastirma islemi tamamlanamadi.\n\n" + ex.Message,
-                        "Model Karsilastirma",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+                    trace.SetResult("Skipped=True; Reason=InvalidModelCount");
+                    return false;
                 }
 
-                return false;
-            }
-            finally
-            {
-                SetBusy(false);
+                SetBusy(true);
+                SetStatus("Modeller okunuyor...", false);
+
+                try
+                {
+                    ResolveModelSides();
+                    UpdateModelLabels();
+
+                    ModelInfo leftModel;
+                    using (var leftTrace = PerformanceTraceLogger.Start(
+                        "ModelComparisonView.LoadLeftModel",
+                        "ModelIndex=" + leftModelIndex + "; Role=" + leftRole))
+                    {
+                        leftModel = erwinLib.loadModelObjectForIntegrate(leftModelIndex);
+                        leftTrace.SetResult("ModelLoaded=" + (leftModel != null));
+                    }
+
+                    ModelInfo rightModel;
+                    using (var rightTrace = PerformanceTraceLogger.Start(
+                        "ModelComparisonView.LoadRightModel",
+                        "ModelIndex=" + rightModelIndex + "; Role=" + rightRole))
+                    {
+                        rightModel = erwinLib.loadModelObjectForIntegrate(rightModelIndex);
+                        rightTrace.SetResult("ModelLoaded=" + (rightModel != null));
+                    }
+
+                    if (leftModel == null || rightModel == null)
+                        throw new InvalidOperationException("Modeller okunamadi.");
+
+                    using (var compareTrace = PerformanceTraceLogger.Start(
+                        "ModelComparisonView.ModelObjectComparer.Compare",
+                        "LeftRole=" + leftRole + "; RightRole=" + rightRole))
+                    {
+                        diff = ModelObjectComparer.Compare(leftModel, rightModel);
+                        compareTrace.SetResult("DiffCreated=" + (diff != null));
+                    }
+
+                    LoadDiffTrees();
+
+                    SetStatus("Karsilastirma tamamlandi.", false);
+                    trace.SetResult("Completed=True; DiffCreated=" + (diff != null));
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    diff = null;
+                    ClearDiffTrees();
+                    SetStatus("Karsilastirma hatasi: " + ex.Message, true);
+
+                    if (showMessages)
+                    {
+                        MessageBox.Show(
+                            "Model Karsilastirma islemi tamamlanamadi.\n\n" + ex.Message,
+                            "Model Karsilastirma",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+
+                    return false;
+                }
+                finally
+                {
+                    SetBusy(false);
+                }
             }
         }
 

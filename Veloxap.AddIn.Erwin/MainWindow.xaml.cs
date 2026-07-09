@@ -76,19 +76,34 @@ namespace Veloxap.AddIn.Erwin
 
         public void Init(ref SCAPI.Application app)
         {
-            oApp = app;
-            veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref app);
-            models = new List<(string value, string key1, string key2)>();
-            rules = new List<string>();
-            validationRules = new List<Rule>();
-            apiCookieContainer = new CookieContainer();
-            authTokenProvider = new AuthTokenProvider(CreatePlainHttpClient(apiCookieContainer));
-            ruleService = new RuleService(CreateAuthorizedHttpClient(authTokenProvider, apiCookieContainer));
-            isValidationActive = true;
-            isValidationOk = false;
-            if (EnsureAuthCredentialsConfigured(showMessage: true))
-                _ = InitializeAuthenticationAsync();
-            PopulateModels();
+            using (var trace = PerformanceTraceLogger.Start(
+                "Window1.Init",
+                "PerformanceLogFile=" + PerformanceTraceLogger.LogFilePath))
+            {
+                try
+                {
+                    oApp = app;
+                    veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref app);
+                    models = new List<(string value, string key1, string key2)>();
+                    rules = new List<string>();
+                    validationRules = new List<Rule>();
+                    apiCookieContainer = new CookieContainer();
+                    authTokenProvider = new AuthTokenProvider(CreatePlainHttpClient(apiCookieContainer));
+                    ruleService = new RuleService(CreateAuthorizedHttpClient(authTokenProvider, apiCookieContainer));
+                    isValidationActive = true;
+                    isValidationOk = false;
+                    if (EnsureAuthCredentialsConfigured(showMessage: true))
+                        _ = InitializeAuthenticationAsync();
+                    PopulateModels();
+
+                    trace.SetResult("Initialized=True; ModelCount=" + (models == null ? 0 : models.Count));
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    throw;
+                }
+            }
         }
 
         private async void Menu_Checked(object sender, RoutedEventArgs e)
@@ -212,18 +227,23 @@ namespace Veloxap.AddIn.Erwin
 
         public void PopulateModels()
         {
-            models = veloxapEDGErwinLib.getModelsNamePath() ?? new List<(string value, string key1, string key2)>();
+            using (var trace = PerformanceTraceLogger.Start("Window1.PopulateModels"))
+            {
+                models = veloxapEDGErwinLib.getModelsNamePath() ?? new List<(string value, string key1, string key2)>();
 
-            var modelItems = models
-                .Select(model => new ModelSelection(model.value, model.key1, model.key2))
-                .ToList();
+                var modelItems = models
+                    .Select(model => new ModelSelection(model.value, model.key1, model.key2))
+                    .ToList();
 
-            cmbMainModel.ItemsSource = modelItems;
+                cmbMainModel.ItemsSource = modelItems;
 
-            if (modelItems.Count > 0)
-                cmbMainModel.SelectedIndex = 0;
-            else
-                MainContent.Content = new ModelInfoView();
+                if (modelItems.Count > 0)
+                    cmbMainModel.SelectedIndex = 0;
+                else
+                    MainContent.Content = new ModelInfoView();
+
+                trace.SetResult("ModelCount=" + modelItems.Count);
+            }
             //comboBox1.Items.Clear();
             //models = veloxapEDGErwinLib.getModelsNamePath();
 
@@ -243,71 +263,99 @@ namespace Veloxap.AddIn.Erwin
         private async void CmbMainModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var selectedModel = cmbMainModel.SelectedItem as ModelSelection;
-            if (veloxapEDGErwinLib == null || selectedModel == null)
-                return;
-
-            selectedModelName = selectedModel.Name;
-            selectedModelLongId = selectedModel.ObjectId;
-            SetSelectedModelRuleParameters(selectedModel.Name);
-            ClearValidationRules();
-
-            LoadSelectedModelSummary(selectedModel);
-
-            if (rbModelInfo.IsChecked == true)
+            using (var trace = PerformanceTraceLogger.Start(
+                "Window1.CmbMainModel_SelectionChanged",
+                BuildSelectedModelLogDetail(selectedModel, null)))
             {
-                ShowModelInfoView(true);
-            }
-            else if (rbTableUdps.IsChecked == true)
-            {
-                ShowModelInfoView(true);
-            }
-            //else if (rbRules.IsChecked == true)
-            //{
-            //    if (!EnsureAuthCredentialsConfigured(showMessage: true))
-            //        return;
+                try
+                {
+                    if (veloxapEDGErwinLib == null || selectedModel == null)
+                    {
+                        trace.SetResult("Skipped=True; Reason=LibOrSelectionNull");
+                        return;
+                    }
 
-            //    await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-            //    MainContent.Content = new ModelValidationView(
-            //        currentModelInfo,
-            //        rules,
-            //        GetRuleService(),
-            //        selectedModelName,
-            //        selectedModelLongId,
-            //        validationRules,
-            //        true);
-            //}
-            else if (rbValidation.IsChecked == true)
-            {
-                if (!EnsureAuthCredentialsConfigured(showMessage: true))
-                    return;
+                    selectedModelName = selectedModel.Name;
+                    selectedModelLongId = selectedModel.ObjectId;
+                    SetSelectedModelRuleParameters(selectedModel.Name);
+                    ClearValidationRules();
 
-                EnsureSelectedModelLoaded(ModelLoadPurpose.Full);
-                await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-                MainContent.Content = new ModelValidationView(
-                    currentModelInfo,
-                    rules,
-                    GetRuleService(),
-                    selectedModelName,
-                    selectedModelLongId,
-                    validationRules,
-                    false,
-                    tableUdpStartupResult,
-                    isStartupTableUdpApplyRunning);
+                    LoadSelectedModelSummary(selectedModel);
+
+                    if (rbModelInfo.IsChecked == true)
+                    {
+                        ShowModelInfoView(true);
+                    }
+                    else if (rbTableUdps.IsChecked == true)
+                    {
+                        ShowModelInfoView(true);
+                    }
+                    //else if (rbRules.IsChecked == true)
+                    //{
+                    //    if (!EnsureAuthCredentialsConfigured(showMessage: true))
+                    //        return;
+
+                    //    await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+                    //    MainContent.Content = new ModelValidationView(
+                    //        currentModelInfo,
+                    //        rules,
+                    //        GetRuleService(),
+                    //        selectedModelName,
+                    //        selectedModelLongId,
+                    //        validationRules,
+                    //        true);
+                    //}
+                    else if (rbValidation.IsChecked == true)
+                    {
+                        if (!EnsureAuthCredentialsConfigured(showMessage: true))
+                        {
+                            trace.SetResult("Stopped=True; Reason=MissingAuthCredentials");
+                            return;
+                        }
+
+                        EnsureSelectedModelLoaded(ModelLoadPurpose.Full);
+                        await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+                        MainContent.Content = new ModelValidationView(
+                            currentModelInfo,
+                            rules,
+                            GetRuleService(),
+                            selectedModelName,
+                            selectedModelLongId,
+                            validationRules,
+                            false,
+                            tableUdpStartupResult,
+                            isStartupTableUdpApplyRunning);
+                    }
+
+                    trace.SetResult("Completed=True");
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    throw;
+                }
             }
         }
 
         private void ShowModelInfoView(bool showTableUdpTab)
         {
-            ModelInfo modelInfo = EnsureSelectedModelLoaded(ModelLoadPurpose.Summary);
+            using (var trace = PerformanceTraceLogger.Start(
+                "Window1.ShowModelInfoView",
+                "ShowTableUdpTab=" + showTableUdpTab))
+            {
+                ModelInfo modelInfo = EnsureSelectedModelLoaded(ModelLoadPurpose.Summary);
 
-            MainContent.Content = new ModelInfoView(
-                modelInfo,
-                oApp,
-                GetCurrentPersistenceUnit(),
-                showTableUdpTab,
-                GetCatalogOverviewRuleService(),
-                selectedModelName,
-                selectedModelLongId);
+                MainContent.Content = new ModelInfoView(
+                    modelInfo,
+                    oApp,
+                    GetCurrentPersistenceUnit(),
+                    showTableUdpTab,
+                    GetCatalogOverviewRuleService(),
+                    selectedModelName,
+                    selectedModelLongId);
+
+                trace.SetResult("ModelInfoExists=" + (modelInfo != null));
+            }
         }
 
         private ModelInfo EnsureSelectedModelLoaded(ModelLoadPurpose purpose)
@@ -316,81 +364,144 @@ namespace Veloxap.AddIn.Erwin
                 ? null
                 : cmbMainModel.SelectedItem as ModelSelection;
 
-            if (veloxapEDGErwinLib == null || selectedModel == null)
-                return currentModelInfo;
-
-            string modelKey = BuildModelKey(selectedModel);
-
-            if (purpose == ModelLoadPurpose.Summary)
+            using (var trace = PerformanceTraceLogger.Start(
+                "Window1.EnsureSelectedModelLoaded",
+                "Purpose=" + purpose + "; " + BuildSelectedModelLogDetail(selectedModel, null)))
             {
-                if (!string.Equals(loadedSummaryModelKey, modelKey, StringComparison.Ordinal))
-                    LoadSelectedModelSummary(selectedModel);
-
-                return currentModelInfo;
-            }
-
-            if (purpose == ModelLoadPurpose.TableUdpsOnly)
-            {
-                if (string.Equals(loadedDetailedModelKey, modelKey, StringComparison.Ordinal))
+                if (veloxapEDGErwinLib == null || selectedModel == null)
+                {
+                    trace.SetResult("Skipped=True; Reason=LibOrSelectionNull");
                     return currentModelInfo;
+                }
 
-                if (string.Equals(loadedTableUdpModelKey, modelKey, StringComparison.Ordinal))
+                string modelKey = BuildModelKey(selectedModel);
+
+                if (purpose == ModelLoadPurpose.Summary)
+                {
+                    if (!string.Equals(loadedSummaryModelKey, modelKey, StringComparison.Ordinal))
+                    {
+                        PerformanceTraceLogger.Info(
+                            "Window1.EnsureSelectedModelLoaded.CacheMiss",
+                            "Purpose=Summary; " + BuildSelectedModelLogDetail(selectedModel, modelKey));
+                        LoadSelectedModelSummary(selectedModel);
+                    }
+                    else
+                    {
+                        PerformanceTraceLogger.Info(
+                            "Window1.EnsureSelectedModelLoaded.CacheHit",
+                            "Purpose=Summary; " + BuildSelectedModelLogDetail(selectedModel, modelKey));
+                    }
+
+                    trace.SetResult("Purpose=Summary; CacheKey=" + CleanLogValue(modelKey));
+                    return currentModelInfo;
+                }
+
+                if (purpose == ModelLoadPurpose.TableUdpsOnly)
+                {
+                    if (string.Equals(loadedDetailedModelKey, modelKey, StringComparison.Ordinal))
+                    {
+                        trace.SetResult("Purpose=TableUdpsOnly; CacheHit=DetailedModel");
+                        return currentModelInfo;
+                    }
+
+                    if (string.Equals(loadedTableUdpModelKey, modelKey, StringComparison.Ordinal))
+                    {
+                        trace.SetResult("Purpose=TableUdpsOnly; CacheHit=TableUdpModel");
+                        return currentTableUdpModelInfo;
+                    }
+
+                    currentTableUdpModelInfo = LoadModelWithBusyCursor(
+                        "Window1.LoadSelectedModel.TableUdpsOnly",
+                        BuildSelectedModelLogDetail(selectedModel, modelKey),
+                        () => veloxapEDGErwinLib.loadTableUdpModelObject(
+                            selectedModel.ObjectId,
+                            selectedModel.PersistenceObjectId));
+                    loadedTableUdpModelKey = modelKey;
+                    trace.SetResult("Purpose=TableUdpsOnly; CacheHit=False");
                     return currentTableUdpModelInfo;
+                }
 
-                currentTableUdpModelInfo = LoadModelWithBusyCursor(() =>
-                    veloxapEDGErwinLib.loadTableUdpModelObject(
+                if (string.Equals(loadedDetailedModelKey, modelKey, StringComparison.Ordinal))
+                {
+                    trace.SetResult("Purpose=Full; CacheHit=DetailedModel");
+                    return currentModelInfo;
+                }
+
+                currentModelInfo = LoadModelWithBusyCursor(
+                    "Window1.LoadSelectedModel.Full",
+                    BuildSelectedModelLogDetail(selectedModel, modelKey),
+                    () => veloxapEDGErwinLib.loadModelObject(
                         selectedModel.ObjectId,
                         selectedModel.PersistenceObjectId));
-                loadedTableUdpModelKey = modelKey;
-                return currentTableUdpModelInfo;
-            }
-
-            if (string.Equals(loadedDetailedModelKey, modelKey, StringComparison.Ordinal))
+                loadedDetailedModelKey = modelKey;
+                loadedSummaryModelKey = modelKey;
+                trace.SetResult("Purpose=Full; CacheHit=False");
                 return currentModelInfo;
-
-            currentModelInfo = LoadModelWithBusyCursor(() =>
-                veloxapEDGErwinLib.loadModelObject(
-                    selectedModel.ObjectId,
-                    selectedModel.PersistenceObjectId));
-            loadedDetailedModelKey = modelKey;
-            loadedSummaryModelKey = modelKey;
-            return currentModelInfo;
+            }
         }
 
         private void LoadSelectedModelSummary(ModelSelection selectedModel)
         {
-            if (veloxapEDGErwinLib == null || selectedModel == null)
-                return;
+            using (var trace = PerformanceTraceLogger.Start(
+                "Window1.LoadSelectedModelSummary",
+                BuildSelectedModelLogDetail(selectedModel, null)))
+            {
+                if (veloxapEDGErwinLib == null || selectedModel == null)
+                {
+                    trace.SetResult("Skipped=True; Reason=LibOrSelectionNull");
+                    return;
+                }
 
-            string modelKey = BuildModelKey(selectedModel);
-            if (string.Equals(loadedSummaryModelKey, modelKey, StringComparison.Ordinal))
-                return;
+                string modelKey = BuildModelKey(selectedModel);
+                if (string.Equals(loadedSummaryModelKey, modelKey, StringComparison.Ordinal))
+                {
+                    trace.SetResult("CacheHit=True; ModelKey=" + CleanLogValue(modelKey));
+                    return;
+                }
 
-            currentModelInfo = LoadModelWithBusyCursor(() =>
-                veloxapEDGErwinLib.loadModelSummary(
-                    selectedModel.ObjectId,
-                    selectedModel.PersistenceObjectId));
+                currentModelInfo = LoadModelWithBusyCursor(
+                    "Window1.LoadSelectedModel.Summary",
+                    BuildSelectedModelLogDetail(selectedModel, modelKey),
+                    () => veloxapEDGErwinLib.loadModelSummary(
+                        selectedModel.ObjectId,
+                        selectedModel.PersistenceObjectId));
 
-            loadedSummaryModelKey = modelKey;
-            loadedDetailedModelKey = null;
-            loadedTableUdpModelKey = null;
-            currentTableUdpModelInfo = null;
+                loadedSummaryModelKey = modelKey;
+                loadedDetailedModelKey = null;
+                loadedTableUdpModelKey = null;
+                currentTableUdpModelInfo = null;
+                trace.SetResult("CacheHit=False; ModelKey=" + CleanLogValue(modelKey));
+            }
         }
 
-        private static ModelInfo LoadModelWithBusyCursor(Func<ModelInfo> loadModel)
+        private static ModelInfo LoadModelWithBusyCursor(
+            string operation,
+            string detail,
+            Func<ModelInfo> loadModel)
         {
-            Cursor previousCursor = Mouse.OverrideCursor;
-            Mouse.OverrideCursor = Cursors.Wait;
+            using (var trace = PerformanceTraceLogger.Start(operation, detail))
+            {
+                Cursor previousCursor = Mouse.OverrideCursor;
+                Mouse.OverrideCursor = Cursors.Wait;
 
-            try
-            {
-                return loadModel == null
-                    ? null
-                    : loadModel();
-            }
-            finally
-            {
-                Mouse.OverrideCursor = previousCursor;
+                try
+                {
+                    ModelInfo modelInfo = loadModel == null
+                        ? null
+                        : loadModel();
+
+                    trace.SetResult("ModelLoaded=" + (modelInfo != null));
+                    return modelInfo;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    throw;
+                }
+                finally
+                {
+                    Mouse.OverrideCursor = previousCursor;
+                }
             }
         }
 
@@ -402,6 +513,29 @@ namespace Veloxap.AddIn.Erwin
             return (selectedModel.ObjectId ?? string.Empty) +
                    "|" +
                    (selectedModel.PersistenceObjectId ?? string.Empty);
+        }
+
+        private static string BuildSelectedModelLogDetail(
+            ModelSelection selectedModel,
+            string modelKey)
+        {
+            if (selectedModel == null)
+                return "SelectedModel=<null>";
+
+            return "ModelName=" + CleanLogValue(selectedModel.DisplayName) +
+                   "; ObjectId=" + CleanLogValue(selectedModel.ObjectId) +
+                   "; PersistenceObjectId=" + CleanLogValue(selectedModel.PersistenceObjectId) +
+                   "; ModelKey=" + CleanLogValue(modelKey);
+        }
+
+        private static string CleanLogValue(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            return PerformanceTraceLogger.Truncate(
+                value.Replace("\r", " ").Replace("\n", " "),
+                500);
         }
 
         private async Task ApplyTableUdpsOnStartupAsync(
@@ -579,14 +713,22 @@ namespace Veloxap.AddIn.Erwin
 
         private SCAPI.PersistenceUnit GetCurrentPersistenceUnit()
         {
-            int selectedIndex = cmbMainModel == null
-                ? -1
-                : cmbMainModel.SelectedIndex;
+            using (var trace = PerformanceTraceLogger.Start("Window1.GetCurrentPersistenceUnit"))
+            {
+                int selectedIndex = cmbMainModel == null
+                    ? -1
+                    : cmbMainModel.SelectedIndex;
 
-            if (veloxapEDGErwinLib == null || selectedIndex < 0)
-                return null;
+                if (veloxapEDGErwinLib == null || selectedIndex < 0)
+                {
+                    trace.SetResult("Found=False; SelectedIndex=" + selectedIndex);
+                    return null;
+                }
 
-            return veloxapEDGErwinLib.getPersistenceUnit(selectedIndex);
+                SCAPI.PersistenceUnit unit = veloxapEDGErwinLib.getPersistenceUnit(selectedIndex);
+                trace.SetResult("Found=" + (unit != null) + "; SelectedIndex=" + selectedIndex);
+                return unit;
+            }
         }
 
         private AuthTokenProvider GetAuthTokenProvider()

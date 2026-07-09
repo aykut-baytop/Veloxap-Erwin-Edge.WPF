@@ -7,12 +7,9 @@
         xmlns:pages="clr-namespace:Veloxap.AddIn.Erwin.Pages"
         mc:Ignorable="d"
         Title="Veloxap Erwin Add-In"
-        Height="700"
-        Width="1100"
-        MinHeight="600"
-        MinWidth="950"
-        ShowInTaskbar="False"
-        WindowStartupLocation="CenterScreen">
+        Height="600"
+        Width="900"
+        >
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -148,7 +145,7 @@
                                    Foreground="White"
                                    FontSize="19"
                                    FontWeight="SemiBold"/>
-                        <TextBlock Text="Erwin Add-In v2"
+                        <TextBlock Text="Erwin Add-In v33"
                                    Foreground="{StaticResource MenuMutedForegroundBrush}"
                                    FontSize="12"
                                    Margin="0,2,0,0"/>

@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
+using Veloxap.AddIn.Erwin.Services;
 
 namespace Veloxap.AddIn.Erwin.Models
 {
     internal class ModelLoad
     {
+        private const long SlowPropertyPartThresholdMilliseconds = 100;
+
         private static readonly string[] DefaultObjectClasses =
         {
             "Entity",
@@ -36,29 +41,52 @@ namespace Veloxap.AddIn.Erwin.Models
         public List<ModelObject> loadTableSummaries(SCAPI.PersistenceUnit oPersistenceUnit)
         {
             var tables = new List<ModelObject>();
+            var stats = new ScapiLoadStats("TableSummaries");
 
-            if (oPersistenceUnit == null || oApplication == null)
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelLoad.loadTableSummaries",
+                DescribePersistenceUnit(oPersistenceUnit)))
+            {
+                if (oPersistenceUnit == null || oApplication == null)
+                {
+                    trace.SetResult("Skipped=True; Reason=PersistenceUnitOrApplicationNull");
+                    return tables;
+                }
+
+                SCAPI.Session session = null;
+
+                try
+                {
+                    session = OpenSession(oApplication, oPersistenceUnit, "ModelLoad.loadTableSummaries");
+                    SCAPI.ModelObject root = ReadRoot(session, "ModelLoad.loadTableSummaries");
+
+                    foreach (SCAPI.ModelObject entity in Collect(
+                        session,
+                        root,
+                        "Entity",
+                        "ModelLoad.loadTableSummaries",
+                        stats))
+                    {
+                        tables.Add(CreateModelObject(entity, stats));
+                    }
+
+                    trace.SetResult("TableCount=" + tables.Count + "; " + stats.ToSummary());
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error(
+                        "ModelLoad.loadTableSummaries",
+                        DescribePersistenceUnit(oPersistenceUnit),
+                        ex);
+                }
+                finally
+                {
+                    CloseSession(oApplication, session, "ModelLoad.loadTableSummaries");
+                }
+
                 return tables;
-
-            SCAPI.Session session = null;
-
-            try
-            {
-                session = oApplication.Sessions.Add();
-                session.Open(oPersistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
-
-                foreach (SCAPI.ModelObject entity in Collect(session, session.ModelObjects.Root, "Entity"))
-                    tables.Add(CreateModelObject(entity));
             }
-            catch
-            {
-            }
-            finally
-            {
-                CloseSession(oApplication, session);
-            }
-
-            return tables;
         }
 
         public ModelObject loadTableUdpObject(
@@ -66,37 +94,71 @@ namespace Veloxap.AddIn.Erwin.Models
             string tableObjectId,
             string tableName)
         {
-            if (oPersistenceUnit == null || oApplication == null)
-                return null;
+            var stats = new ScapiLoadStats("TableUdpObject");
+            string detail =
+                DescribePersistenceUnit(oPersistenceUnit) +
+                "; TableObjectId=" + CleanLogValue(tableObjectId) +
+                "; TableName=" + CleanLogValue(tableName);
 
-            SCAPI.Session session = null;
-
-            try
+            using (var trace = PerformanceTraceLogger.Start("ModelLoad.loadTableUdpObject", detail))
             {
-                session = oApplication.Sessions.Add();
-                session.Open(oPersistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
-
-                SCAPI.ModelObject entity = FindEntity(
-                    session,
-                    tableObjectId,
-                    tableName);
-
-                if (entity == null)
+                if (oPersistenceUnit == null || oApplication == null)
+                {
+                    trace.SetResult("Skipped=True; Reason=PersistenceUnitOrApplicationNull");
                     return null;
+                }
 
-                ModelObject table = CreateModelObject(entity);
-                table.setoObjectProperty(ReadObjectProperties(entity));
-                table.setoModelObjects(LoadChildObjects(session, entity, new[] { "Attribute" }, 1));
+                SCAPI.Session session = null;
 
-                return table;
-            }
-            catch
-            {
-                return null;
-            }
-            finally
-            {
-                CloseSession(oApplication, session);
+                try
+                {
+                    session = OpenSession(oApplication, oPersistenceUnit, "ModelLoad.loadTableUdpObject");
+
+                    SCAPI.ModelObject entity = FindEntity(
+                        session,
+                        tableObjectId,
+                        tableName,
+                        stats);
+
+                    if (entity == null)
+                    {
+                        trace.SetResult("EntityFound=False; " + stats.ToSummary());
+                        return null;
+                    }
+
+                    ModelObject table = CreateModelObject(entity, stats);
+                    List<ObjectProperty> properties = ReadObjectProperties(
+                        entity,
+                        "ModelLoad.loadTableUdpObject.Table",
+                        stats);
+                    List<ModelObject> children = LoadChildObjects(
+                        session,
+                        entity,
+                        new[] { "Attribute" },
+                        1,
+                        "ModelLoad.loadTableUdpObject.Attributes",
+                        stats);
+
+                    table.setoObjectProperty(properties);
+                    table.setoModelObjects(children);
+
+                    trace.SetResult(
+                        "EntityFound=True; PropertyCount=" + properties.Count +
+                        "; ChildCount=" + children.Count +
+                        "; " + stats.ToSummary());
+
+                    return table;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error("ModelLoad.loadTableUdpObject", detail, ex);
+                    return null;
+                }
+                finally
+                {
+                    CloseSession(oApplication, session, "ModelLoad.loadTableUdpObject");
+                }
             }
         }
 
@@ -120,157 +182,323 @@ namespace Veloxap.AddIn.Erwin.Models
             ModelLoadMode mode)
         {
             var model = new ModelInfo();
+            var stats = new ScapiLoadStats(mode.ToString());
 
-            if (oPersistenceUnit == null || oApplication == null)
-                return model;
-
-            SCAPI.Session session = null;
-
-            try
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelLoad.LoadModel",
+                "Mode=" + mode + "; " + DescribePersistenceUnit(oPersistenceUnit)))
             {
-                session = oApplication.Sessions.Add();
-                session.Open(oPersistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
-
-                SCAPI.ModelObject root = session.ModelObjects.Root;
-                model.setoName(oPersistenceUnit.Name);
-                model.setoObjectId(root.ObjectId);
-                model.setoLocation(ReadLocation(oPersistenceUnit));
-                model.setoObjectProperty(ReadObjectProperties(root));
-
-                if (mode == ModelLoadMode.Summary)
+                if (oPersistenceUnit == null || oApplication == null)
+                {
+                    trace.SetResult("Skipped=True; Reason=PersistenceUnitOrApplicationNull");
                     return model;
+                }
 
-                model.setoModelObject(
-                    mode == ModelLoadMode.TableUdpsOnly
-                        ? LoadTableUdpObjects(session, root)
-                        : LoadChildObjects(session, root, DefaultObjectClasses, 2));
+                SCAPI.Session session = null;
 
-                return model;
-            }
-            catch
-            {
-                return model;
-            }
-            finally
-            {
-                CloseSession(oApplication, session);
+                try
+                {
+                    session = OpenSession(oApplication, oPersistenceUnit, "ModelLoad.LoadModel." + mode);
+
+                    SCAPI.ModelObject root = ReadRoot(session, "ModelLoad.LoadModel." + mode);
+                    ReadModelHeader(model, oPersistenceUnit, root, mode);
+
+                    List<ObjectProperty> rootProperties = ReadObjectProperties(
+                        root,
+                        "ModelLoad.LoadModel.Root",
+                        stats);
+                    model.setoObjectProperty(rootProperties);
+
+                    if (mode == ModelLoadMode.Summary)
+                    {
+                        trace.SetResult(
+                            "Mode=" + mode +
+                            "; RootPropertyCount=" + rootProperties.Count +
+                            "; " + stats.ToSummary());
+                        return model;
+                    }
+
+                    List<ModelObject> objects = mode == ModelLoadMode.TableUdpsOnly
+                        ? LoadTableUdpObjects(session, root, stats)
+                        : LoadChildObjects(
+                            session,
+                            root,
+                            DefaultObjectClasses,
+                            2,
+                            "ModelLoad.LoadModel.Full",
+                            stats);
+
+                    model.setoModelObject(objects);
+
+                    trace.SetResult(
+                        "Mode=" + mode +
+                        "; RootPropertyCount=" + rootProperties.Count +
+                        "; TopLevelObjectCount=" + objects.Count +
+                        "; " + stats.ToSummary());
+
+                    return model;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error(
+                        "ModelLoad.LoadModel",
+                        "Mode=" + mode + "; " + DescribePersistenceUnit(oPersistenceUnit),
+                        ex);
+                    return model;
+                }
+                finally
+                {
+                    CloseSession(oApplication, session, "ModelLoad.LoadModel." + mode);
+                }
             }
         }
 
         private static List<ModelObject> LoadTableUdpObjects(
             SCAPI.Session session,
-            SCAPI.ModelObject root)
+            SCAPI.ModelObject root,
+            ScapiLoadStats stats)
         {
             var tables = new List<ModelObject>();
 
-            foreach (SCAPI.ModelObject entity in Collect(session, root, "Entity"))
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelLoad.LoadTableUdpObjects",
+                DescribeModelObject(root)))
             {
-                ModelObject table = CreateModelObject(entity);
-                table.setoObjectProperty(ReadObjectProperties(entity));
-                table.setoModelObjects(LoadChildObjects(session, entity, new[] { "Attribute" }, 1));
-                tables.Add(table);
-            }
+                foreach (SCAPI.ModelObject entity in Collect(
+                    session,
+                    root,
+                    "Entity",
+                    "ModelLoad.LoadTableUdpObjects",
+                    stats))
+                {
+                    ModelObject table = CreateModelObject(entity, stats);
+                    table.setoObjectProperty(ReadObjectProperties(
+                        entity,
+                        "ModelLoad.LoadTableUdpObjects.Table",
+                        stats));
+                    table.setoModelObjects(LoadChildObjects(
+                        session,
+                        entity,
+                        new[] { "Attribute" },
+                        1,
+                        "ModelLoad.LoadTableUdpObjects.Attributes",
+                        stats));
+                    tables.Add(table);
+                }
 
-            return tables;
+                trace.SetResult("TableCount=" + tables.Count + "; " + stats.ToSummary());
+                return tables;
+            }
         }
 
         private static List<ModelObject> LoadChildObjects(
             SCAPI.Session session,
             SCAPI.ModelObject parent,
             string[] allowedClasses,
-            int remainingDepth)
+            int remainingDepth,
+            string caller,
+            ScapiLoadStats stats)
         {
             var modelObjects = new List<ModelObject>();
 
-            if (session == null || parent == null || remainingDepth <= 0)
-                return modelObjects;
+            if (stats != null)
+                stats.ChildLoadCalls++;
 
-            foreach (SCAPI.ModelObject scapiObject in Collect(session, parent, null))
+            string detail =
+                "Caller=" + CleanLogValue(caller) +
+                "; RemainingDepth=" + remainingDepth +
+                "; AllowedClasses=" + CleanLogValue(FormatAllowedClasses(allowedClasses)) +
+                "; " + DescribeModelObject(parent);
+
+            using (var trace = PerformanceTraceLogger.Start("ModelLoad.LoadChildObjects", detail))
             {
-                if (!IsAllowedClass(scapiObject, allowedClasses))
-                    continue;
+                if (session == null || parent == null || remainingDepth <= 0)
+                {
+                    trace.SetResult("Skipped=True; ResultCount=0");
+                    return modelObjects;
+                }
 
-                ModelObject modelObject = CreateModelObject(scapiObject);
-                modelObject.setoObjectProperty(ReadObjectProperties(scapiObject));
-                modelObject.setoModelObjects(LoadChildObjects(
+                foreach (SCAPI.ModelObject scapiObject in Collect(
                     session,
-                    scapiObject,
-                    allowedClasses,
-                    remainingDepth - 1));
-                modelObjects.Add(modelObject);
-            }
+                    parent,
+                    null,
+                    caller,
+                    stats))
+                {
+                    if (!IsAllowedClass(scapiObject, allowedClasses))
+                        continue;
 
-            return modelObjects;
+                    ModelObject modelObject = CreateModelObject(scapiObject, stats);
+                    modelObject.setoObjectProperty(ReadObjectProperties(
+                        scapiObject,
+                        "ModelLoad.LoadChildObjects.Properties",
+                        stats));
+                    modelObject.setoModelObjects(LoadChildObjects(
+                        session,
+                        scapiObject,
+                        allowedClasses,
+                        remainingDepth - 1,
+                        "ModelLoad.LoadChildObjects.Children",
+                        stats));
+                    modelObjects.Add(modelObject);
+                }
+
+                trace.SetResult("ResultCount=" + modelObjects.Count + "; " + stats.ToSummary());
+                return modelObjects;
+            }
         }
 
         private static List<SCAPI.ModelObject> Collect(
             SCAPI.Session session,
             SCAPI.ModelObject parent,
-            string className)
+            string className,
+            string caller,
+            ScapiLoadStats stats)
         {
             var objects = new List<SCAPI.ModelObject>();
 
-            if (session == null || parent == null)
+            if (stats != null)
+                stats.CollectCalls++;
+
+            string parentObjectId = SafeGetString(() => parent.ObjectId);
+            string detail =
+                "Caller=" + CleanLogValue(caller) +
+                "; ClassName=" + CleanLogValue(className ?? "<all>") +
+                "; ParentObjectId=" + CleanLogValue(parentObjectId) +
+                "; " + DescribeModelObject(parent);
+
+            using (var trace = PerformanceTraceLogger.Start("ModelLoad.Collect", detail))
+            {
+                if (session == null || parent == null)
+                {
+                    trace.SetResult("Skipped=True; ObjectCount=0");
+                    return objects;
+                }
+
+                try
+                {
+                    SCAPI.ModelObjects selectedCollection = null;
+
+                    using (var collectTrace = PerformanceTraceLogger.Start(
+                        "SCAPI.ModelObjects.Collect",
+                        detail))
+                    {
+                        selectedCollection = session.ModelObjects.Collect(
+                            parentObjectId,
+                            className,
+                            1);
+                        collectTrace.SetResult("CollectionCreated=True");
+                    }
+
+                    using (var enumerateTrace = PerformanceTraceLogger.Start(
+                        "SCAPI.ModelObjects.Collect.Enumerate",
+                        detail))
+                    {
+                        foreach (SCAPI.ModelObject scapiObject in selectedCollection)
+                            objects.Add(scapiObject);
+
+                        enumerateTrace.SetResult("ObjectCount=" + objects.Count);
+                    }
+
+                    if (stats != null)
+                        stats.CollectedObjects += objects.Count;
+
+                    trace.SetResult("ObjectCount=" + objects.Count);
+                }
+                catch (Exception ex)
+                {
+                    if (stats != null)
+                        stats.CollectErrors++;
+
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error("ModelLoad.Collect", detail, ex);
+                }
+
                 return objects;
-
-            try
-            {
-                SCAPI.ModelObjects selectedCollection = session.ModelObjects.Collect(
-                    parent.ObjectId,
-                    className,
-                    1);
-
-                foreach (SCAPI.ModelObject scapiObject in selectedCollection)
-                    objects.Add(scapiObject);
             }
-            catch
-            {
-            }
-
-            return objects;
         }
 
         private static SCAPI.ModelObject FindEntity(
             SCAPI.Session session,
             string tableObjectId,
-            string tableName)
+            string tableName,
+            ScapiLoadStats stats)
         {
-            if (session == null)
-                return null;
+            string detail =
+                "TableObjectId=" + CleanLogValue(tableObjectId) +
+                "; TableName=" + CleanLogValue(tableName);
 
-            if (!string.IsNullOrWhiteSpace(tableObjectId))
+            using (var trace = PerformanceTraceLogger.Start("ModelLoad.FindEntity", detail))
             {
+                if (session == null)
+                {
+                    trace.SetResult("Skipped=True; Reason=SessionNull");
+                    return null;
+                }
+
+                if (!string.IsNullOrWhiteSpace(tableObjectId))
+                {
+                    using (var lookupTrace = PerformanceTraceLogger.Start(
+                        "SCAPI.ModelObjects.ItemByObjectId",
+                        detail))
+                    {
+                        try
+                        {
+                            SCAPI.ModelObject directEntity = session.ModelObjects[tableObjectId];
+                            lookupTrace.SetResult("Found=" + (directEntity != null));
+
+                            if (directEntity != null)
+                            {
+                                trace.SetResult("Found=True; FoundBy=ObjectId");
+                                return directEntity;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            lookupTrace.Fail(ex);
+                            PerformanceTraceLogger.Info(
+                                "ModelLoad.FindEntity.DirectLookupMiss",
+                                detail + "; Error=" + CleanLogValue(ex.Message));
+                        }
+                    }
+                }
+
                 try
                 {
-                    return session.ModelObjects[tableObjectId];
-                }
-                catch
-                {
-                }
-            }
+                    SCAPI.ModelObject root = ReadRoot(session, "ModelLoad.FindEntity");
 
-            try
-            {
-                foreach (SCAPI.ModelObject entity in Collect(session, session.ModelObjects.Root, "Entity"))
-                {
-                    if (!string.IsNullOrWhiteSpace(tableObjectId) &&
-                        string.Equals(entity.ObjectId, tableObjectId, StringComparison.OrdinalIgnoreCase))
+                    foreach (SCAPI.ModelObject entity in Collect(
+                        session,
+                        root,
+                        "Entity",
+                        "ModelLoad.FindEntity",
+                        stats))
                     {
-                        return entity;
-                    }
+                        if (!string.IsNullOrWhiteSpace(tableObjectId) &&
+                            string.Equals(entity.ObjectId, tableObjectId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            trace.SetResult("Found=True; FoundBy=FallbackObjectId");
+                            return entity;
+                        }
 
-                    if (!string.IsNullOrWhiteSpace(tableName) &&
-                        string.Equals(entity.Name, tableName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return entity;
+                        if (!string.IsNullOrWhiteSpace(tableName) &&
+                            string.Equals(entity.Name, tableName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            trace.SetResult("Found=True; FoundBy=Name");
+                            return entity;
+                        }
                     }
                 }
-            }
-            catch
-            {
-            }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error("ModelLoad.FindEntity", detail, ex);
+                }
 
-            return null;
+                trace.SetResult("Found=False");
+                return null;
+            }
         }
 
         private static bool IsAllowedClass(
@@ -285,89 +513,328 @@ namespace Veloxap.AddIn.Erwin.Models
                 StringComparer.OrdinalIgnoreCase);
         }
 
-        private static ModelObject CreateModelObject(SCAPI.ModelObject scapiObject)
+        private static ModelObject CreateModelObject(
+            SCAPI.ModelObject scapiObject,
+            ScapiLoadStats stats)
         {
+            var stopwatch = Stopwatch.StartNew();
             var modelObject = new ModelObject();
-
-            if (scapiObject == null)
-                return modelObject;
-
-            modelObject.setoObjectId(scapiObject.ObjectId);
-            modelObject.setoClassName(scapiObject.ClassName);
-            modelObject.setoName(scapiObject.Name);
-
-            return modelObject;
-        }
-
-        private static List<ObjectProperty> ReadObjectProperties(SCAPI.ModelObject scapiObject)
-        {
-            var properties = new List<ObjectProperty>();
-
-            if (scapiObject == null)
-                return properties;
 
             try
             {
-                foreach (SCAPI.ModelProperty scapiProperty in scapiObject.Properties)
+                if (scapiObject == null)
+                    return modelObject;
+
+                modelObject.setoObjectId(SafeGetString(() => scapiObject.ObjectId));
+                modelObject.setoClassName(SafeGetString(() => scapiObject.ClassName));
+                modelObject.setoName(SafeGetString(() => scapiObject.Name));
+
+                if (stats != null)
+                    stats.ModelObjectsCreated++;
+
+                return modelObject;
+            }
+            finally
+            {
+                stopwatch.Stop();
+
+                if (stopwatch.ElapsedMilliseconds >= SlowPropertyPartThresholdMilliseconds)
                 {
-                    try
-                    {
-                        var property = new ObjectProperty();
-                        property.setoPropertyClassID(scapiProperty.ClassId);
-                        property.setoPropertyClassName(scapiProperty.ClassName);
-                        property.setoPropertyType(PropertyDataType(scapiProperty));
-                        property.setoPropertyValue(RetrieveValue(scapiProperty));
-                        property.setoPropertyFormatAsString(scapiProperty.FormatAsString());
-                        properties.Add(property);
-                    }
-                    catch
-                    {
-                    }
+                    PerformanceTraceLogger.Info(
+                        "ModelLoad.CreateModelObject.Slow",
+                        FormatElapsed(stopwatch.Elapsed) + "; " + DescribeModelObject(modelObject));
                 }
             }
-            catch
-            {
-            }
+        }
 
-            return properties;
+        private static List<ObjectProperty> ReadObjectProperties(
+            SCAPI.ModelObject scapiObject,
+            string caller,
+            ScapiLoadStats stats)
+        {
+            var properties = new List<ObjectProperty>();
+            string objectDetail =
+                "Caller=" + CleanLogValue(caller) +
+                "; " + DescribeModelObject(scapiObject);
+
+            using (var trace = PerformanceTraceLogger.Start("ModelLoad.ReadObjectProperties", objectDetail))
+            {
+                if (scapiObject == null)
+                {
+                    trace.SetResult("Skipped=True; PropertyCount=0");
+                    return properties;
+                }
+
+                int propertyErrors = 0;
+
+                if (stats != null)
+                    stats.ObjectsWithProperties++;
+
+                try
+                {
+                    foreach (SCAPI.ModelProperty scapiProperty in scapiObject.Properties)
+                    {
+                        string propertyDetail =
+                            objectDetail +
+                            "; PropertyClassName=" + CleanLogValue(SafeGetString(() => scapiProperty.ClassName));
+                        var propertyStopwatch = Stopwatch.StartNew();
+
+                        try
+                        {
+                            var property = new ObjectProperty();
+                            property.setoPropertyClassID(MeasureSlow(
+                                "SCAPI.ModelProperty.ClassId",
+                                propertyDetail,
+                                () => scapiProperty.ClassId));
+                            property.setoPropertyClassName(MeasureSlow(
+                                "SCAPI.ModelProperty.ClassName",
+                                propertyDetail,
+                                () => scapiProperty.ClassName));
+                            property.setoPropertyType(MeasureSlow(
+                                "ModelLoad.PropertyDataType",
+                                propertyDetail,
+                                () => PropertyDataType(scapiProperty)));
+                            property.setoPropertyValue(MeasureSlow(
+                                "ModelLoad.RetrieveValue",
+                                propertyDetail,
+                                () => RetrieveValue(scapiProperty)));
+                            property.setoPropertyFormatAsString(MeasureSlow(
+                                "SCAPI.ModelProperty.FormatAsString",
+                                propertyDetail,
+                                () => scapiProperty.FormatAsString()));
+                            properties.Add(property);
+
+                            if (stats != null)
+                                stats.PropertiesRead++;
+                        }
+                        catch (Exception ex)
+                        {
+                            propertyErrors++;
+
+                            if (stats != null)
+                                stats.PropertyReadErrors++;
+
+                            PerformanceTraceLogger.Error(
+                                "ModelLoad.ReadObjectProperties.PropertyError",
+                                propertyDetail,
+                                ex);
+                        }
+                        finally
+                        {
+                            propertyStopwatch.Stop();
+
+                            if (propertyStopwatch.ElapsedMilliseconds >= SlowPropertyPartThresholdMilliseconds)
+                            {
+                                PerformanceTraceLogger.Info(
+                                    "ModelLoad.ReadObjectProperties.PropertySlow",
+                                    FormatElapsed(propertyStopwatch.Elapsed) + "; " + propertyDetail);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error("ModelLoad.ReadObjectProperties", objectDetail, ex);
+                }
+
+                trace.SetResult(
+                    "PropertyCount=" + properties.Count +
+                    "; PropertyErrors=" + propertyErrors);
+                return properties;
+            }
         }
 
         private static string ReadLocation(SCAPI.PersistenceUnit persistenceUnit)
         {
-            try
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelLoad.ReadLocation",
+                DescribePersistenceUnit(persistenceUnit)))
             {
-                return persistenceUnit.PropertyBag["Locator"].Value["Locator"];
+                try
+                {
+                    string location = persistenceUnit.PropertyBag["Locator"].Value["Locator"];
+                    trace.SetResult("HasLocation=" + !string.IsNullOrWhiteSpace(location));
+                    return location;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    PerformanceTraceLogger.Error(
+                        "ModelLoad.ReadLocation",
+                        DescribePersistenceUnit(persistenceUnit),
+                        ex);
+                    return string.Empty;
+                }
             }
-            catch
+        }
+
+        private static SCAPI.Session OpenSession(
+            SCAPI.Application application,
+            SCAPI.PersistenceUnit persistenceUnit,
+            string caller)
+        {
+            SCAPI.Session session = null;
+            string detail =
+                "Caller=" + CleanLogValue(caller) +
+                "; " + DescribePersistenceUnit(persistenceUnit);
+
+            using (var addTrace = PerformanceTraceLogger.Start("SCAPI.Sessions.Add", detail))
             {
-                return string.Empty;
+                try
+                {
+                    session = application.Sessions.Add();
+                    addTrace.SetResult("SessionCreated=True");
+                }
+                catch (Exception ex)
+                {
+                    addTrace.Fail(ex);
+                    throw;
+                }
+            }
+
+            using (var openTrace = PerformanceTraceLogger.Start("SCAPI.Session.Open", detail))
+            {
+                try
+                {
+                    session.Open(persistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
+                    openTrace.SetResult("Opened=True; Level=SCD_SL_M0");
+                }
+                catch (Exception ex)
+                {
+                    openTrace.Fail(ex);
+                    throw;
+                }
+            }
+
+            return session;
+        }
+
+        private static SCAPI.ModelObject ReadRoot(
+            SCAPI.Session session,
+            string caller)
+        {
+            using (var trace = PerformanceTraceLogger.Start(
+                "SCAPI.ModelObjects.Root",
+                "Caller=" + CleanLogValue(caller)))
+            {
+                try
+                {
+                    SCAPI.ModelObject root = session == null
+                        ? null
+                        : session.ModelObjects.Root;
+
+                    trace.SetResult(DescribeModelObject(root));
+                    return root;
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    throw;
+                }
+            }
+        }
+
+        private static void ReadModelHeader(
+            ModelInfo model,
+            SCAPI.PersistenceUnit persistenceUnit,
+            SCAPI.ModelObject root,
+            ModelLoadMode mode)
+        {
+            using (var trace = PerformanceTraceLogger.Start(
+                "ModelLoad.ReadModelHeader",
+                "Mode=" + mode + "; " + DescribePersistenceUnit(persistenceUnit)))
+            {
+                try
+                {
+                    model.setoName(SafeGetString(() => persistenceUnit.Name));
+                    model.setoObjectId(SafeGetString(() => root.ObjectId));
+                    model.setoLocation(ReadLocation(persistenceUnit));
+                    trace.SetResult(
+                        "ModelName=" + CleanLogValue(model.getoName()) +
+                        "; RootObjectId=" + CleanLogValue(model.getoObjectId()));
+                }
+                catch (Exception ex)
+                {
+                    trace.Fail(ex);
+                    throw;
+                }
             }
         }
 
         private static void CloseSession(
             SCAPI.Application application,
-            SCAPI.Session session)
+            SCAPI.Session session,
+            string caller)
         {
+            string detail = "Caller=" + CleanLogValue(caller);
+
             if (session == null)
                 return;
 
-            try
+            using (var closeTrace = PerformanceTraceLogger.Start("SCAPI.Session.Close", detail))
             {
-                session.Close();
-            }
-            catch
-            {
+                try
+                {
+                    session.Close();
+                    closeTrace.SetResult("Closed=True");
+                }
+                catch (Exception ex)
+                {
+                    closeTrace.Fail(ex);
+                    PerformanceTraceLogger.Error("SCAPI.Session.Close", detail, ex);
+                }
             }
 
             if (application == null)
                 return;
 
+            using (var removeTrace = PerformanceTraceLogger.Start("SCAPI.Sessions.Remove", detail))
+            {
+                try
+                {
+                    application.Sessions.Remove(session);
+                    removeTrace.SetResult("Removed=True");
+                }
+                catch (Exception ex)
+                {
+                    removeTrace.Fail(ex);
+                    PerformanceTraceLogger.Error("SCAPI.Sessions.Remove", detail, ex);
+                }
+            }
+        }
+
+        private static T MeasureSlow<T>(
+            string operation,
+            string detail,
+            Func<T> action)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
             try
             {
-                application.Sessions.Remove(session);
+                return action == null ? default(T) : action();
             }
-            catch
+            catch (Exception ex)
             {
+                stopwatch.Stop();
+                PerformanceTraceLogger.Error(
+                    operation,
+                    FormatElapsed(stopwatch.Elapsed) + "; " + detail,
+                    ex);
+                throw;
+            }
+            finally
+            {
+                if (stopwatch.IsRunning)
+                    stopwatch.Stop();
+
+                if (stopwatch.ElapsedMilliseconds >= SlowPropertyPartThresholdMilliseconds)
+                {
+                    PerformanceTraceLogger.Info(
+                        operation + ".Slow",
+                        FormatElapsed(stopwatch.Elapsed) + "; " + detail);
+                }
             }
         }
 
@@ -466,6 +933,110 @@ namespace Veloxap.AddIn.Erwin.Models
             catch
             {
                 return string.Empty;
+            }
+        }
+
+        private static string DescribePersistenceUnit(SCAPI.PersistenceUnit persistenceUnit)
+        {
+            if (persistenceUnit == null)
+                return "PersistenceUnit=<null>";
+
+            return "PersistenceUnitName=" + CleanLogValue(SafeGetString(() => persistenceUnit.Name)) +
+                   "; PersistenceUnitObjectId=" + CleanLogValue(SafeGetString(() => persistenceUnit.ObjectId));
+        }
+
+        private static string DescribeModelObject(SCAPI.ModelObject modelObject)
+        {
+            if (modelObject == null)
+                return "ModelObject=<null>";
+
+            return "ObjectClass=" + CleanLogValue(SafeGetString(() => modelObject.ClassName)) +
+                   "; ObjectName=" + CleanLogValue(SafeGetString(() => modelObject.Name)) +
+                   "; ObjectId=" + CleanLogValue(SafeGetString(() => modelObject.ObjectId));
+        }
+
+        private static string DescribeModelObject(ModelObject modelObject)
+        {
+            if (modelObject == null)
+                return "ModelObject=<null>";
+
+            return "ObjectClass=" + CleanLogValue(modelObject.getoClassName()) +
+                   "; ObjectName=" + CleanLogValue(modelObject.getoName()) +
+                   "; ObjectId=" + CleanLogValue(modelObject.getoObjectId());
+        }
+
+        private static string FormatAllowedClasses(string[] allowedClasses)
+        {
+            return allowedClasses == null
+                ? "<null>"
+                : string.Join(",", allowedClasses);
+        }
+
+        private static string FormatElapsed(TimeSpan elapsed)
+        {
+            return "ElapsedMs=" + elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private static string SafeGetString(Func<string> getter)
+        {
+            try
+            {
+                return getter == null
+                    ? string.Empty
+                    : getter() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                return "<error: " + CleanLogValue(ex.Message) + ">";
+            }
+        }
+
+        private static string CleanLogValue(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            return PerformanceTraceLogger.Truncate(
+                value.Replace("\r", " ").Replace("\n", " "),
+                500);
+        }
+
+        private sealed class ScapiLoadStats
+        {
+            private readonly string loadKind;
+
+            public ScapiLoadStats(string loadKind)
+            {
+                this.loadKind = loadKind;
+            }
+
+            public int ChildLoadCalls { get; set; }
+
+            public int CollectCalls { get; set; }
+
+            public int CollectErrors { get; set; }
+
+            public int CollectedObjects { get; set; }
+
+            public int ModelObjectsCreated { get; set; }
+
+            public int ObjectsWithProperties { get; set; }
+
+            public int PropertiesRead { get; set; }
+
+            public int PropertyReadErrors { get; set; }
+
+            public string ToSummary()
+            {
+                return "LoadKind=" + loadKind +
+                       "; ChildLoadCalls=" + ChildLoadCalls +
+                       "; CollectCalls=" + CollectCalls +
+                       "; CollectErrors=" + CollectErrors +
+                       "; CollectedObjects=" + CollectedObjects +
+                       "; ModelObjectsCreated=" + ModelObjectsCreated +
+                       "; ObjectsWithProperties=" + ObjectsWithProperties +
+                       "; PropertiesRead=" + PropertiesRead +
+                       "; PropertyReadErrors=" + PropertyReadErrors;
             }
         }
 
