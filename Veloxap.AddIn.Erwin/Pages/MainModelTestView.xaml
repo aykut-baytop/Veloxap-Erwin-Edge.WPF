@@ -44,7 +44,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="Test Ekrani"
+            <TextBlock Text=""
                        Style="{StaticResource HeaderTextStyle}"/>
         </StackPanel>
 
@@ -87,7 +87,7 @@
                               Background="White"
                               BorderBrush="#E5E7EB"
                               BorderThickness="1"
-                              RowHeaderWidth="0" Margin="0,0,0,10" Grid.RowSpan="5" SelectionChanged="dgObjectDetails_SelectionChanged">
+                              RowHeaderWidth="0" Margin="0,0,0,10" Grid.RowSpan="5">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Property"
                                                 Binding="{Binding PropertyName}"

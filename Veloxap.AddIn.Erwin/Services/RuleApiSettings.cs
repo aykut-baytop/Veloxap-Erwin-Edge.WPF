@@ -19,7 +19,6 @@ namespace Veloxap.AddIn.Erwin.Services
         private const string ApprovalStatusByCatalogUrlKey = "ApprovalStatusByCatalogUrl";
         private const string MartCatalogsUrlKey = "MartCatalogsUrl";
         private const string MartCatalogVersionsUrlKey = "MartCatalogVersionsUrl";
-        private const string EnableModelComparisonKey = "EnableModelComparison";
 
         public static string GetApiBaseUrl()
         {
@@ -125,19 +124,8 @@ namespace Veloxap.AddIn.Erwin.Services
                 CatalogUnlockUrlKey,
                 ApprovalStatusByCatalogUrlKey,
                 MartCatalogsUrlKey,
-                MartCatalogVersionsUrlKey,
-                EnableModelComparisonKey
+                MartCatalogVersionsUrlKey
             };
-        }
-
-        public static bool IsModelComparisonEnabled()
-        {
-            string configured = GetOptionalSetting(EnableModelComparisonKey);
-            bool parsed;
-            if (bool.TryParse(configured, out parsed))
-                return parsed;
-
-            return false;
         }
 
         private static string GetServiceUrl(string key)

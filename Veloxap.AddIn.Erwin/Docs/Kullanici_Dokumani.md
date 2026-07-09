@@ -6,7 +6,7 @@ Veloxap Add-In — Kullanıcı Dokümanı (Basit)
 
 **Hızlı Başlangıç**
 - Uygulamayı çalıştırın (masaüstü kısayolu veya uygulama menüsünden).
-- Ana pencere açıldığında üst menüden gerekli işlemi seçin: Model Yükle, Doğrula, Karşılaştır vb.
+- Ana pencere açıldığında üst menüden gerekli işlemi seçin: Model Yükle, Doğrula vb.
 
 **1. Model Yükleme**
 - Menü: "Model Yükle" veya "Aç" seçeneğini tıklayın.
@@ -24,24 +24,19 @@ Kullanıcı adımları:
 İpuçları:
 - Doğrulama tamamlanmazsa modeli tekrar yükleyin veya uygulamayı yeniden başlatın.
 
-**3. Model Karşılaştırma**
-- İki farklı modeli karşılaştırmak için "Karşılaştır" ya da "Compare Models" ekranını açın.
-- Karşılaştırma için sol ve sağ model dosyalarını seçin, ardından "Başlat" tuşuna basın.
-- Farklılıklar özet ve detay görünümünde gösterilir.
-
-**4. Kurallar / Doğrulama Kuralları**
+**3. Kurallar / Doğrulama Kuralları**
 - "Validation Rules" bölümünden tanımlı kuralları görüntüleyebilir, ihtiyaç varsa etkin/devre dışı bırakabilirsiniz.
 - Kurallar uygulandığında hangi öğelerin etkilendiği sonuç listesinde belirtilir.
 
-**5. Ayarlar (Settings)**
+**4. Ayarlar (Settings)**
 - Uygulama menüsünden "Ayarlar"i açarak tercihleri değiştirin (ör. zaman aşımı, kayıt seviyesi).
 - Değişiklikten sonra uygulamayı yeniden başlatmak bazı ayarların etkin olması için gerekebilir.
 
-**6. UDP / Canlı Veri Görünümleri**
+**5. UDP / Canlı Veri Görünümleri**
 - Uygulama UDP dinleyici veya canlı veri penceresi sunuyorsa, ilgili ekranı açıp "Dinle"/"Başlat" tuşuna basın.
 - Gelen mesajlar listede görünür; gereksinime göre filtreleyin veya kaydedin.
 
-**7. İzleme ve Loglar**
+**6. İzleme ve Loglar**
 - Uygulama çalışırken oluşan izleme bilgileri (log) hata çözümlemede yardımcı olur.
 - Destek istendiğinde log dosyalarını paylaşın. Logların konumu uygulama yapılandırmasına göre değişir (ör. uygulama klasöründeki "Logs").
 

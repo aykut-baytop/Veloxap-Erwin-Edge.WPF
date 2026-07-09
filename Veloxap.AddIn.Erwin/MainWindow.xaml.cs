@@ -64,15 +64,6 @@ namespace Veloxap.AddIn.Erwin
         {
             InitializeComponent();
             rbModelInfo.Checked += Menu_Checked;
-            if (RuleApiSettings.IsModelComparisonEnabled())
-            {
-                rbCompare.Checked += Menu_Checked;
-                rbCompare.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                rbCompare.Visibility = Visibility.Collapsed;
-            }
             rbTableUdps.Checked += Menu_Checked;
             rbValidation.Checked += Menu_Checked;
             rbTest.Checked += Menu_Checked;
@@ -105,14 +96,6 @@ namespace Veloxap.AddIn.Erwin
             if (sender == rbModelInfo)
             {
                 ShowModelInfoView(true);
-            }
-
-            else if (sender == rbCompare)
-            {
-                MainContent.Content = new ModelComparisonView(
-                    veloxapEDGErwinLib,
-                    oApp,
-                    models);
             }
 
             else if (sender == rbTableUdps)
@@ -171,7 +154,6 @@ namespace Veloxap.AddIn.Erwin
         private void ClearMenuSelection()
         {
             rbModelInfo.IsChecked = false;
-            rbCompare.IsChecked = false;
             rbTableUdps.IsChecked = false;
             rbValidation.IsChecked = false;
             rbTest.IsChecked = false;
@@ -204,10 +186,10 @@ namespace Veloxap.AddIn.Erwin
             return false;
         }
 
-        private void ModelInfo_Checked(object sender, RoutedEventArgs e)
-        {
-            ShowModelInfoView(true);
-        }
+        //private void ModelInfo_Checked(object sender, RoutedEventArgs e)
+        //{
+        //    ShowModelInfoView(true);
+        //}
 
         //private void ModelValidation_Checked(object sender, RoutedEventArgs e)
         //{

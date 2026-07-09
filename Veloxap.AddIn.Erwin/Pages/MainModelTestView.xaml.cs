@@ -139,8 +139,17 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
             }
 
-            
-            List<ObjectPropertyDetail> details = LoadNodeDetails(node);
+
+            List<ObjectPropertyDetail> details = LoadNodeDetails(node)
+                            .Where(n =>
+                    n.PropertyName.Trim().StartsWith("Entity.Physical")
+            //n.PropertyName.Equals("Entity.Physical.Veri_Degeri") ||
+            //n.PropertyName.Equals("Entity.Physical.Is_Sureci")
+            ).ToList();
+
+
+            //MessageBox.Show(details.FirstOrDefault().PropertyName + "  -  " + details.LastOrDefault().PropertyName);
+
             dgObjectDetails.ItemsSource = details;
         }
 
@@ -247,11 +256,6 @@ namespace Veloxap.AddIn.Erwin.Pages
             public string Format { get; private set; }
 
             public string Value { get; private set; }
-        }
-
-        private void dgObjectDetails_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-
         }
     }
 }

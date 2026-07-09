@@ -69,7 +69,6 @@
     <Compile Include="Models\ModelObject.cs" />
     <Compile Include="Models\MainModelSelectionInfo.cs" />
     <Compile Include="Models\ObjectProperty.cs" />
-    <Compile Include="Models\Integrate\ModelObjectComparer.cs" />
     <Compile Include="Models\Rule.cs" />
     <Compile Include="Models\RuleDependencyExtractor.cs" />
     <Compile Include="Models\RulesResponse.cs" />
@@ -79,9 +78,6 @@
     </Compile>
     <Compile Include="Pages\MainModelTestView.xaml.cs">
       <DependentUpon>MainModelTestView.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Pages\ModelComparisonView.xaml.cs">
-      <DependentUpon>ModelComparisonView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Pages\ModelUdpView.xaml.cs">
       <DependentUpon>ModelUdpView.xaml</DependentUpon>
@@ -99,7 +95,6 @@
     <Compile Include="Services\AuthTokenProvider.cs" />
     <Compile Include="Services\BearerTokenHandler.cs" />
     <Compile Include="Services\CryptoHelper.cs" />
-    <Compile Include="Services\ModelDiffApplyService.cs" />
     <Compile Include="Services\RuleApiSettings.cs" />
     <Compile Include="Services\RuleService.cs" />
     <Compile Include="Services\TableUdpSecurityService.cs" />
@@ -112,10 +107,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Pages\MainModelTestView.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Pages\ModelComparisonView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
