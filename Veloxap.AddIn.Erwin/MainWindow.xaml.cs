@@ -71,7 +71,7 @@ namespace Veloxap.AddIn.Erwin
             //rbRules.Visibility = Visibility.Collapsed;
             cmbMainModel.SelectionChanged += CmbMainModel_SelectionChanged;
 
-            MainContent.Content = new ModelInfoView();
+            MainContent.Content = new MainModelTestView();
         }
 
         public void Init(ref SCAPI.Application app)
@@ -105,21 +105,7 @@ namespace Veloxap.AddIn.Erwin
 
             else if (sender == rbValidation)
             {
-                if (!EnsureAuthCredentialsConfigured(showMessage: true))
-                    return;
-
-                EnsureSelectedModelLoaded(ModelLoadPurpose.Full);
-                await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-                MainContent.Content = new ModelValidationView(
-                    currentModelInfo,
-                    rules,
-                    GetRuleService(),
-                    selectedModelName,
-                    selectedModelLongId,
-                    validationRules,
-                    false,
-                    tableUdpStartupResult,
-                    isStartupTableUdpApplyRunning);
+                await ShowModelValidationViewAsync();
             }
 
             else if (sender == rbTest)
@@ -222,7 +208,7 @@ namespace Veloxap.AddIn.Erwin
             else
             {
                 UpdateSelectedMainModelInfo(null);
-                MainContent.Content = new ModelInfoView();
+                MainContent.Content = new MainModelTestView();
             }
             //comboBox1.Items.Clear();
             //models = veloxapEDGErwinLib.getModelsNamePath();
@@ -289,21 +275,13 @@ namespace Veloxap.AddIn.Erwin
             //}
             else if (rbValidation.IsChecked == true)
             {
-                if (!EnsureAuthCredentialsConfigured(showMessage: true))
-                    return;
-
-                EnsureSelectedModelLoaded(ModelLoadPurpose.Full);
-                await LoadValidationRulesForSelectedModelAsync(showErrors: true);
-                MainContent.Content = new ModelValidationView(
-                    currentModelInfo,
-                    rules,
-                    GetRuleService(),
-                    selectedModelName,
-                    selectedModelLongId,
-                    validationRules,
-                    false,
-                    tableUdpStartupResult,
-                    isStartupTableUdpApplyRunning);
+                await ShowModelValidationViewAsync();
+            }
+            else if (rbTest.IsChecked == true)
+            {
+                var currentTestView = MainContent.Content as MainModelTestView;
+                if (currentTestView == null || !currentTestView.IsBoundToOwner)
+                    ShowMainModelTestView();
             }
         }
 
@@ -319,6 +297,32 @@ namespace Veloxap.AddIn.Erwin
                 GetCatalogOverviewRuleService(),
                 selectedModelName,
                 selectedModelLongId);
+        }
+
+        private async Task ShowModelValidationViewAsync()
+        {
+            if (!EnsureAuthCredentialsConfigured(showMessage: true))
+                return;
+
+            ModelInfo modelInfo = EnsureSelectedModelLoaded(ModelLoadPurpose.Summary);
+            var validationView = new ModelValidationView(
+                modelInfo,
+                rules,
+                GetRuleService(),
+                selectedModelName,
+                selectedModelLongId,
+                validationRules,
+                false,
+                tableUdpStartupResult,
+                isStartupTableUdpApplyRunning,
+                () => EnsureSelectedModelLoaded(ModelLoadPurpose.Full));
+
+            MainContent.Content = validationView;
+
+            await LoadValidationRulesForSelectedModelAsync(showErrors: true);
+
+            if (ReferenceEquals(MainContent.Content, validationView))
+                validationView.SetValidationRules(rules, validationRules);
         }
 
         private void UpdateSelectedMainModelInfo(ModelSelection selectedModel)

@@ -15,19 +15,22 @@ namespace Veloxap.AddIn.Erwin.Pages
 {
     public partial class ModelValidationView : UserControl
     {
-        private readonly ModelInfo modelInfo;
-        private readonly List<string> validationRules;
-        private readonly List<Rule> validationRuleItems;
+        private ModelInfo modelInfo;
+        private List<string> validationRules;
+        private List<Rule> validationRuleItems;
         private readonly RuleService ruleService;
         private readonly string catalogName;
         private readonly string catalogLongId;
+        private readonly Func<ModelInfo> fullModelLoader;
         private string currentAlterDdl;
         private TableUdpStartupApplyResult tableUdpStartupResult;
         private bool isInitializing;
         private bool isUpdatingTargetVersion;
         private bool isValidationOk;
+        private bool isValidationRunning;
         private bool isSendingApproval;
         private bool isTableUdpStartupRunning;
+        private bool hasLoadedFullModel;
 
         public ModelValidationView()
             : this(null, null, null, null, null)
@@ -85,6 +88,31 @@ namespace Veloxap.AddIn.Erwin.Pages
             bool showRulesTab,
             TableUdpStartupApplyResult tableUdpStartupResult,
             bool isTableUdpStartupRunning)
+            : this(
+                modelInfo,
+                validationRules,
+                ruleService,
+                catalogName,
+                catalogLongId,
+                validationRuleItems,
+                showRulesTab,
+                tableUdpStartupResult,
+                isTableUdpStartupRunning,
+                null)
+        {
+        }
+
+        internal ModelValidationView(
+            ModelInfo modelInfo,
+            IEnumerable<string> validationRules,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId,
+            IEnumerable<Rule> validationRuleItems,
+            bool showRulesTab,
+            TableUdpStartupApplyResult tableUdpStartupResult,
+            bool isTableUdpStartupRunning,
+            Func<ModelInfo> fullModelLoader)
         {
             InitializeComponent();
 
@@ -96,8 +124,10 @@ namespace Veloxap.AddIn.Erwin.Pages
             this.ruleService = ruleService;
             this.catalogName = catalogName;
             this.catalogLongId = catalogLongId;
+            this.fullModelLoader = fullModelLoader;
             this.tableUdpStartupResult = tableUdpStartupResult;
             this.isTableUdpStartupRunning = isTableUdpStartupRunning;
+            hasLoadedFullModel = fullModelLoader == null || HasModelObjects(modelInfo);
 
             LoadValidationRulesTab();
             //UpdateTableUdpStartupResultPanel();
@@ -115,6 +145,19 @@ namespace Veloxap.AddIn.Erwin.Pages
             tableUdpStartupResult = result;
             isTableUdpStartupRunning = isRunning;
             //UpdateTableUdpStartupResultPanel();
+        }
+
+        internal void SetValidationRules(
+            IEnumerable<string> validationRules,
+            IEnumerable<Rule> validationRuleItems)
+        {
+            this.validationRules = validationRules?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
+                ?? new List<string>();
+            this.validationRuleItems = validationRuleItems?.Where(rule => rule != null).ToList()
+                ?? new List<Rule>();
+
+            LoadValidationRulesTab();
+            ResetValidationState("Validasyon bekleniyor.");
         }
 
         private void LoadValidationRulesTab()
@@ -155,9 +198,9 @@ namespace Veloxap.AddIn.Erwin.Pages
            await RefreshAlterDdlPreviewAsync();
         }
 
-        private void BtnRunValidation_Click(object sender, RoutedEventArgs e)
+        private async void BtnRunValidation_Click(object sender, RoutedEventArgs e)
         {
-            RunValidation();
+            await RunValidationAsync();
         }
 
         private async void BtnSendApproval_Click(object sender, RoutedEventArgs e)
@@ -207,6 +250,9 @@ namespace Veloxap.AddIn.Erwin.Pages
                 SetStatus("Onaya gondermek icin cName veya cLongId okunamadi.");
                 return;
             }
+
+            if (!await EnsureFullModelLoadedAsync())
+                return;
 
             string description = PromptForValidationDescription();
             if (description == null)
@@ -416,28 +462,38 @@ namespace Veloxap.AddIn.Erwin.Pages
                 : null;
         }
 
-        private void RunValidation()
+        private async Task RunValidationAsync()
         {
-            if (modelInfo == null)
-            {
-                ResetValidationState("Secili model bulunamadi.");
-                txtValidationResults.Text = "Validasyon calistirmak icin once bir model secilmeli.";
+            if (isValidationRunning)
                 return;
-            }
-
-            var rules = GetValidationRules().ToList();
-            if (rules.Count == 0)
-            {
-                ResetValidationState("Validasyon kurali bulunamadi.");
-                txtValidationResults.Text =
-                    "Kural listesi bos. ValidationRulesView veya kalici kural kaynagi baglandiginda bu test calisacak.";
-                return;
-            }
 
             try
             {
+                isValidationRunning = true;
+                SetValidationBusy(true);
+
+                if (!await EnsureFullModelLoadedAsync())
+                    return;
+
+                if (modelInfo == null)
+                {
+                    ResetValidationState("Secili model bulunamadi.");
+                    txtValidationResults.Text = "Validasyon calistirmak icin once bir model secilmeli.";
+                    return;
+                }
+
+                var rules = GetValidationRules().ToList();
+                if (rules.Count == 0)
+                {
+                    ResetValidationState("Validasyon kurali bulunamadi.");
+                    txtValidationResults.Text =
+                        "Kural listesi bos. ValidationRulesView veya kalici kural kaynagi baglandiginda bu test calisacak.";
+                    return;
+                }
+
                 SetStatus("Validasyon calisiyor...");
-                var issues = CrossRuleValidationEngine.Validate(modelInfo, rules, runParallel: true);
+                var issues = await Task.Run(() =>
+                    CrossRuleValidationEngine.Validate(modelInfo, rules, runParallel: true));
 
                 isValidationOk = issues.Count == 0;
                 btnSendApproval.IsEnabled = isValidationOk;
@@ -451,6 +507,42 @@ namespace Veloxap.AddIn.Erwin.Pages
                 ResetValidationState("Validasyon sirasinda hata olustu.");
                 txtValidationResults.Text = ex.ToString();
             }
+            finally
+            {
+                isValidationRunning = false;
+                SetValidationBusy(false);
+            }
+        }
+
+        private async Task<bool> EnsureFullModelLoadedAsync()
+        {
+            if (hasLoadedFullModel || fullModelLoader == null)
+                return modelInfo != null;
+
+            try
+            {
+                SetStatus("Tam model validasyon icin yukleniyor...");
+                await Task.Delay(1);
+
+                ModelInfo loadedModel = fullModelLoader();
+                if (loadedModel != null)
+                    modelInfo = loadedModel;
+
+                hasLoadedFullModel = true;
+                return modelInfo != null;
+            }
+            catch (Exception ex)
+            {
+                ResetValidationState("Tam model yuklenirken hata olustu.");
+                txtValidationResults.Text = ex.ToString();
+                return false;
+            }
+        }
+
+        private static bool HasModelObjects(ModelInfo modelInfo)
+        {
+            var modelObjects = modelInfo?.getoModelObject();
+            return modelObjects != null && modelObjects.Count > 0;
         }
 
         private IEnumerable<string> GetValidationRules()
@@ -708,6 +800,20 @@ namespace Veloxap.AddIn.Erwin.Pages
         }
 
         private void SetApprovalBusy(bool value)
+        {
+            if (btnRunValidation != null)
+                btnRunValidation.IsEnabled = !value;
+
+            if (btnSendApproval != null)
+                btnSendApproval.IsEnabled = !value && isValidationOk;
+
+            if (approvalBusyBar != null)
+                approvalBusyBar.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+
+            Mouse.OverrideCursor = value ? Cursors.Wait : null;
+        }
+
+        private void SetValidationBusy(bool value)
         {
             if (btnRunValidation != null)
                 btnRunValidation.IsEnabled = !value;

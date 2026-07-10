@@ -25,6 +25,11 @@ namespace Veloxap.AddIn.Erwin.Pages
         private string currentCatalogLongId;
         private string loadedCatalogOverviewKey;
 
+        internal bool IsBoundToOwner
+        {
+            get { return owner != null; }
+        }
+
 
         public MainModelTestView()
         {

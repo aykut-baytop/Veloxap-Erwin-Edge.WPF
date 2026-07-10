@@ -198,16 +198,6 @@
                     </Button>
                 </Grid>
 
-                <RadioButton x:Name="rbModelInfo"
-             GroupName="MainMenu"
-             Style="{StaticResource SideMenuButtonStyle}"
-             IsChecked="False">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE946;" Style="{StaticResource SideMenuIconStyle}"/>
-                        <TextBlock Text="Model Bilgileri" Style="{StaticResource SideMenuTextStyle}"/>
-                    </StackPanel>
-                </RadioButton>
-
                 <RadioButton x:Name="rbValidation"
              GroupName="MainMenu"
              Style="{StaticResource SideMenuButtonStyle}">
@@ -232,6 +222,15 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE80A;" Style="{StaticResource SideMenuIconStyle}"/>
                         <TextBlock Text="Tablo UDP'leri" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton x:Name="rbModelInfo"
+             GroupName="MainMenu"
+             Style="{StaticResource SideMenuButtonStyle}"
+             IsChecked="False">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE946;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Bilgileri" Style="{StaticResource SideMenuTextStyle}"/>
                     </StackPanel>
                 </RadioButton>
             </StackPanel>
