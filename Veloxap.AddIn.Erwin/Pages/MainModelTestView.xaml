@@ -247,12 +247,6 @@
                             <DataGridTextColumn Header="Property"
                                                 Binding="{Binding PropertyName}"
                                                 Width="1.1*"/>
-                            <DataGridTextColumn Header="Tip"
-                                                Binding="{Binding PropertyType}"
-                                                Width="0.8*"/>
-                            <DataGridTextColumn Header="Format"
-                                                Binding="{Binding Format}"
-                                                Width="1*"/>
                             <DataGridTextColumn Header="Deger"
                                                 Binding="{Binding Value}"
                                                 Width="1.6*"/>

@@ -214,13 +214,19 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             List<ObjectPropertyDetail> details = LoadNodeDetails(node)
                             .Where(n =>
-                    n.PropertyName.Trim() == ("Entity.Physical.Veri_Degeri") ||
-                    n.PropertyName.Trim() == ("Entity.Physical.Banka_Gorece_Degeri") ||
-                    n.PropertyName.Trim() == ("Entity.Physical.Guvenlik_Sinifi_Degeri")
-            //n.PropertyName.Equals("Entity.Physical.Veri_Degeri") ||
-            //n.PropertyName.Equals("Entity.Physical.Is_Sureci")
-            ).ToList();
+                    n.PropertyName.Trim() == ("Veri_Degeri") ||
+                    n.PropertyName.Trim() == ("Banka_Gorece_Degeri") ||
+                    n.PropertyName.Trim() == ("Guvenlik_Sinifi_Degeri")).ToList();
 
+
+            ////n.PropertyName.Equals("Entity.Physical.Veri_Degeri") ||
+            ////n.PropertyName.Equals("Entity.Physical.Is_Sureci")
+            //).ToList();
+
+            //foreach (ObjectPropertyDetail item in details)
+            //{
+            //    item.PropertyName = item.PropertyName.Split(',').LastOrDefault();
+            //}
 
             //MessageBox.Show(details.FirstOrDefault().PropertyName + "  -  " + details.LastOrDefault().PropertyName);
 
@@ -242,7 +248,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             return properties.EntityProperties
                 .Select(property => new ObjectPropertyDetail(
-                    property.ClassName,
+                    property.ClassName.Split('.').LastOrDefault(),
                     property.DataType,
                     property.Format,
                     property.Value))
@@ -318,7 +324,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 Value = value ?? string.Empty;
             }
 
-            public string PropertyName { get; private set; }
+            public string PropertyName { get; set; }
 
             public string PropertyType { get; private set; }
 
