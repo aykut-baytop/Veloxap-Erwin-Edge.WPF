@@ -81,6 +81,7 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Models\ObjectPropertiesResult.cs" />
     <Compile Include="Models\CrossRuleValidationEngine.cs" />
     <Compile Include="Models\ModelInfo.cs" />
     <Compile Include="Models\ModelLoad.cs" />
@@ -110,6 +111,7 @@
       <DependentUpon>ValidationRulesView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Services\ApiTraceLogger.cs" />
+    <Compile Include="Services\ScapiTraceLogger.cs" />
     <Compile Include="Services\AuthTokenProvider.cs" />
     <Compile Include="Services\BearerTokenHandler.cs" />
     <Compile Include="Services\CryptoHelper.cs" />

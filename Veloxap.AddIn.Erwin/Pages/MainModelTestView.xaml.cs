@@ -237,20 +237,15 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return new List<ObjectPropertyDetail>();
             }
 
-            List<(string, string, string, string)> properties =
-                veloxapEDGErwinLib.getObjectProperities(
-                    node.IsRoot,
-                    node.ObjectId,
-                    node.ParentObjectId,
-                    selectedMainModelInfo.SelectedIndex) ??
-                new List<(string, string, string, string)>();
+            var properties =
+                veloxapEDGErwinLib.GetObjectProperties(node.IsRoot,node.ObjectId,node.ParentObjectId,selectedMainModelInfo.SelectedIndex);
 
-            return properties
+            return properties.EntityProperties
                 .Select(property => new ObjectPropertyDetail(
-                    property.Item1,
-                    property.Item2,
-                    property.Item3,
-                    property.Item4))
+                    property.ClassName,
+                    property.DataType,
+                    property.Format,
+                    property.Value))
                 .ToList();
         }
 
