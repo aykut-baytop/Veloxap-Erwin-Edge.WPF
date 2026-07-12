@@ -205,12 +205,13 @@
         </Border>
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.45*"/>
-                <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="1.45*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Background="#FFFFFF"
+            <Border Grid.Column="2"
+                    Background="#FFFFFF"
                     BorderBrush="#E2E8F0"
                     BorderThickness="1"
                     CornerRadius="8"
@@ -255,7 +256,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2"
+            <Border Grid.Column="0"
                     Background="#FFFFFF"
                     BorderBrush="#E2E8F0"
                     BorderThickness="1"
