@@ -276,14 +276,10 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel>
-                            <TextBlock Text="Rootlar"
+                            <TextBlock
                                        Foreground="#0F172A"
                                        FontSize="16"
-                                       FontWeight="SemiBold"/>
-
-                            <TextBlock Text="Model nesne agaci"
-                                       Style="{StaticResource MutedTextStyle}"
-                                       Margin="0,4,0,0"/>
+                                       FontWeight="SemiBold" Text="Model &amp; Tablo Bilgileri"/>
                         </StackPanel>
 
                         <TextBlock x:Name="txtModelObjectCount"

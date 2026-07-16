@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Remoting.Contexts;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Xml.Linq;
@@ -663,6 +664,7 @@ namespace VeloxapEDGErwinTools.AddIn
                     "Entity.Physical.Kisisel_Veri_Mi",
                     "Entity.Physical.Erisilebilirlik",
                     "Entity.Physical.Butunluk",
+                    "Entity.Physical.Bütünlük",
                     "Entity.Physical.Gizlilik_Seviyesi",
                     "Entity.Physical.Is_Sureci_Seviyesi"
                 };
@@ -730,7 +732,6 @@ namespace VeloxapEDGErwinTools.AddIn
                 }
                 catch
                 {
-                    // Session temizleme hatası ana hatayı gölgelemesin.
                 }
             }
         }
@@ -747,6 +748,7 @@ namespace VeloxapEDGErwinTools.AddIn
 
                 try
                 {
+
                     targetList.Add(new ScapiPropertyInfo
                     {
                         ClassName = property.ClassName,
@@ -755,7 +757,7 @@ namespace VeloxapEDGErwinTools.AddIn
                         Value = RetrieveValue(property)
                     });
 
-                    ScapiTraceLogger.Info(property.ClassName + " // " + PropertyDataType(property) + " - " + SafeFormatAsString(property) + " - " + RetrieveValue(property) +
+                    ScapiTraceLogger.Info(modelObject.ClassName + " - property : " + property.ClassName + " // " + PropertyDataType(property) + " - " + SafeFormatAsString(property) + " - " + RetrieveValue(property) +
                         Environment.NewLine);
                 }
                 catch (Exception ex)
@@ -827,6 +829,189 @@ namespace VeloxapEDGErwinTools.AddIn
             {
                 return false;
             }
+        }
+
+        public string CalculateVeriDegeri(
+    string erisilebilirlik,
+    string butunluk,
+    string gizlilikSeviyesi)
+        {
+            var values = new[]
+            {
+        erisilebilirlik,
+        butunluk,
+        gizlilikSeviyesi
+    };
+
+            int maxValue = 1;
+
+            foreach (string value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                string normalized = value
+                    .Trim()
+                    .ToLowerInvariant()
+                    .Replace("ç", "c")
+                    .Replace("ğ", "g")
+                    .Replace("ı", "i")
+                    .Replace("ö", "o")
+                    .Replace("ş", "s")
+                    .Replace("ü", "u");
+
+                int currentValue = 1;
+
+                // Değer içerisinde doğrudan 1-4 arasında sayı varsa onu kullan.
+                Match numberMatch = Regex.Match(normalized, @"(?<!\d)[1-4](?!\d)");
+
+                if (numberMatch.Success)
+                {
+                    currentValue = int.Parse(numberMatch.Value);
+                }
+                else if (normalized.Contains("cok gizli") ||
+                         normalized.Contains("yuksek"))
+                {
+                    currentValue = 4;
+                }
+                else if (normalized.Contains("gizli") ||
+                         normalized.Contains("orta"))
+                {
+                    currentValue = 3;
+                }
+                else if (normalized.Contains("hizmete ozel") ||
+                         normalized.Contains("dusuk"))
+                {
+                    currentValue = 2;
+                }
+                else if (normalized.Contains("kamuya acik") ||
+                         normalized.Contains("bilgi"))
+                {
+                    currentValue = 1;
+                }
+
+                if (currentValue > maxValue)
+                    maxValue = currentValue;
+            }
+
+            switch (maxValue)
+            {
+                case 4:
+                    return "4-Çok Gizli/Yüksek";
+
+                case 3:
+                    return "3-Gizli/Orta";
+
+                case 2:
+                    return "2-Hizmete Özel/Düşük";
+
+                default:
+                    return "1-Kamuya Açık/Bilgi";
+            }
+        }
+
+        public int CalculateBankaGoreceDegeri(
+    string veriDegeri,
+    string isSureciSeviyesi)
+        {
+            int veriDegeriNumber = 0;
+            int isSureciNumber = 0;
+
+            if (!string.IsNullOrWhiteSpace(veriDegeri))
+            {
+                Match match = Regex.Match(veriDegeri, @"(?<!\d)[1-4](?!\d)");
+
+                if (match.Success)
+                    int.TryParse(match.Value, out veriDegeriNumber);
+            }
+
+            if (!string.IsNullOrWhiteSpace(isSureciSeviyesi))
+            {
+                // İş süreci alanında birden fazla sayı bulunabilme ihtimaline karşı
+                // son bulunan 1-4 arasındaki sayıyı kullanıyoruz.
+                MatchCollection matches = Regex.Matches(
+                    isSureciSeviyesi,
+                    @"(?<!\d)[1-4](?!\d)");
+
+                if (matches.Count > 0)
+                {
+                    int.TryParse(
+                        matches[matches.Count - 1].Value,
+                        out isSureciNumber);
+                }
+            }
+
+            if (veriDegeriNumber == 0 || isSureciNumber == 0)
+                return 0;
+
+            return veriDegeriNumber * isSureciNumber;
+        }
+
+        public int CalculateGuvenlikSinifiDegeri(
+    int bankaGoreceDegeri,
+    List<ScapiColumnInfo> columns)
+        {
+            if (bankaGoreceDegeri <= 0)
+                return 0;
+
+            if (columns == null || columns.Count == 0)
+                return bankaGoreceDegeri;
+
+            int trueCount = 0;
+
+            foreach (ScapiColumnInfo column in columns)
+            {
+                if (column?.Properties == null)
+                    continue;
+
+                foreach (ScapiPropertyInfo property in column.Properties)
+                {
+                    if (property == null)
+                        continue;
+
+                    bool isTargetProperty =
+                        string.Equals(
+                            property.ClassName,
+                            "Attribute.Physical.Kisisel_Veri_Mi",
+                            StringComparison.OrdinalIgnoreCase)
+                        ||
+                        string.Equals(
+                            property.ClassName,
+                            "Attribute.Physical.Hassas_Veri_Mi",
+                            StringComparison.OrdinalIgnoreCase);
+
+                    if (!isTargetProperty)
+                        continue;
+
+                    string propertyValue = property.Value;
+
+                    bool isTrue =
+                        string.Equals(
+                            propertyValue,
+                            "True",
+                            StringComparison.OrdinalIgnoreCase)
+                        ||
+                        string.Equals(
+                            propertyValue,
+                            "1",
+                            StringComparison.OrdinalIgnoreCase)
+                        ||
+                        string.Equals(
+                            propertyValue,
+                            "Evet",
+                            StringComparison.OrdinalIgnoreCase);
+
+                    if (isTrue)
+                        trueCount++;
+                }
+            }
+
+            // Her True için x2:
+            // trueCount = 0 => x1
+            // trueCount = 1 => x2
+            // trueCount = 2 => x4
+            // trueCount = 3 => x8
+            return bankaGoreceDegeri * (int)Math.Pow(2, trueCount);
         }
     }
 }

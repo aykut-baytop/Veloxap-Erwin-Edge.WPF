@@ -43,7 +43,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             MainModelSelectionInfo selectedMainModelInfo,
             ModelInfo modelInfo,
             SCAPI.Application oApp,
-            RuleService ruleService, 
+            RuleService ruleService,
             string catalogName,
             string catalogLongId)
             : this()
@@ -212,11 +212,13 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
 
 
-            List<ObjectPropertyDetail> details = LoadNodeDetails(node)
-                            .Where(n =>
-                    n.PropertyName.Trim() == ("Veri_Degeri") ||
-                    n.PropertyName.Trim() == ("Banka_Gorece_Degeri") ||
-                    n.PropertyName.Trim() == ("Guvenlik_Sinifi_Degeri")).ToList();
+            List<ObjectPropertyDetail> details = LoadNodeDetails(node);
+
+
+            //        .Where(n =>
+            //n.PropertyName.Trim() == ("Veri_Degeri") ||
+            //n.PropertyName.Trim() == ("Banka_Gorece_Degeri") ||
+            //n.PropertyName.Trim() == ("Guvenlik_Sinifi_Degeri")).ToList();
 
 
             ////n.PropertyName.Equals("Entity.Physical.Veri_Degeri") ||
@@ -244,7 +246,36 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
 
             var properties =
-                veloxapEDGErwinLib.GetObjectProperties(node.IsRoot,node.ObjectId,node.ParentObjectId,selectedMainModelInfo.SelectedIndex);
+                veloxapEDGErwinLib.GetObjectProperties(node.IsRoot, node.ObjectId, node.ParentObjectId, selectedMainModelInfo.SelectedIndex);
+
+            var Erisilebilirlik = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Erisilebilirlik").FirstOrDefault();
+            var Butunluk = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Butunluk" || x.ClassName == "Entity.Physical.Bütünlük").FirstOrDefault();
+            var Gizlilik_Seviyesi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Gizlilik_Seviyesi").FirstOrDefault();
+            var Is_Sureci_Seviyesi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Is_Sureci_Seviyesi").FirstOrDefault();
+
+            var veriDegeriResult = veloxapEDGErwinLib.CalculateVeriDegeri(Erisilebilirlik?.Value, Butunluk?.Value, Gizlilik_Seviyesi?.Value);
+
+            var bankaGoreceDegeriResult = veloxapEDGErwinLib.CalculateBankaGoreceDegeri(veriDegeriResult, Is_Sureci_Seviyesi?.Value);
+
+            var guvenlikSinifiDegeriResult = veloxapEDGErwinLib.CalculateGuvenlikSinifiDegeri(bankaGoreceDegeriResult, properties.Columns);
+
+            foreach (var item in properties.EntityProperties)
+            {
+                if (item.ClassName == "Entity.Physical.Veri_Degeri")
+                {
+                    item.Value = veriDegeriResult;
+                }
+
+                if (item.ClassName == "Entity.Physical.Banka_Gorece_Degeri")
+                {
+                    item.Value = bankaGoreceDegeriResult.ToString();
+                }
+
+                if (item.ClassName == "Entity.Physical.Guvenlik_Sinifi_Degeri")
+                {
+                    item.Value = guvenlikSinifiDegeriResult.ToString();
+                }
+            }
 
             return properties.EntityProperties
                 .Select(property => new ObjectPropertyDetail(
@@ -330,7 +361,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             public string Format { get; private set; }
 
-            public string Value { get; private set; }
+            public string Value { get; set; }
         }
 
         private async void BtnDeleteCatalog_Click(object sender, RoutedEventArgs e)

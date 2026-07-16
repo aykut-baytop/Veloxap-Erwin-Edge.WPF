@@ -327,6 +327,7 @@ namespace Veloxap.AddIn.Erwin
 
         private void UpdateSelectedMainModelInfo(ModelSelection selectedModel)
         {
+            ScapiTraceLogger.Info("Selected model changed: " + (selectedModel == null ? "(none)" : selectedModel.Name) );
             selectedMainModelInfo = selectedModel == null
                 ? MainModelSelectionInfo.Empty
                 : new MainModelSelectionInfo(

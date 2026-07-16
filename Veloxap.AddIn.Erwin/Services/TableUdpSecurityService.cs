@@ -93,7 +93,8 @@ namespace Veloxap.AddIn.Erwin.Services
         public static TableUdpApprovalScriptResult BuildApprovalScript(ModelInfo modelInfo)
         {
             var changes = BuildApprovalChanges(modelInfo);
-            return new TableUdpApprovalScriptResult(changes, BuildApprovalScriptText(changes));
+            //return new TableUdpApprovalScriptResult(changes, BuildApprovalScriptText(changes));
+            return new TableUdpApprovalScriptResult(changes, "");
         }
 
         public static TableUdpCalculationPreview PreviewCalculation(
@@ -558,15 +559,15 @@ namespace Veloxap.AddIn.Erwin.Services
                 return string.Empty;
 
             var builder = new StringBuilder();
-            builder.AppendLine("-- TABLE UDP CALCULATED DIFFERENCES");
-            builder.AppendLine("");
+            //builder.AppendLine("-- TABLE UDP CALCULATED DIFFERENCES");
+            //builder.AppendLine("");
             //builder.AppendLine("-- TableName          >          UDPName          >          UDPValue");
 
             foreach (var change in changeList)
             {
-                builder.Append("--  ");
+                //builder.Append("--  ");
                 //builder.Append("UPDATE [");
-                builder.Append(EscapeSqlIdentifier(change.TableName) + " = ");
+                //builder.Append(EscapeSqlIdentifier(change.TableName) + " = ");
 
                 //for (var i = change.TableName.Length; i < 20; i++)
                 //{
@@ -574,7 +575,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 //}
                 //builder.Append("] SET [");
                 //builder.Append("     >     ");
-                builder.Append(EscapeSqlIdentifier(change.UdpName) + " : ");
+                //builder.Append(EscapeSqlIdentifier(change.UdpName) + " : ");
                 
                 //for (var i = change.UdpName.Length; i < 20; i++)
                 //{
@@ -583,7 +584,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 
                 //builder.Append("     >     ");
                 //builder.Append("] = N'");
-                builder.Append(change.UdpValue);
+                //builder.Append(change.UdpValue);
                 //builder.Append("'; -- ");
                 //builder.Append(EscapeSqlComment(change.TableName));
                 //builder.Append(" > ");
