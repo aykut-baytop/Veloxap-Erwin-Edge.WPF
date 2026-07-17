@@ -661,12 +661,13 @@ namespace VeloxapEDGErwinTools.AddIn
                     "Entity.Physical.Banka_Gorece_Degeri",
                     "Entity.Physical.Guvenlik_Sinifi_Degeri",
                     "Entity.Physical.Hassas_Veri_Mi",
-                    "Entity.Physical.Kisisel_Veri_Mi",
+                    //"Entity.Physical.Kisisel_Veri_Mi",
                     "Entity.Physical.Erisilebilirlik",
                     "Entity.Physical.Butunluk",
                     "Entity.Physical.Bütünlük",
                     "Entity.Physical.Gizlilik_Seviyesi",
-                    "Entity.Physical.Is_Sureci_Seviyesi"
+                    "Entity.Physical.Is_Sureci_Seviyesi",
+                    "Entity.Physical.Sir_Kapsaminda_Veri_Mi"
                 };
 
                     // Attribute UDP alanları
@@ -947,71 +948,51 @@ namespace VeloxapEDGErwinTools.AddIn
             return veriDegeriNumber * isSureciNumber;
         }
 
-        public int CalculateGuvenlikSinifiDegeri(
-    int bankaGoreceDegeri,
-    List<ScapiColumnInfo> columns)
+        public int CalculateGuvenlikSinifiDegeri(int veriDegeri,
+    List<ScapiColumnInfo> columns,
+    string hassasVeriMi,
+    string sirKapsamindaVeriMi)
         {
-            if (bankaGoreceDegeri <= 0)
-                return 0;
+            int kisiselVeriDegeri = 1;
 
-            if (columns == null || columns.Count == 0)
-                return bankaGoreceDegeri;
+            int HassasVeriDegeri = (string.Equals(
+                   hassasVeriMi,
+                   "True",
+                   StringComparison.OrdinalIgnoreCase) ? 2 : 1);
 
-            int trueCount = 0;
+            int sirKapsamindaVeriDegeri = (string.Equals(
+                   sirKapsamindaVeriMi,
+                   "True",
+                   StringComparison.OrdinalIgnoreCase) ? 2 : 1);
+
+
+            bool isKisiselVeri = false;
 
             foreach (ScapiColumnInfo column in columns)
             {
                 if (column?.Properties == null)
                     continue;
 
-                foreach (ScapiPropertyInfo property in column.Properties)
-                {
-                    if (property == null)
-                        continue;
+                isKisiselVeri = column.Properties.Any(c =>
+                    string.Equals(
+                        c.ClassName,
+                        "Attribute.Physical.Kisisel_Veri_Mi",
+                        StringComparison.OrdinalIgnoreCase)
+                    &&
+                        c.Format == "True"
+                );
 
-                    bool isTargetProperty =
-                        string.Equals(
-                            property.ClassName,
-                            "Attribute.Physical.Kisisel_Veri_Mi",
-                            StringComparison.OrdinalIgnoreCase)
-                        ||
-                        string.Equals(
-                            property.ClassName,
-                            "Attribute.Physical.Hassas_Veri_Mi",
-                            StringComparison.OrdinalIgnoreCase);
-
-                    if (!isTargetProperty)
-                        continue;
-
-                    string propertyValue = property.Value;
-
-                    bool isTrue =
-                        string.Equals(
-                            propertyValue,
-                            "True",
-                            StringComparison.OrdinalIgnoreCase)
-                        ||
-                        string.Equals(
-                            propertyValue,
-                            "1",
-                            StringComparison.OrdinalIgnoreCase)
-                        ||
-                        string.Equals(
-                            propertyValue,
-                            "Evet",
-                            StringComparison.OrdinalIgnoreCase);
-
-                    if (isTrue)
-                        trueCount++;
-                }
+                if (isKisiselVeri)
+                    break;
             }
 
-            // Her True için x2:
-            // trueCount = 0 => x1
-            // trueCount = 1 => x2
-            // trueCount = 2 => x4
-            // trueCount = 3 => x8
-            return bankaGoreceDegeri * (int)Math.Pow(2, trueCount);
+            if (isKisiselVeri)
+                kisiselVeriDegeri = 2;
+
+            int res = veriDegeri * kisiselVeriDegeri * HassasVeriDegeri * sirKapsamindaVeriDegeri;
+
+            ScapiTraceLogger.Info($"veriDegeri : {veriDegeri} * kisiselVeriDegeri : {kisiselVeriDegeri} * HassasVeriDegeri : {HassasVeriDegeri} * sirKapsamindaVeriDegeri : {sirKapsamindaVeriDegeri} = {res}");
+            return res;
         }
     }
 }

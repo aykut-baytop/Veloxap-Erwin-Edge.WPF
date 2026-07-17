@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web.ApplicationServices;
 using System.Windows;
@@ -161,7 +162,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 List<(string, string, string)> modelObjectsList =
                     veloxapEDGErwinLib.getModelObjects(
                         selectionInfo.ObjectId,
-                        selectionInfo.SelectedIndex) ??
+                        selectionInfo.SelectedIndex).OrderBy(x=> x.Item2).ToList() ??
                     new List<(string, string, string)>();
 
                 string rootName = string.IsNullOrWhiteSpace(selectionInfo.DisplayName)
@@ -211,26 +212,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
             }
 
-
             List<ObjectPropertyDetail> details = LoadNodeDetails(node);
-
-
-            //        .Where(n =>
-            //n.PropertyName.Trim() == ("Veri_Degeri") ||
-            //n.PropertyName.Trim() == ("Banka_Gorece_Degeri") ||
-            //n.PropertyName.Trim() == ("Guvenlik_Sinifi_Degeri")).ToList();
-
-
-            ////n.PropertyName.Equals("Entity.Physical.Veri_Degeri") ||
-            ////n.PropertyName.Equals("Entity.Physical.Is_Sureci")
-            //).ToList();
-
-            //foreach (ObjectPropertyDetail item in details)
-            //{
-            //    item.PropertyName = item.PropertyName.Split(',').LastOrDefault();
-            //}
-
-            //MessageBox.Show(details.FirstOrDefault().PropertyName + "  -  " + details.LastOrDefault().PropertyName);
 
             dgObjectDetails.ItemsSource = details;
         }
@@ -246,18 +228,27 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
 
             var properties =
-                veloxapEDGErwinLib.GetObjectProperties(node.IsRoot, node.ObjectId, node.ParentObjectId, selectedMainModelInfo.SelectedIndex);
+                veloxapEDGErwinLib
+                .GetObjectProperties(node.IsRoot, node.ObjectId, node.ParentObjectId, selectedMainModelInfo.SelectedIndex);
 
             var Erisilebilirlik = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Erisilebilirlik").FirstOrDefault();
             var Butunluk = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Butunluk" || x.ClassName == "Entity.Physical.Bütünlük").FirstOrDefault();
-            var Gizlilik_Seviyesi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Gizlilik_Seviyesi").FirstOrDefault();
-            var Is_Sureci_Seviyesi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Is_Sureci_Seviyesi").FirstOrDefault();
+            var gizlilikSeviyesi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Gizlilik_Seviyesi").FirstOrDefault();
+            var isSureciSeviyesi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Is_Sureci_Seviyesi").FirstOrDefault();
+            var hassasVeriMi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Hassas_Veri_Mi").FirstOrDefault();
+            var sirKapsamindaVeriMi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Sir_Kapsaminda_Veri_Mi").FirstOrDefault();
 
-            var veriDegeriResult = veloxapEDGErwinLib.CalculateVeriDegeri(Erisilebilirlik?.Value, Butunluk?.Value, Gizlilik_Seviyesi?.Value);
+            var veriDegeriResult = veloxapEDGErwinLib.CalculateVeriDegeri(Erisilebilirlik?.Value, Butunluk?.Value, gizlilikSeviyesi?.Value);
 
-            var bankaGoreceDegeriResult = veloxapEDGErwinLib.CalculateBankaGoreceDegeri(veriDegeriResult, Is_Sureci_Seviyesi?.Value);
+            var bankaGoreceDegeriResult = veloxapEDGErwinLib.CalculateBankaGoreceDegeri(veriDegeriResult, isSureciSeviyesi?.Value);
 
-            var guvenlikSinifiDegeriResult = veloxapEDGErwinLib.CalculateGuvenlikSinifiDegeri(bankaGoreceDegeriResult, properties.Columns);
+            int veriDeger = int.TryParse(Regex.Match(veriDegeriResult, @"\d+").Value, out var result) ? result : 0;
+
+            var guvenlikSinifiDegeriResult = veloxapEDGErwinLib.CalculateGuvenlikSinifiDegeri(
+                veriDeger,
+                properties.Columns,
+                hassasVeriMi?.Value,
+                sirKapsamindaVeriMi?.Value);
 
             foreach (var item in properties.EntityProperties)
             {

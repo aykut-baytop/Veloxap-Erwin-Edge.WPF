@@ -365,6 +365,8 @@ namespace Veloxap.AddIn.Erwin.Services
             string versionName,
             string versionNumber)
         {
+            ScapiTraceLogger.Info($"GetCatalogVersionOwnerAsync method parametreleri : + {catalogVersionsUrl} - {cLongId} - {versionName} - {versionNumber}");
+
             //if (string.IsNullOrWhiteSpace(catalogsUrl))
             //    throw new ArgumentException("Mart catalog servis URL'i bos olamaz.", nameof(catalogsUrl));
 
@@ -377,39 +379,7 @@ namespace Veloxap.AddIn.Erwin.Services
             if (string.IsNullOrWhiteSpace(cLongId))
                 throw new ArgumentException("cLongId bos olamaz.", nameof(cLongId));
 
-            //string catalogsRequestUrl = BuildSingleQueryUrl(catalogsUrl, "username", username);
-
-            //ApiTraceLogger.Info(
-            //    "MART CATALOGS REQUEST" + Environment.NewLine +
-            //    "Url: " + catalogsRequestUrl);
-
-            //var catalogsResponse = await httpClient.GetAsync(catalogsRequestUrl).ConfigureAwait(false);
-            //string catalogsJson = await catalogsResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-            //ApiTraceLogger.Info(
-            //    "MART CATALOGS RESPONSE" + Environment.NewLine +
-            //    "Url: " + catalogsRequestUrl + Environment.NewLine +
-            //    "Status: " + (int)catalogsResponse.StatusCode + " " + catalogsResponse.ReasonPhrase + Environment.NewLine +
-            //    "BodyLength: " + (catalogsJson == null ? 0 : catalogsJson.Length) + Environment.NewLine +
-            //    "BodyPreview: " + ApiTraceLogger.Truncate(catalogsJson, 2000));
-
-            //catalogsResponse.EnsureSuccessStatusCode();
-
-            //CatalogItem catalog = FindCatalogByLongId(DeserializeJson(catalogsJson), cLongId);
-            //if (catalog == null || string.IsNullOrWhiteSpace(catalog.Id))
-            //    throw new InvalidOperationException("Secili cLongId ile eslesen mart catalog bulunamadi.");
-
-            //ApiTraceLogger.Info(
-            //    "MART CATALOG MATCH" + Environment.NewLine +
-            //    "CatalogId: " + catalog.Id + Environment.NewLine +
-            //    "CatalogName: " + (catalog.Name ?? string.Empty));
-
             string versionsRequestUrl = BuildCatalogVersionsUrl(catalogVersionsUrl, cLongId);
-
-            //ApiTraceLogger.Info(
-            //    "MART CATALOG VERSIONS REQUEST" + Environment.NewLine +
-            //    "CatalogId: " + catalog.Id + Environment.NewLine +
-            //    "Url: " + versionsRequestUrl);
 
             var versionsResponse = await httpClient.GetAsync(versionsRequestUrl).ConfigureAwait(false);
             string versionsJson = await versionsResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -957,43 +927,9 @@ namespace Veloxap.AddIn.Erwin.Services
             string versionName,
             string versionNumber)
         {
-            var versionList = (versions ?? Enumerable.Empty<CatalogVersionInfo>())
-                .Where(version => version != null)
-                .ToList();
-
-            CatalogVersionInfo match = versionList.FirstOrDefault(
-                version => LongIdsMatch(version.CLongId, cLongId));
-
-            if (match != null)
-                return match;
-
-            string normalizedVersionNumber = NormalizeText(versionNumber);
-            if (!string.IsNullOrWhiteSpace(normalizedVersionNumber))
-            {
-                match = versionList.FirstOrDefault(version =>
-                    string.Equals(
-                        NormalizeText(version.VersionNumber),
-                        normalizedVersionNumber,
-                        StringComparison.OrdinalIgnoreCase));
-
-                if (match != null)
-                    return match;
-            }
-
-            string normalizedVersionName = NormalizeText(versionName);
-            if (!string.IsNullOrWhiteSpace(normalizedVersionName))
-            {
-                match = versionList.FirstOrDefault(version =>
-                    string.Equals(
-                        NormalizeText(version.Name),
-                        normalizedVersionName,
-                        StringComparison.OrdinalIgnoreCase));
-
-                if (match != null)
-                    return match;
-            }
-
-            return null;
+            return (versions ?? Enumerable.Empty<CatalogVersionInfo>())
+                .Where(version => version != null && versionNumber == version.VersionNumber)
+                .FirstOrDefault();
         }
 
         private static bool LongIdsMatch(string left, string right)
