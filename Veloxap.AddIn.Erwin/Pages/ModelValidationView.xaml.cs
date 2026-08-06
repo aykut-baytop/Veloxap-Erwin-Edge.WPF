@@ -251,6 +251,9 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
             }
 
+            if (!await IsCurrentUserVersionOwnerAsync(cLongId, sourceVersion))
+                return;
+
             if (!await EnsureFullModelLoadedAsync())
                 return;
 
@@ -314,6 +317,77 @@ namespace Veloxap.AddIn.Erwin.Pages
                 isSendingApproval = false;
                 SetApprovalBusy(false);
             }
+        }
+
+        private async Task<bool> IsCurrentUserVersionOwnerAsync(
+            string cLongId,
+            VersionOption sourceVersion)
+        {
+            try
+            {
+                CatalogVersionOwnerInfo ownerInfo = await ruleService.GetCatalogVersionOwnerAsync(
+                    RuleApiSettings.GetMartCatalogVersionsUrlTemplate(),
+                    cLongId,
+                    "Version " + sourceVersion.VersionNo,
+                    sourceVersion.VersionNo);
+
+                string versionOwner = ownerInfo == null ? string.Empty : ownerInfo.CreatedBy;
+                if (NamesMatch(versionOwner, RuleApiSettings.GetAuthUsername()))
+                    return true;
+
+                string displayedOwner = string.IsNullOrWhiteSpace(versionOwner)
+                    ? "Bilinmeyen"
+                    : versionOwner.Trim();
+                string warningMessage =
+                    "Versiyon sahibi \"" + displayedOwner +
+                    "\" kullanıcısı olduğundan onay'a gönderme işleminize devam edilemedi";
+
+                SetStatus(warningMessage);
+                MessageBox.Show(
+                    warningMessage,
+                    "Onaya Gönder",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                string warningMessage = "Versiyon sahibi kontrol edilemedi: " + ex.Message;
+                SetStatus(warningMessage);
+                MessageBox.Show(
+                    warningMessage,
+                    "Onaya Gönder",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return false;
+            }
+        }
+
+        private static bool NamesMatch(string left, string right)
+        {
+            string normalizedLeft = NormalizeUserName(left);
+            string normalizedRight = NormalizeUserName(right);
+
+            return !string.IsNullOrWhiteSpace(normalizedLeft) &&
+                   !string.IsNullOrWhiteSpace(normalizedRight) &&
+                   string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeUserName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string normalized = value.Trim();
+            int domainIndex = normalized.LastIndexOf('\\');
+            if (domainIndex >= 0 && domainIndex < normalized.Length - 1)
+                normalized = normalized.Substring(domainIndex + 1);
+
+            int mailIndex = normalized.IndexOf('@');
+            if (mailIndex > 0)
+                normalized = normalized.Substring(0, mailIndex);
+
+            return normalized.Trim();
         }
 
         private async Task<string> BuildApprovalDdlTextAsync(string existingDdl)
