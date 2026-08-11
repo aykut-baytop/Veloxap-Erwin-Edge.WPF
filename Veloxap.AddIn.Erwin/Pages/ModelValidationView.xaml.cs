@@ -684,16 +684,23 @@ namespace Veloxap.AddIn.Erwin.Pages
            try
            {
                currentAlterDdl = string.Empty;
-               txtAlterDdl.Text = "Alter DDL hazirlaniyor...";
-               string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
+               txtAlterDdl.Text = "UDP degisiklikleri ve Alter DDL hazirlaniyor...";
+
+               Task<string> ddlTask = RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
+               Task<UdpDiffResult> udpDiffTask = RequestUdpDiffFromApiAsync(sourceVersion, targetVersion);
+               await Task.WhenAll(ddlTask, udpDiffTask);
+
+               string ddl = await ddlTask;
+               UdpDiffResult udpDiff = await udpDiffTask;
 
                currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
                    ? string.Empty
                    : ddl;
 
-               txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
+               string ddlText = string.IsNullOrWhiteSpace(ddl)
                    ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
                    : ddl;
+               txtAlterDdl.Text = CombineUdpDiffAndDdl(udpDiff, ddlText);
            }
            catch (Exception ex)
            {
@@ -727,6 +734,38 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             SetStatus("Alter DDL hazirlandi. Kaynak: " + sourceVNo + ", Hedef: " + targetVNo + ".");
             return FormatDdlForDisplay(ddl);
+        }
+
+        private async Task<UdpDiffResult> RequestUdpDiffFromApiAsync(
+            VersionOption sourceVersion,
+            VersionOption targetVersion)
+        {
+            if (ruleService == null)
+                return new UdpDiffResult(false, "UDP fark servisi kullanilabilir degil.", null);
+
+            if (!int.TryParse(sourceVersion.VersionNo, out int sourceVNo))
+                throw new InvalidOperationException("UDP farki icin kaynak versiyon numarasi okunamadi.");
+
+            if (!int.TryParse(targetVersion.VersionNo, out int targetVNo))
+                throw new InvalidOperationException("UDP farki icin hedef versiyon numarasi okunamadi.");
+
+            string catalogPath = ExtractAlterDdlPath(sourceVersion.Locator);
+            if (string.IsNullOrWhiteSpace(catalogPath))
+                throw new InvalidOperationException("UDP farki icin katalog yolu secili modelden okunamadi.");
+
+            string resolvedCatalogName = ResolveCatalogName();
+            if (string.IsNullOrWhiteSpace(resolvedCatalogName))
+                throw new InvalidOperationException("UDP farki icin katalog adi okunamadi.");
+
+            UdpDiffResult result = await ruleService.GetUdpDiffAsync(
+                RuleApiSettings.GetUdpDiffUrl(),
+                catalogPath.Split('/').LastOrDefault(),
+                catalogPath,
+                sourceVNo,
+                targetVNo);
+
+            SetStatus("UDP degisiklikleri hazirlandi. Kaynak: " + sourceVNo + ", Hedef: " + targetVNo + ".");
+            return result;
         }
 
         private void SelectPreviousTargetVersion()
@@ -864,6 +903,79 @@ namespace Veloxap.AddIn.Erwin.Pages
             builder.AppendLine("API ddl alani dolu dondugunde sonuc burada gosterilecek.");
 
             return builder.ToString();
+        }
+
+        private static string CombineUdpDiffAndDdl(UdpDiffResult udpDiff, string ddl)
+        {
+            return FormatUdpDiffForDisplay(udpDiff).TrimEnd() +
+                   Environment.NewLine + Environment.NewLine +
+                   "----------------------------------------" +
+                   Environment.NewLine +
+                   "ALTER DDL" +
+                   Environment.NewLine +
+                   "----------------------------------------" +
+                   Environment.NewLine +
+                   (ddl ?? string.Empty).TrimStart();
+        }
+
+        private static string FormatUdpDiffForDisplay(UdpDiffResult result)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("UDP DEGISIKLIKLERI");
+            builder.AppendLine("----------------------------------------");
+
+            if (result == null)
+            {
+                builder.AppendLine("UDP degisiklik bilgisi alinamadi.");
+                return builder.ToString();
+            }
+
+            if (!result.Success)
+            {
+                builder.AppendLine("UDP degisiklik bilgisi alinamadi.");
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                    builder.AppendLine("Mesaj: " + result.Message);
+
+                return builder.ToString();
+            }
+
+            if (result.Items == null || result.Items.Count == 0)
+            {
+                builder.AppendLine("UDP degisikligi bulunamadi.");
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                    builder.AppendLine("Mesaj: " + result.Message);
+
+                return builder.ToString();
+            }
+
+            builder.AppendLine("Toplam UDP degisikligi: " + result.Items.Count);
+            builder.AppendLine();
+
+            for (int index = 0; index < result.Items.Count; index++)
+            {
+                UdpDiffItem item = result.Items[index];
+                builder.AppendLine((index + 1) + ". UDP Degisikligi");
+                AppendUdpDiffField(builder, "Degisiklik tipi", item.ChangeType);
+                AppendUdpDiffField(builder, "Degisiklik nedeni", item.ChangeReason);
+                AppendUdpDiffField(builder, "Nesne tipi", item.ObjectType);
+                AppendUdpDiffField(builder, "Model", item.ModelName);
+                AppendUdpDiffField(builder, "Tablo", item.TableName);
+                AppendUdpDiffField(builder, "Kolon", item.ColumnName);
+                AppendUdpDiffField(builder, "UDP adi", item.UdpName?.Split('.')?.LastOrDefault());
+                AppendUdpDiffField(builder, "Onceki icerik", item.PreviousContent);
+                AppendUdpDiffField(builder, "Guncel icerik", item.CurrentContent);
+
+                if (index < result.Items.Count - 1)
+                    builder.AppendLine();
+            }
+
+            return builder.ToString();
+        }
+
+        private static void AppendUdpDiffField(StringBuilder builder, string label, string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                builder.AppendLine("  " + label + ": " + value);
         }
 
         private void ResetValidationState(string message)

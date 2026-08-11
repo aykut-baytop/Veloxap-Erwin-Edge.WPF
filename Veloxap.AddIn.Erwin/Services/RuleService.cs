@@ -105,6 +105,60 @@ namespace Veloxap.AddIn.Erwin.Services
             }
         }
 
+        public async Task<UdpDiffResult> GetUdpDiffAsync(
+            string serviceUrl,
+            string catalogName,
+            string catalogPath,
+            int sourceVersion,
+            int targetVersion)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("UDP fark servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            var serializer = new JavaScriptSerializer
+            {
+                MaxJsonLength = int.MaxValue
+            };
+
+            string payload = serializer.Serialize(new Dictionary<string, object>
+            {
+                { "catalogName", catalogName ?? string.Empty },
+                { "catalogPath", catalogPath ?? string.Empty },
+                { "sourceVersion", sourceVersion },
+                { "targetVersion", targetVersion }
+            });
+
+            ApiTraceLogger.Info(
+                "UDP DIFF REQUEST" + Environment.NewLine +
+                "Url: " + serviceUrl + Environment.NewLine +
+                "Body: " + payload);
+
+            using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
+            {
+                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "UDP DIFF RESPONSE" + Environment.NewLine +
+                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                response.EnsureSuccessStatusCode();
+
+                UdpDiffResult result = ParseUdpDiffResult(json);
+
+                ApiTraceLogger.Info(
+                    "UDP DIFF PARSE" + Environment.NewLine +
+                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Success: " + result.Success + Environment.NewLine +
+                    "ItemCount: " + result.Items.Count);
+
+                return result;
+            }
+        }
+
         public async Task<ApprovalStartResult> StartApprovalByCatalogAsync(
             string serviceUrl,
             string cName,
@@ -645,6 +699,32 @@ namespace Veloxap.AddIn.Erwin.Services
                 message,
                 locks,
                 json ?? string.Empty);
+        }
+
+        private static UdpDiffResult ParseUdpDiffResult(string json)
+        {
+            object payload = DeserializeJson(json);
+            var dictionary = payload as Dictionary<string, object>;
+            bool? success = dictionary == null ? null : GetNullableBool(dictionary, "success");
+            string message = dictionary == null ? string.Empty : GetString(dictionary, "message");
+            object itemsValue = dictionary == null ? null : GetDictionaryValue(dictionary, "items");
+            var items = (itemsValue as object[] ?? new object[0])
+                .OfType<Dictionary<string, object>>()
+                .Select(item => new UdpDiffItem
+                {
+                    ChangeType = GetString(item, "changeType"),
+                    ChangeReason = GetString(item, "changeReason"),
+                    ObjectType = GetString(item, "objectType"),
+                    ModelName = GetString(item, "modelName"),
+                    TableName = GetString(item, "tableName"),
+                    ColumnName = GetString(item, "columnName"),
+                    UdpName = GetString(item, "udpName"),
+                    PreviousContent = GetString(item, "previousContent"),
+                    CurrentContent = GetString(item, "currentContent")
+                })
+                .ToList();
+
+            return new UdpDiffResult(success.HasValue ? success.Value : true, message, items);
         }
 
         private static IEnumerable<object> ResolveCatalogLockItems(object payload)
@@ -1588,6 +1668,35 @@ namespace Veloxap.AddIn.Erwin.Services
         public string Time { get; set; }
 
         public string SessionId { get; set; }
+    }
+
+    internal sealed class UdpDiffResult
+    {
+        public UdpDiffResult(bool success, string message, List<UdpDiffItem> items)
+        {
+            Success = success;
+            Message = message ?? string.Empty;
+            Items = items ?? new List<UdpDiffItem>();
+        }
+
+        public bool Success { get; private set; }
+
+        public string Message { get; private set; }
+
+        public List<UdpDiffItem> Items { get; private set; }
+    }
+
+    internal sealed class UdpDiffItem
+    {
+        public string ChangeType { get; set; }
+        public string ChangeReason { get; set; }
+        public string ObjectType { get; set; }
+        public string ModelName { get; set; }
+        public string TableName { get; set; }
+        public string ColumnName { get; set; }
+        public string UdpName { get; set; }
+        public string PreviousContent { get; set; }
+        public string CurrentContent { get; set; }
     }
 
     internal sealed class CatalogLocksResult

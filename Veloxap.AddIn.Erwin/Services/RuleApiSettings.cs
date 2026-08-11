@@ -12,6 +12,7 @@ namespace Veloxap.AddIn.Erwin.Services
         private const string AuthPasswordKey = "AuthPassword";
         private const string RulesByModelUrlKey = "ValidationRulesByModelUrl";
         private const string AlterDdlUrlKey = "AlterDdlUrl";
+        private const string UdpDiffUrlKey = "UdpDiffUrl";
         private const string ApprovalStartByCatalogUrlKey = "ApprovalStartByCatalogUrl";
         private const string CatalogLocksUrlKey = "CatalogLocksUrl";
         private const string CatalogUnlockUrlKey = "CatalogUnlockUrl";
@@ -62,6 +63,11 @@ namespace Veloxap.AddIn.Erwin.Services
         public static string GetAlterDdlUrl()
         {
             return GetServiceUrl(AlterDdlUrlKey);
+        }
+
+        public static string GetUdpDiffUrl()
+        {
+            return GetServiceUrl(UdpDiffUrlKey);
         }
 
         public static string GetApprovalStartByCatalogUrl()
@@ -119,6 +125,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 AuthPasswordKey,
                 RulesByModelUrlKey,
                 AlterDdlUrlKey,
+                UdpDiffUrlKey,
                 ApprovalStartByCatalogUrlKey,
                 CatalogLocksUrlKey,
                 CatalogUnlockUrlKey,
