@@ -149,15 +149,7 @@
     <Page Include="Themes\Styles.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="UserControl.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
     <Compile Include="COMVeloxapManagerClass.cs" />
-    <Compile Include="UserControl.xaml.cs">
-      <DependentUpon>UserControl.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
     <Page Include="MainWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
