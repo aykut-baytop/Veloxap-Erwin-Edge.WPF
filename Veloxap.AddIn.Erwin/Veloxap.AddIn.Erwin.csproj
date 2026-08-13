@@ -77,8 +77,6 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DpiDiagnostics.cs" />
-    <Compile Include="DpiAwarenessScope.cs" />
     <Compile Include="Models\ObjectPropertiesResult.cs" />
     <Compile Include="Models\CrossRuleValidationEngine.cs" />
     <Compile Include="Models\ModelInfo.cs" />

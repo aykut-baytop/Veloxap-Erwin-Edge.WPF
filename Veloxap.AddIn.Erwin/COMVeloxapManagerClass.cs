@@ -24,14 +24,14 @@ namespace Veloxap.AddIn
         public void Run()
         {
             IntPtr ownerHandle = GetHostOwnerHandle();
-            Exception startupError = null;
 
-            // WPF's Dispatcher and ShowDialog modal loop change the current
-            // thread's DPI context while processing messages for its window.
-            // Running that loop on Erwin's STA thread is what made Erwin move
-            // to the top-left and appear scaled. Always isolate WPF in its own
-            // STA thread; the native Owner handle still preserves modality and
-            // Z-order relative to Erwin.
+            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+            {
+                RunWindow(ownerHandle);
+                return;
+            }
+
+            Exception startupError = null;
             var uiThread = new Thread(() =>
             {
                 try
@@ -57,40 +57,23 @@ namespace Veloxap.AddIn
         {
             SCAPI.Application app = new SCAPI.Application();
 
-            // This is the add-in's dedicated STA thread, never Erwin's UI
-            // thread. Keeping the scope around the WPF modal loop produces a
-            // legacy 96-DPI WPF window without virtualizing Erwin's messages.
-            DpiDiagnostics.Log("before WPF DPI scope", IntPtr.Zero, ownerHandle);
-
-            using (DpiAwarenessScope.EnterUnaware())
-            {
-                DpiDiagnostics.Log("inside WPF DPI scope", IntPtr.Zero, ownerHandle);
-
-                Window1 mainForm = new Window1();
-                ConfigureIndependentWindow(mainForm, ownerHandle);
-                mainForm.SourceInitialized += (sender, args) => DpiDiagnostics.Log(
-                    "WPF main window source initialized",
-                    new WindowInteropHelper(mainForm).Handle,
-                    ownerHandle);
-                mainForm.Init(ref app);
-                mainForm.ShowDialog();
-            }
+            // The add-in must use the same SYSTEM_DPI_AWARE context as Erwin.
+            // A 96-DPI WPF window within this host process causes Erwin itself
+            // to be DPI-virtualized and re-positioned. Do not override the
+            // current thread's DPI awareness here.
+            Window1 mainForm = new Window1();
+            AssignOwner(mainForm, ownerHandle);
+            mainForm.Init(ref app);
+            mainForm.ShowDialog();
         }
 
-        private static void ConfigureIndependentWindow(Window window, IntPtr ownerHandle)
+        private static void AssignOwner(Window window, IntPtr ownerHandle)
         {
-            if (window == null)
+            if (window == null || ownerHandle == IntPtr.Zero)
                 return;
 
-            // Do not set WindowInteropHelper.Owner here. Erwin's system-aware
-            // HWND is 120 DPI while this legacy add-in window is 96 DPI. The
-            // mixed-DPI native ownership relationship makes Erwin re-layout
-            // itself (top-left, reduced size). Run() waits until ShowDialog
-            // closes, so Erwin cannot receive another add-in invocation while
-            // this independent dialog is displayed.
-            window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-
-            DpiDiagnostics.Log("native owner intentionally omitted", IntPtr.Zero, ownerHandle);
+            new WindowInteropHelper(window).Owner = ownerHandle;
+            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         }
 
         private static IntPtr GetHostOwnerHandle()
