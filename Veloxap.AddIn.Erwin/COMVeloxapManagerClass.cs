@@ -67,7 +67,7 @@ namespace Veloxap.AddIn
                 DpiDiagnostics.Log("inside WPF DPI scope", IntPtr.Zero, ownerHandle);
 
                 Window1 mainForm = new Window1();
-                AssignOwner(mainForm, ownerHandle);
+                ConfigureIndependentWindow(mainForm, ownerHandle);
                 mainForm.SourceInitialized += (sender, args) => DpiDiagnostics.Log(
                     "WPF main window source initialized",
                     new WindowInteropHelper(mainForm).Handle,
@@ -77,13 +77,20 @@ namespace Veloxap.AddIn
             }
         }
 
-        private static void AssignOwner(Window window, IntPtr ownerHandle)
+        private static void ConfigureIndependentWindow(Window window, IntPtr ownerHandle)
         {
-            if (window == null || ownerHandle == IntPtr.Zero)
+            if (window == null)
                 return;
 
-            new WindowInteropHelper(window).Owner = ownerHandle;
-            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            // Do not set WindowInteropHelper.Owner here. Erwin's system-aware
+            // HWND is 120 DPI while this legacy add-in window is 96 DPI. The
+            // mixed-DPI native ownership relationship makes Erwin re-layout
+            // itself (top-left, reduced size). Run() waits until ShowDialog
+            // closes, so Erwin cannot receive another add-in invocation while
+            // this independent dialog is displayed.
+            window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+            DpiDiagnostics.Log("native owner intentionally omitted", IntPtr.Zero, ownerHandle);
         }
 
         private static IntPtr GetHostOwnerHandle()
