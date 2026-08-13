@@ -55,12 +55,19 @@ namespace Veloxap.AddIn
 
         private static void RunWindow(IntPtr ownerHandle)
         {
-            SCAPI.Application app = new SCAPI.Application();
+            // This add-in runs in Erwin's process. Do not call a process-wide
+            // DPI API here: it would also change the host application's DPI
+            // behavior. The scope affects only this UI thread and is active
+            // before WPF creates any window handles.
+            using (DpiAwarenessScope.EnterUnaware())
+            {
+                SCAPI.Application app = new SCAPI.Application();
 
-            Window1 mainForm = new Window1();
-            AssignOwner(mainForm, ownerHandle);
-            mainForm.Init(ref app);
-            mainForm.ShowDialog();
+                Window1 mainForm = new Window1();
+                AssignOwner(mainForm, ownerHandle);
+                mainForm.Init(ref app);
+                mainForm.ShowDialog();
+            }
         }
 
         private static void AssignOwner(Window window, IntPtr ownerHandle)
