@@ -2,14 +2,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Interop;
-using Veloxap.AddIn.Erwin;
 
 namespace Veloxap.AddIn
 {
@@ -19,61 +17,33 @@ namespace Veloxap.AddIn
     [ClassInterface(ClassInterfaceType.None)]
     public class COMVeloxapManagerClass : IErwinAddIn
     {
+        private const string UiHostExecutableName = "Veloxap.AddIn.Erwin.UiHost.exe";
+
         public COMVeloxapManagerClass() { }
 
         public void Run()
         {
             IntPtr ownerHandle = GetHostOwnerHandle();
+            string executablePath = Path.Combine(
+                Path.GetDirectoryName(typeof(COMVeloxapManagerClass).Assembly.Location),
+                UiHostExecutableName);
 
-            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+            if (!File.Exists(executablePath))
             {
-                RunWindow(ownerHandle);
-                return;
+                throw new FileNotFoundException(
+                    "WPF UI host executable was not found. Deploy '" + UiHostExecutableName +
+                    "' next to the add-in DLL.",
+                    executablePath);
             }
 
-            Exception startupError = null;
-            var uiThread = new Thread(() =>
+            Process.Start(new ProcessStartInfo
             {
-                try
-                {
-                    RunWindow(ownerHandle);
-                }
-                catch (Exception ex)
-                {
-                    startupError = ex;
-                }
+                FileName = executablePath,
+                Arguments = "--erwin-process-id " + Process.GetCurrentProcess().Id +
+                            " --owner-hwnd " + ownerHandle.ToInt64(),
+                WorkingDirectory = Path.GetDirectoryName(executablePath),
+                UseShellExecute = false
             });
-
-            uiThread.SetApartmentState(ApartmentState.STA);
-            uiThread.IsBackground = false;
-            uiThread.Start();
-            uiThread.Join();
-
-            if (startupError != null)
-                throw new InvalidOperationException("Veloxap EDGE WPF add-in failed to start.", startupError);
-        }
-
-        private static void RunWindow(IntPtr ownerHandle)
-        {
-            SCAPI.Application app = new SCAPI.Application();
-
-            // The add-in must use the same SYSTEM_DPI_AWARE context as Erwin.
-            // A 96-DPI WPF window within this host process causes Erwin itself
-            // to be DPI-virtualized and re-positioned. Do not override the
-            // current thread's DPI awareness here.
-            Window1 mainForm = new Window1();
-            AssignOwner(mainForm, ownerHandle);
-            mainForm.Init(ref app);
-            mainForm.ShowDialog();
-        }
-
-        private static void AssignOwner(Window window, IntPtr ownerHandle)
-        {
-            if (window == null || ownerHandle == IntPtr.Zero)
-                return;
-
-            new WindowInteropHelper(window).Owner = ownerHandle;
-            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         }
 
         private static IntPtr GetHostOwnerHandle()
