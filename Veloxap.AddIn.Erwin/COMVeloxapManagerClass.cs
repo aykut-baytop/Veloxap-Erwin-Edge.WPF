@@ -55,27 +55,38 @@ namespace Veloxap.AddIn
 
         private static void RunWindow(IntPtr ownerHandle)
         {
-            // This add-in runs in Erwin's process. Do not call a process-wide
-            // DPI API here: it would also change the host application's DPI
-            // behavior. The scope affects only this UI thread and is active
-            // before WPF creates any window handles.
+            SCAPI.Application app = new SCAPI.Application();
+            Window1 mainForm;
+
+            // This add-in runs in Erwin's UI thread. Keep the DPI override as
+            // short as possible: a window retains the context it had when its
+            // HWND was created, while the host thread must immediately return
+            // to Erwin's system-aware (120 DPI) context.
             DpiDiagnostics.Log("before WPF DPI scope", IntPtr.Zero, ownerHandle);
 
             using (DpiAwarenessScope.EnterUnaware())
             {
                 DpiDiagnostics.Log("inside WPF DPI scope", IntPtr.Zero, ownerHandle);
 
-                SCAPI.Application app = new SCAPI.Application();
-
-                Window1 mainForm = new Window1();
+                mainForm = new Window1();
                 AssignOwner(mainForm, ownerHandle);
                 mainForm.SourceInitialized += (sender, args) => DpiDiagnostics.Log(
                     "WPF main window source initialized",
                     new WindowInteropHelper(mainForm).Handle,
                     ownerHandle);
                 mainForm.Init(ref app);
-                mainForm.ShowDialog();
+
+                // Force HWND creation while the legacy DPI context is active.
+                // ShowDialog is deliberately called after the using block so
+                // its modal loop does not run under the host's DPI override.
+                new WindowInteropHelper(mainForm).EnsureHandle();
             }
+
+            DpiDiagnostics.Log(
+                "before WPF ShowDialog after DPI scope restored",
+                new WindowInteropHelper(mainForm).Handle,
+                ownerHandle);
+            mainForm.ShowDialog();
         }
 
         private static void AssignOwner(Window window, IntPtr ownerHandle)
