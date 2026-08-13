@@ -59,12 +59,20 @@ namespace Veloxap.AddIn
             // DPI API here: it would also change the host application's DPI
             // behavior. The scope affects only this UI thread and is active
             // before WPF creates any window handles.
+            DpiDiagnostics.Log("before WPF DPI scope", IntPtr.Zero, ownerHandle);
+
             using (DpiAwarenessScope.EnterUnaware())
             {
+                DpiDiagnostics.Log("inside WPF DPI scope", IntPtr.Zero, ownerHandle);
+
                 SCAPI.Application app = new SCAPI.Application();
 
                 Window1 mainForm = new Window1();
                 AssignOwner(mainForm, ownerHandle);
+                mainForm.SourceInitialized += (sender, args) => DpiDiagnostics.Log(
+                    "WPF main window source initialized",
+                    new WindowInteropHelper(mainForm).Handle,
+                    ownerHandle);
                 mainForm.Init(ref app);
                 mainForm.ShowDialog();
             }
