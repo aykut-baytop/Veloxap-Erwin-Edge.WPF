@@ -150,7 +150,7 @@ namespace Veloxap.AddIn.Erwin.Services
             string configuredValue = GetConfiguredSetting(key);
 
             if (string.IsNullOrWhiteSpace(configuredValue))
-                throw new ConfigurationErrorsException("App.config appSettings '" + key + "' degeri eksik veya bos.");
+                throw new ConfigurationErrorsException("Calisan uygulamanin .exe.config dosyasinda appSettings '" + key + "' degeri eksik veya bos.");
 
             return configuredValue.Trim();
         }
@@ -165,12 +165,16 @@ namespace Veloxap.AddIn.Erwin.Services
 
         private static string GetConfiguredSetting(string key)
         {
-            string configuredValue = ReadHostAppSetting(key);
+            return ReadCurrentProcessAppSetting(key);
+        }
 
-            if (string.IsNullOrWhiteSpace(configuredValue))
-                configuredValue = ReadAssemblyAppSetting(key);
-
-            return configuredValue;
+        /// <summary>
+        /// Returns the configuration of the executable that is currently hosting the add-in.
+        /// In the isolated UI process this is Veloxap.AddIn.Erwin.UiHost.exe.config.
+        /// </summary>
+        internal static Configuration OpenCurrentProcessConfiguration()
+        {
+            return ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
         }
 
         private static string CombineUrl(string baseUrl, string endpoint)
@@ -205,28 +209,12 @@ namespace Veloxap.AddIn.Erwin.Services
                     || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static string ReadHostAppSetting(string key)
+        private static string ReadCurrentProcessAppSetting(string key)
         {
             try
             {
-                return ConfigurationManager.AppSettings[key];
-            }
-            catch (ConfigurationErrorsException)
-            {
-                return null;
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-
-        private static string ReadAssemblyAppSetting(string key)
-        {
-            try
-            {
-                var config = ConfigurationManager.OpenExeConfiguration(typeof(RuleApiSettings).Assembly.Location);
-                var setting = config.AppSettings.Settings[key];
+                Configuration config = OpenCurrentProcessConfiguration();
+                KeyValueConfigurationElement setting = config.AppSettings.Settings[key];
                 return setting == null ? null : setting.Value;
             }
             catch (ConfigurationErrorsException)
@@ -238,5 +226,6 @@ namespace Veloxap.AddIn.Erwin.Services
                 return null;
             }
         }
+
     }
 }

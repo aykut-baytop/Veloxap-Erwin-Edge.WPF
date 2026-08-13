@@ -43,7 +43,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             try
             {
-                Configuration config = OpenAssemblyConfiguration();
+                Configuration config = OpenCurrentProcessConfiguration();
                 List<AppConfigSetting> settings = BuildSettingList(config);
                 currentUserSettings = settings
                     .Where(setting => IsUserSetting(setting.Key))
@@ -57,7 +57,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 txtUserSettingCount.Text = currentUserSettings.Count + " ayar";
                 txtServiceSettingCount.Text = VisibleServiceSettingCount + " ayar";
                 txtSettingCount.Text = currentUserSettings.Count + VisibleServiceSettingCount + " ayar";
-                txtConfigSource.Text = "";
+                txtConfigSource.Text = "Kullanilan dosya: " + config.FilePath;
                 emptyState.Visibility = settings.Count == 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
@@ -73,7 +73,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 txtUserSettingCount.Text = "0 ayar";
                 txtServiceSettingCount.Text = "0 ayar";
                 txtSettingCount.Text = "0 ayar";
-                txtConfigSource.Text = "App.config okunamadi.";
+                txtConfigSource.Text = "Calisan uygulamanin .exe.config dosyasi okunamadi.";
                 emptyState.Visibility = Visibility.Visible;
                 SetStatus("Ayarlar okunamadi: " + ex.Message, true);
             }
@@ -86,7 +86,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 UpdateUserSettingsFromCredentialFields();
                 UpdateServiceSettingsFromFields();
 
-                Configuration config = OpenAssemblyConfiguration();
+                Configuration config = OpenCurrentProcessConfiguration();
                 KeyValueConfigurationCollection appSettings = config.AppSettings.Settings;
 
                 foreach (AppConfigSetting setting in GetCurrentSettings())
@@ -219,9 +219,9 @@ namespace Veloxap.AddIn.Erwin.Pages
                 .Concat(currentServiceSettings ?? new List<AppConfigSetting>());
         }
 
-        private static Configuration OpenAssemblyConfiguration()
+        private static Configuration OpenCurrentProcessConfiguration()
         {
-            return ConfigurationManager.OpenExeConfiguration(typeof(SettingsView).Assembly.Location);
+            return RuleApiSettings.OpenCurrentProcessConfiguration();
         }
 
         private static List<AppConfigSetting> BuildSettingList(Configuration config)
@@ -258,18 +258,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (setting != null)
                 return setting.Value;
 
-            try
-            {
-                return ConfigurationManager.AppSettings[key];
-            }
-            catch (ConfigurationErrorsException)
-            {
-                return null;
-            }
-            catch (Exception)
-            {
-                return null;
-            }
+            return null;
         }
 
         private static bool IsUserSetting(string key)

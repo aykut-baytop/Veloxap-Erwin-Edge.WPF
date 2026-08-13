@@ -201,7 +201,7 @@ namespace Veloxap.AddIn.Erwin
             if (showMessage)
             {
                 MessageBox.Show(
-                    "App.config icindeki AuthUsername ve AuthPassword bos.\n\n" +
+                    "Calisan uygulamanin .exe.config dosyasindaki AuthUsername ve AuthPassword bos.\n\n" +
                     "Servisleri kullanmadan once Ayarlar ekranindan kullanici adi ve parola bilgilerini doldurun.",
                     "Eksik Kullanici Bilgileri",
                     MessageBoxButton.OK,
