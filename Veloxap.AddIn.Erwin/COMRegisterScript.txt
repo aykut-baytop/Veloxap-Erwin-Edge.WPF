@@ -1,0 +1,10 @@
+
+Release
+
+%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /u Veloxap.AddIn.Erwin.dll
+
+Register
+%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase /tlb Veloxap.AddIn.Erwin.dll
+
+Kontrol:
+reg query "HKCR\Veloxap.AddIn.Erwin.dll"
