@@ -57,9 +57,12 @@ namespace Veloxap.AddIn
         {
             try
             {
-                int awareness;
-                int result = GetProcessDpiAwareness(IntPtr.Zero, out awareness);
-                return result == 0 ? AwarenessName(awareness) : "unavailable (" + result + ")";
+                using (Process process = Process.GetCurrentProcess())
+                {
+                    int awareness;
+                    int result = GetProcessDpiAwareness(process.Handle, out awareness);
+                    return result == 0 ? AwarenessName(awareness) : "unavailable (" + result + ")";
+                }
             }
             catch (DllNotFoundException)
             {
