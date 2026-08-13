@@ -26,6 +26,8 @@ namespace Veloxap.AddIn
 
         public void Run()
         {
+            ClearPreviousLogFiles();
+
             IntPtr ownerHandle = GetHostOwnerHandle();
             string executablePath = Path.Combine(
                 Path.GetDirectoryName(typeof(COMVeloxapManagerClass).Assembly.Location),
@@ -44,10 +46,39 @@ namespace Veloxap.AddIn
             Process.Start(new ProcessStartInfo
             {
                 FileName = executablePath,
-                Arguments = "--snapshot \"" + snapshotPath + "\"",
+                Arguments = "--snapshot \"" + snapshotPath + "\" --owner " + ownerHandle.ToInt64(),
                 WorkingDirectory = Path.GetDirectoryName(executablePath),
                 UseShellExecute = false
             });
+        }
+
+        private static void ClearPreviousLogFiles()
+        {
+            try
+            {
+                string logDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Veloxap.AddIn");
+
+                if (!Directory.Exists(logDirectory))
+                    return;
+
+                foreach (string logFilePath in Directory.EnumerateFiles(logDirectory, "*.log"))
+                {
+                    try
+                    {
+                        File.Delete(logFilePath);
+                    }
+                    catch
+                    {
+                        // Log cleanup must never prevent the add-in from starting.
+                    }
+                }
+            }
+            catch
+            {
+                // Log cleanup must never prevent the add-in from starting.
+            }
         }
 
         private static string CreateModelSnapshot()

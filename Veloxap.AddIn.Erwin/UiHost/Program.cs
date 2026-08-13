@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Web.Script.Serialization;
 using System.Windows;
+using System.Windows.Interop;
 using Veloxap.AddIn.Erwin;
 using Veloxap.AddIn.Erwin.Models;
 
@@ -21,11 +22,24 @@ namespace Veloxap.AddIn.Erwin.UiHost
             try
             {
                 ExternalModelSnapshot snapshot = ReadSnapshot(args);
+                IntPtr ownerHandle = ReadOwnerHandle(args);
                 var window = new Window1
                 {
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    ShowInTaskbar = true
+                    // An owned window is kept above its Erwin owner, closes with it,
+                    // and is not represented as a separate taskbar application.
+                    WindowStartupLocation = ownerHandle == IntPtr.Zero
+                        ? WindowStartupLocation.CenterScreen
+                        : WindowStartupLocation.CenterOwner,
+                    ShowInTaskbar = false
                 };
+
+                window.SourceInitialized += delegate
+                {
+                    RemoveMinimizeButton(window);
+                };
+
+                if (ownerHandle != IntPtr.Zero && IsWindow(ownerHandle))
+                    new WindowInteropHelper(window).Owner = ownerHandle;
 
                 window.Init(snapshot);
 
@@ -33,7 +47,36 @@ namespace Veloxap.AddIn.Erwin.UiHost
                 {
                     ShutdownMode = ShutdownMode.OnMainWindowClose
                 };
-                application.Run(window);
+
+                // The UI runs in a separate process for DPI isolation. Disable the
+                // Erwin owner while it is open so this window behaves as a modal
+                // part of the host application rather than a parallel application.
+                bool restoreOwnerWhenClosed = ownerHandle != IntPtr.Zero
+                    && IsWindow(ownerHandle)
+                    && IsWindowEnabled(ownerHandle);
+
+                if (restoreOwnerWhenClosed)
+                    EnableWindow(ownerHandle, false);
+
+                try
+                {
+                    application.Run(window);
+                }
+                finally
+                {
+                    if (restoreOwnerWhenClosed && IsWindow(ownerHandle))
+                    {
+                        EnableWindow(ownerHandle, true);
+
+                        // The owned window is the foreground window while it is
+                        // closing. Explicitly restore/activate Erwin so Windows
+                        // does not leave its owner minimized on the taskbar.
+                        if (IsIconic(ownerHandle))
+                            ShowWindowAsync(ownerHandle, SwRestore);
+
+                        SetForegroundWindow(ownerHandle);
+                    }
+                }
             }
             catch (Exception exception)
             {
@@ -84,6 +127,14 @@ namespace Veloxap.AddIn.Erwin.UiHost
             return null;
         }
 
+        private static IntPtr ReadOwnerHandle(string[] args)
+        {
+            long ownerValue;
+            return long.TryParse(GetArgumentValue(args, "--owner"), out ownerValue)
+                ? new IntPtr(ownerValue)
+                : IntPtr.Zero;
+        }
+
         private static void SetLegacyDpiAwareness()
         {
             try
@@ -98,7 +149,70 @@ namespace Veloxap.AddIn.Erwin.UiHost
             }
         }
 
+        private static void RemoveMinimizeButton(Window window)
+        {
+            IntPtr windowHandle = new WindowInteropHelper(window).Handle;
+            if (windowHandle == IntPtr.Zero)
+                return;
+
+            long windowStyle = GetWindowLongPtr(windowHandle, GwlStyle).ToInt64();
+            SetWindowLongPtr(
+                windowHandle,
+                GwlStyle,
+                new IntPtr(windowStyle & ~WsMinimizeBox));
+            SetWindowPos(
+                windowHandle,
+                IntPtr.Zero,
+                0,
+                0,
+                0,
+                0,
+                SwpNoMove | SwpNoSize | SwpNoZOrder | SwpFrameChanged);
+        }
+
+        private const int GwlStyle = -16;
+        private const long WsMinimizeBox = 0x00020000L;
+        private const uint SwpNoSize = 0x0001;
+        private const uint SwpNoMove = 0x0002;
+        private const uint SwpNoZOrder = 0x0004;
+        private const uint SwpFrameChanged = 0x0020;
+        private const int SwRestore = 9;
+
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnableWindow(IntPtr hWnd, bool enable);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindowAsync(IntPtr hWnd, int command);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
+        private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int index);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+        private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int index, IntPtr newLong);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(
+            IntPtr hWnd,
+            IntPtr hWndInsertAfter,
+            int x,
+            int y,
+            int cx,
+            int cy,
+            uint flags);
     }
 }

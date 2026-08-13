@@ -57,7 +57,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 txtUserSettingCount.Text = currentUserSettings.Count + " ayar";
                 txtServiceSettingCount.Text = VisibleServiceSettingCount + " ayar";
                 txtSettingCount.Text = currentUserSettings.Count + VisibleServiceSettingCount + " ayar";
-                txtConfigSource.Text = "Kullanilan dosya: " + config.FilePath;
                 emptyState.Visibility = settings.Count == 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
@@ -73,7 +72,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 txtUserSettingCount.Text = "0 ayar";
                 txtServiceSettingCount.Text = "0 ayar";
                 txtSettingCount.Text = "0 ayar";
-                txtConfigSource.Text = "Calisan uygulamanin .exe.config dosyasi okunamadi.";
                 emptyState.Visibility = Visibility.Visible;
                 SetStatus("Ayarlar okunamadi: " + ex.Message, true);
             }

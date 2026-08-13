@@ -122,20 +122,6 @@
                                FontSize="24"
                                FontWeight="SemiBold"
                                Foreground="#0F172A"/>
-
-                    <TextBlock x:Name="txtConfigSource"
-                               Margin="0,6,0,0"
-                               Style="{StaticResource MutedTextStyle}"
-                               TextWrapping="Wrap" RenderTransformOrigin="0.5,0.5">
-                        <TextBlock.RenderTransform>
-                            <TransformGroup>
-                                <ScaleTransform/>
-                                <SkewTransform/>
-                                <RotateTransform Angle="0.128"/>
-                                <TranslateTransform/>
-                            </TransformGroup>
-                        </TextBlock.RenderTransform>
-                    </TextBlock>
                 </StackPanel>
 
                 <TextBlock x:Name="txtSettingCount"
