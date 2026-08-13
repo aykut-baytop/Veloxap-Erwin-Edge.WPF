@@ -18,6 +18,7 @@ namespace Veloxap.AddIn.Erwin.Models
         public ModelObject()
         {
             oObjectProperty = new List<ObjectProperty>();
+            oModelObjects = new List<ModelObject>();
             oObjectId = "";
             oClassName = "";
             oName = "";

@@ -8,6 +8,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Script.Serialization;
+using Veloxap.AddIn.Erwin.Models;
+using VeloxapEDGErwinTools.AddIn;
 
 namespace Veloxap.AddIn
 {
@@ -36,14 +39,89 @@ namespace Veloxap.AddIn
                     executablePath);
             }
 
+            string snapshotPath = CreateModelSnapshot();
+
             Process.Start(new ProcessStartInfo
             {
                 FileName = executablePath,
-                Arguments = "--erwin-process-id " + Process.GetCurrentProcess().Id +
-                            " --owner-hwnd " + ownerHandle.ToInt64(),
+                Arguments = "--snapshot \"" + snapshotPath + "\"",
                 WorkingDirectory = Path.GetDirectoryName(executablePath),
                 UseShellExecute = false
             });
+        }
+
+        private static string CreateModelSnapshot()
+        {
+            var snapshot = new ExternalModelSnapshot();
+            SCAPI.Application application = new SCAPI.Application();
+            var erwin = new VeloxapEDGErwinLib(ref application);
+            var modelList = erwin.getModelsNamePath() ?? new List<(string value, string key1, string key2)>();
+
+            for (int index = 0; index < modelList.Count; index++)
+            {
+                var model = modelList[index];
+                var snapshotItem = new ExternalModelSnapshotItem
+                {
+                    DisplayName = model.Item1,
+                    ObjectId = model.Item2,
+                    PersistenceObjectId = model.Item3,
+                    // Used by the Model UDP screen.
+                    Model = ModelSnapshotInfo.FromModelInfo(
+                        erwin.loadModelObject(model.Item2, model.Item3))
+                };
+
+                // Preserve the existing Model & Tablo Bilgileri workflow:
+                // getModelObjects() builds the left tree and GetObjectProperties()
+                // populates the right detail grid for each selected node.
+                snapshotItem.ModelObjects.Add(new ExternalModelObjectSnapshot
+                {
+                    ClassName = "Model",
+                    Name = model.Item1,
+                    ObjectId = model.Item2,
+                    ParentObjectId = null,
+                    IsRoot = true,
+                    Properties = erwin.GetObjectProperties(true, model.Item2, null, index)
+                });
+
+                var modelObjects = erwin.getModelObjects(model.Item2, index) ??
+                    new List<(string, string, string)>();
+                foreach (var modelObject in modelObjects)
+                {
+                    snapshotItem.ModelObjects.Add(new ExternalModelObjectSnapshot
+                    {
+                        ClassName = modelObject.Item1,
+                        Name = modelObject.Item2,
+                        ObjectId = modelObject.Item3,
+                        ParentObjectId = model.Item2,
+                        IsRoot = false,
+                        Properties = erwin.GetObjectProperties(
+                            false,
+                            modelObject.Item3,
+                            model.Item2,
+                            index)
+                    });
+                }
+
+                snapshot.Models.Add(new ExternalModelSnapshotItem
+                {
+                    DisplayName = snapshotItem.DisplayName,
+                    ObjectId = snapshotItem.ObjectId,
+                    PersistenceObjectId = snapshotItem.PersistenceObjectId,
+                    Model = snapshotItem.Model,
+                    ModelObjects = snapshotItem.ModelObjects
+                });
+            }
+
+            string snapshotPath = Path.Combine(
+                Path.GetTempPath(),
+                "Veloxap-Erwin-" + Guid.NewGuid().ToString("N") + ".json");
+            var serializer = new JavaScriptSerializer
+            {
+                MaxJsonLength = int.MaxValue,
+                RecursionLimit = 100
+            };
+            File.WriteAllText(snapshotPath, serializer.Serialize(snapshot), Encoding.UTF8);
+            return snapshotPath;
         }
 
         private static IntPtr GetHostOwnerHandle()

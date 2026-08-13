@@ -44,7 +44,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             string catalogName,
             string catalogLongId)
         {
-            tableUdpModelInfo = modelInfo;
+            tableUdpModelInfo = modelInfo ?? new ModelInfo();
             tableUdpApplication = application;
             tableUdpPersistenceUnit = persistenceUnit;
             catalogRuleService = ruleService;
@@ -55,9 +55,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             Loaded += ModelInfoView_Loaded;
             tabModelSections.SelectionChanged += TabModelSections_SelectionChanged;
 
-            DataContext = modelInfo == null
-                ? new ModelInfoViewModel()
-                : new ModelInfoViewModel(modelInfo);
+            DataContext = new ModelInfoViewModel(tableUdpModelInfo);
 
             if (showTableUdpTab)
             {

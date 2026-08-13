@@ -47,6 +47,8 @@ namespace Veloxap.AddIn.Erwin
         private string loadedRulesModelKey;
         private string lastRuleRequestTrace;
         private TableUdpStartupApplyResult tableUdpStartupResult;
+        private Dictionary<string, ModelInfo> externalModelsByPersistenceObjectId;
+        private Dictionary<string, List<ExternalModelObjectSnapshot>> externalTestObjectsByPersistenceObjectId;
 
         private bool isValidationActive;
         private bool isValidationOk;
@@ -79,6 +81,44 @@ namespace Veloxap.AddIn.Erwin
             oApp = app;
             veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref app);
             models = new List<(string value, string key1, string key2)>();
+            InitializeServices();
+            PopulateModels();
+        }
+
+        /// <summary>
+        /// Initializes the isolated UI-host process from a model snapshot that
+        /// was captured inside Erwin. The UI host must never create its own
+        /// SCAPI.Application instance because it would not be attached to the
+        /// caller's active Erwin session.
+        /// </summary>
+        public void Init(ExternalModelSnapshot snapshot)
+        {
+            snapshot = snapshot ?? new ExternalModelSnapshot();
+            externalModelsByPersistenceObjectId = new Dictionary<string, ModelInfo>(
+                StringComparer.OrdinalIgnoreCase);
+            externalTestObjectsByPersistenceObjectId =
+                new Dictionary<string, List<ExternalModelObjectSnapshot>>(
+                    StringComparer.OrdinalIgnoreCase);
+            models = new List<(string value, string key1, string key2)>();
+
+            foreach (var item in snapshot.Models ?? new List<ExternalModelSnapshotItem>())
+            {
+                if (item == null)
+                    continue;
+
+                models.Add((item.DisplayName, item.ObjectId, item.PersistenceObjectId));
+                externalModelsByPersistenceObjectId[item.PersistenceObjectId ?? string.Empty] =
+                    item.Model == null ? new ModelInfo() : item.Model.ToModelInfo();
+                externalTestObjectsByPersistenceObjectId[item.PersistenceObjectId ?? string.Empty] =
+                    item.ModelObjects ?? new List<ExternalModelObjectSnapshot>();
+            }
+
+            InitializeServices();
+            PopulateModels();
+        }
+
+        private void InitializeServices()
+        {
             rules = new List<string>();
             validationRules = new List<Rule>();
             apiCookieContainer = new CookieContainer();
@@ -88,7 +128,6 @@ namespace Veloxap.AddIn.Erwin
             isValidationOk = false;
             if (EnsureAuthCredentialsConfigured(showMessage: true))
                 _ = InitializeAuthenticationAsync();
-            PopulateModels();
         }
 
         private async void Menu_Checked(object sender, RoutedEventArgs e)
@@ -195,7 +234,10 @@ namespace Veloxap.AddIn.Erwin
 
         public void PopulateModels()
         {
-            models = veloxapEDGErwinLib.getModelsNamePath() ?? new List<(string value, string key1, string key2)>();
+            if (veloxapEDGErwinLib != null)
+                models = veloxapEDGErwinLib.getModelsNamePath() ?? new List<(string value, string key1, string key2)>();
+            else if (models == null)
+                models = new List<(string value, string key1, string key2)>();
 
             var modelItems = models
                 .Select(model => new ModelSelection(model.value, model.key1, model.key2))
@@ -245,9 +287,6 @@ namespace Veloxap.AddIn.Erwin
             UpdateSelectedMainModelInfo(selectedModel);
             ClearValidationRules();
 
-            if (veloxapEDGErwinLib == null)
-                return;
-
             LoadSelectedModelSummary(selectedModel);
 
             if (rbModelInfo.IsChecked == true)
@@ -296,7 +335,28 @@ namespace Veloxap.AddIn.Erwin
                 oApp,
                 GetCatalogOverviewRuleService(),
                 selectedModelName,
-                selectedModelLongId);
+                selectedModelLongId,
+                GetExternalTestObjects());
+        }
+
+        private List<ExternalModelObjectSnapshot> GetExternalTestObjects()
+        {
+            if (externalTestObjectsByPersistenceObjectId == null ||
+                cmbMainModel == null)
+            {
+                return null;
+            }
+
+            var selectedModel = cmbMainModel.SelectedItem as ModelSelection;
+            if (selectedModel == null)
+                return null;
+
+            List<ExternalModelObjectSnapshot> objects;
+            return externalTestObjectsByPersistenceObjectId.TryGetValue(
+                selectedModel.PersistenceObjectId ?? string.Empty,
+                out objects)
+                ? objects
+                : null;
         }
 
         private async Task ShowModelValidationViewAsync()
@@ -371,10 +431,31 @@ namespace Veloxap.AddIn.Erwin
                 ? null
                 : cmbMainModel.SelectedItem as ModelSelection;
 
-            if (veloxapEDGErwinLib == null || selectedModel == null)
+            if (selectedModel == null)
                 return currentModelInfo;
 
             string modelKey = BuildModelKey(selectedModel);
+
+            if (externalModelsByPersistenceObjectId != null)
+            {
+                ModelInfo externalModel;
+                if (!externalModelsByPersistenceObjectId.TryGetValue(
+                    selectedModel.PersistenceObjectId ?? string.Empty,
+                    out externalModel))
+                {
+                    externalModel = new ModelInfo();
+                }
+
+                currentModelInfo = externalModel;
+                currentTableUdpModelInfo = externalModel;
+                loadedSummaryModelKey = modelKey;
+                loadedDetailedModelKey = modelKey;
+                loadedTableUdpModelKey = modelKey;
+                return externalModel;
+            }
+
+            if (veloxapEDGErwinLib == null)
+                return currentModelInfo;
 
             if (purpose == ModelLoadPurpose.Summary)
             {
@@ -414,11 +495,32 @@ namespace Veloxap.AddIn.Erwin
 
         private void LoadSelectedModelSummary(ModelSelection selectedModel)
         {
-            if (veloxapEDGErwinLib == null || selectedModel == null)
+            if (selectedModel == null)
                 return;
 
             string modelKey = BuildModelKey(selectedModel);
             if (string.Equals(loadedSummaryModelKey, modelKey, StringComparison.Ordinal))
+                return;
+
+            if (externalModelsByPersistenceObjectId != null)
+            {
+                ModelInfo externalModel;
+                if (!externalModelsByPersistenceObjectId.TryGetValue(
+                    selectedModel.PersistenceObjectId ?? string.Empty,
+                    out externalModel))
+                {
+                    externalModel = new ModelInfo();
+                }
+
+                currentModelInfo = externalModel;
+                currentTableUdpModelInfo = externalModel;
+                loadedSummaryModelKey = modelKey;
+                loadedDetailedModelKey = modelKey;
+                loadedTableUdpModelKey = modelKey;
+                return;
+            }
+
+            if (veloxapEDGErwinLib == null)
                 return;
 
             currentModelInfo = LoadModelWithBusyCursor(() =>

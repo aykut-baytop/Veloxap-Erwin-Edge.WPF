@@ -15,6 +15,14 @@ namespace Veloxap.AddIn.Erwin.Models
         private List<ModelObject> oModelObject;
         private List<ObjectProperty> oObjectProperty;
 
+        public ModelInfo()
+        {
+            // Consumers enumerate these collections in several screens. Keep
+            // an empty model safe when a snapshot contains no objects/properties.
+            oModelObject = new List<ModelObject>();
+            oObjectProperty = new List<ObjectProperty>();
+        }
+
 
         public void setoModelObject(List<ModelObject> oModelObject)
         {

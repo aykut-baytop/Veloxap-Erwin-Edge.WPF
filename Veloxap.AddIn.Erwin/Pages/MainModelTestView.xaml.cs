@@ -20,6 +20,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         private bool isSubscribed;
         private int detectedChangeCount;
         private VeloxapEDGErwinLib veloxapEDGErwinLib;
+        private readonly List<ExternalModelObjectSnapshot> snapshotModelObjects;
 
         private readonly RuleService catalogRuleService;
         private string currentCatalogName;
@@ -46,11 +47,14 @@ namespace Veloxap.AddIn.Erwin.Pages
             SCAPI.Application oApp,
             RuleService ruleService,
             string catalogName,
-            string catalogLongId)
+            string catalogLongId,
+            List<ExternalModelObjectSnapshot> externalModelObjects = null)
             : this()
         {
             this.owner = owner;
-            veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref oApp);
+            snapshotModelObjects = externalModelObjects;
+            if (oApp != null)
+                veloxapEDGErwinLib = new VeloxapEDGErwinLib(ref oApp);
             catalogRuleService = ruleService;
             currentCatalogName = catalogName;
             currentCatalogLongId = catalogLongId;
@@ -154,16 +158,22 @@ namespace Veloxap.AddIn.Erwin.Pages
                 if (selectionInfo == null || !selectionInfo.HasSelection)
                     return;
 
-                if (veloxapEDGErwinLib == null || selectionInfo.SelectedIndex < 0)
+                if (snapshotModelObjects != null)
                 {
+                    ShowSnapshotTree(selectionInfo);
                     return;
                 }
 
+                if (veloxapEDGErwinLib == null || selectionInfo.SelectedIndex < 0)
+                    return;
+
                 List<(string, string, string)> modelObjectsList =
-                    veloxapEDGErwinLib.getModelObjects(
+                    (veloxapEDGErwinLib.getModelObjects(
                         selectionInfo.ObjectId,
-                        selectionInfo.SelectedIndex).OrderBy(x=> x.Item2).ToList() ??
-                    new List<(string, string, string)>();
+                        selectionInfo.SelectedIndex) ??
+                    new List<(string, string, string)>())
+                    .OrderBy(item => item.Item2)
+                    .ToList();
 
                 string rootName = string.IsNullOrWhiteSpace(selectionInfo.DisplayName)
                     ? selectionInfo.RawName
@@ -219,17 +229,36 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private List<ObjectPropertyDetail> LoadNodeDetails(ModelObjectTreeNode node)
         {
-            if (node == null ||
-                selectedMainModelInfo == null ||
-                selectedMainModelInfo.SelectedIndex < 0 ||
-                veloxapEDGErwinLib == null)
+            if (node == null)
             {
                 return new List<ObjectPropertyDetail>();
             }
 
-            var properties =
-                veloxapEDGErwinLib
-                .GetObjectProperties(node.IsRoot, node.ObjectId, node.ParentObjectId, selectedMainModelInfo.SelectedIndex);
+            ObjectPropertiesResult properties = node.SnapshotProperties;
+            VeloxapEDGErwinLib calculationLibrary = veloxapEDGErwinLib;
+
+            if (properties == null)
+            {
+                if (selectedMainModelInfo == null ||
+                    selectedMainModelInfo.SelectedIndex < 0 ||
+                    veloxapEDGErwinLib == null)
+                {
+                    return new List<ObjectPropertyDetail>();
+                }
+
+                properties = veloxapEDGErwinLib.GetObjectProperties(
+                    node.IsRoot,
+                    node.ObjectId,
+                    node.ParentObjectId,
+                    selectedMainModelInfo.SelectedIndex);
+            }
+
+            if (properties == null)
+                return new List<ObjectPropertyDetail>();
+
+            properties.EntityProperties = properties.EntityProperties ?? new List<ScapiPropertyInfo>();
+            properties.Columns = properties.Columns ?? new List<ScapiColumnInfo>();
+            calculationLibrary = calculationLibrary ?? CreateDetachedCalculationLibrary();
 
             var Erisilebilirlik = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Erisilebilirlik").FirstOrDefault();
             var Butunluk = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Butunluk" || x.ClassName == "Entity.Physical.Bütünlük").FirstOrDefault();
@@ -238,13 +267,13 @@ namespace Veloxap.AddIn.Erwin.Pages
             var hassasVeriMi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Hassas_Veri_Mi").FirstOrDefault();
             var sirKapsamindaVeriMi = properties.EntityProperties.Where(x => x.ClassName == "Entity.Physical.Sir_Kapsaminda_Veri_Mi").FirstOrDefault();
 
-            var veriDegeriResult = veloxapEDGErwinLib.CalculateVeriDegeri(Erisilebilirlik?.Value, Butunluk?.Value, gizlilikSeviyesi?.Value);
+            var veriDegeriResult = calculationLibrary.CalculateVeriDegeri(Erisilebilirlik?.Value, Butunluk?.Value, gizlilikSeviyesi?.Value);
 
-            var bankaGoreceDegeriResult = veloxapEDGErwinLib.CalculateBankaGoreceDegeri(veriDegeriResult, isSureciSeviyesi?.Value);
+            var bankaGoreceDegeriResult = calculationLibrary.CalculateBankaGoreceDegeri(veriDegeriResult, isSureciSeviyesi?.Value);
 
             int veriDeger = int.TryParse(Regex.Match(veriDegeriResult, @"\d+").Value, out var result) ? result : 0;
 
-            var guvenlikSinifiDegeriResult = veloxapEDGErwinLib.CalculateGuvenlikSinifiDegeri(
+            var guvenlikSinifiDegeriResult = calculationLibrary.CalculateGuvenlikSinifiDegeri(
                 veriDeger,
                 properties.Columns,
                 hassasVeriMi?.Value,
@@ -283,6 +312,48 @@ namespace Veloxap.AddIn.Erwin.Pages
             dgObjectDetails.ItemsSource = null;
         }
 
+        private void ShowSnapshotTree(MainModelSelectionInfo selectionInfo)
+        {
+            var rootSnapshot = snapshotModelObjects.FirstOrDefault(
+                item => item != null && item.IsRoot);
+            string rootName = string.IsNullOrWhiteSpace(selectionInfo.DisplayName)
+                ? selectionInfo.RawName
+                : selectionInfo.DisplayName;
+
+            // Keep the original UI topology: every model object is a direct
+            // child of the model root, ordered by name.
+            var root = new ModelObjectTreeNode(
+                rootSnapshot == null ? "Model" : rootSnapshot.ClassName,
+                rootName,
+                rootSnapshot == null ? selectionInfo.ObjectId : rootSnapshot.ObjectId,
+                null,
+                true,
+                rootSnapshot == null ? null : rootSnapshot.Properties);
+            root.IsExpanded = true;
+
+            foreach (var item in snapshotModelObjects
+                .Where(item => item != null && !item.IsRoot)
+                .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                root.Children.Add(new ModelObjectTreeNode(
+                    item.ClassName,
+                    item.Name,
+                    item.ObjectId,
+                    item.ParentObjectId,
+                    false,
+                    item.Properties));
+            }
+
+            treeModelObjects.ItemsSource = new List<ModelObjectTreeNode> { root };
+            ShowNodeDetails(root);
+        }
+
+        private static VeloxapEDGErwinLib CreateDetachedCalculationLibrary()
+        {
+            SCAPI.Application application = null;
+            return new VeloxapEDGErwinLib(ref application);
+        }
+
         private string BuildChangeStatusText(bool countAsDetectedChange)
         {
             if (!selectedMainModelInfo.HasSelection)
@@ -302,13 +373,15 @@ namespace Veloxap.AddIn.Erwin.Pages
                 string name,
                 string objectId,
                 string parentObjectId,
-                bool isRoot)
+                bool isRoot,
+                ObjectPropertiesResult snapshotProperties = null)
             {
                 ClassName = className ?? string.Empty;
                 Name = name ?? string.Empty;
                 ObjectId = objectId ?? string.Empty;
                 ParentObjectId = parentObjectId;
                 IsRoot = isRoot;
+                SnapshotProperties = snapshotProperties;
                 Children = new List<ModelObjectTreeNode>();
             }
 
@@ -326,6 +399,8 @@ namespace Veloxap.AddIn.Erwin.Pages
             public string ParentObjectId { get; private set; }
 
             public bool IsRoot { get; private set; }
+
+            public ObjectPropertiesResult SnapshotProperties { get; private set; }
 
             public bool IsExpanded { get; set; }
 
