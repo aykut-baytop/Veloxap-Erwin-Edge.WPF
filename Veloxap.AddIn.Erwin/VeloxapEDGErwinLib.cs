@@ -634,85 +634,11 @@ namespace VeloxapEDGErwinTools.AddIn
                 session.Open(
                     persistenceUnit,
                     SCAPI.SC_SessionLevel.SCD_SL_M0);
-
-                SCAPI.ModelObject parentObject;
-
-                if (isRoot)
-                {
-                    parentObject = session.ModelObjects.Root;
-                }
-                else
-                {
-                    parentObject = session.ModelObjects[parentObjectId];
-                }
-
-                SCAPI.ModelObject selectedObject =
-                    session.ModelObjects.Collect(parentObject)[objectId];
-
-                if (selectedObject == null)
-                    return result;
-
-                if (IsEntityObject(selectedObject))
-                {
-                    var entityPropertyNames = new HashSet<string>(
-    StringComparer.OrdinalIgnoreCase)
-                {
-                    "Entity.Physical.Veri_Degeri",
-                    "Entity.Physical.Banka_Gorece_Degeri",
-                    "Entity.Physical.Guvenlik_Sinifi_Degeri",
-                    "Entity.Physical.Hassas_Veri_Mi",
-                    //"Entity.Physical.Kisisel_Veri_Mi",
-                    "Entity.Physical.Erisilebilirlik",
-                    "Entity.Physical.Butunluk",
-                    "Entity.Physical.Bütünlük",
-                    "Entity.Physical.Gizlilik_Seviyesi",
-                    "Entity.Physical.Is_Sureci_Seviyesi",
-                    "Entity.Physical.Sir_Kapsaminda_Veri_Mi"
-                };
-
-                    // Attribute UDP alanları
-                    var attributePropertyNames = new HashSet<string>(
-                        StringComparer.OrdinalIgnoreCase)
-                {
-                    "Attribute.Physical.Hassas_Veri_Mi",
-                    "Attribute.Physical.Kisisel_Veri_Mi"
-                };
-
-                    // Seçili Entity'nin kendi property'lerini oku.
-                    ReadProperties(
-                        selectedObject,
-                        entityPropertyNames,
-                        result.EntityProperties);
-
-                    SCAPI.ModelObjects attributes =
-                        session.ModelObjects.Collect(
-                            selectedObject,
-                            "Attribute");
-
-
-
-                    foreach (SCAPI.ModelObject attribute in attributes)
-                    {
-                        if (attribute == null)
-                            continue;
-
-                        var columnInfo = new ScapiColumnInfo
-                        {
-                            ObjectId = Convert.ToString(attribute.ObjectId),
-                            Name = GetObjectName(attribute)
-                        };
-
-                        ReadProperties(
-                            attribute,
-                            attributePropertyNames,
-                            columnInfo.Properties);
-
-                        result.Columns.Add(columnInfo);
-                    }
-                }
-
-
-                return result;
+                return GetObjectPropertiesInOpenSession(
+                    session,
+                    isRoot,
+                    objectId,
+                    parentObjectId);
             }
             catch (Exception ex)
             {
@@ -735,6 +661,134 @@ namespace VeloxapEDGErwinTools.AddIn
                 {
                 }
             }
+        }
+
+        /// <summary>
+        /// Reads the Model & Tablo Bilgileri details for a model in one SCAPI
+        /// session. The isolated UI host needs these serializable details, and
+        /// opening a separate session for every entity is prohibitively slow for
+        /// large models.
+        /// </summary>
+        public Dictionary<string, ObjectPropertiesResult> GetObjectPropertiesBatch(
+            string rootObjectId,
+            IEnumerable<string> objectIds,
+            int selectedModelIndex)
+        {
+            var results = new Dictionary<string, ObjectPropertiesResult>(
+                StringComparer.OrdinalIgnoreCase);
+            SCAPI.Session session = null;
+
+            try
+            {
+                SCAPI.PersistenceUnit persistenceUnit =
+                    oApplication.PersistenceUnits[selectedModelIndex];
+                session = oApplication.Sessions.Add();
+                session.Open(persistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
+
+                foreach (string objectId in objectIds ?? Enumerable.Empty<string>())
+                {
+                    if (string.IsNullOrWhiteSpace(objectId))
+                        continue;
+
+                    results[objectId] = GetObjectPropertiesInOpenSession(
+                        session,
+                        false,
+                        objectId,
+                        rootObjectId);
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                ScapiTraceLogger.Info(
+                    Environment.NewLine +
+                    "GetObjectPropertiesBatch ERROR" +
+                    Environment.NewLine +
+                    ex +
+                    Environment.NewLine);
+                return results;
+            }
+            finally
+            {
+                try
+                {
+                    oApplication.Sessions.Clear();
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private ObjectPropertiesResult GetObjectPropertiesInOpenSession(
+            SCAPI.Session session,
+            bool isRoot,
+            object objectId,
+            object parentObjectId)
+        {
+            var result = new ObjectPropertiesResult();
+            if (session == null)
+                return result;
+
+            SCAPI.ModelObject selectedObject;
+
+            // Object ids are globally addressable within an open model session.
+            // Avoid Collect(root) for every entity: on a large model that would
+            // repeatedly materialize the entire entity collection.
+            try
+            {
+                selectedObject = isRoot
+                    ? session.ModelObjects.Root
+                    : session.ModelObjects[objectId];
+            }
+            catch
+            {
+                SCAPI.ModelObject parentObject = isRoot
+                    ? session.ModelObjects.Root
+                    : session.ModelObjects[parentObjectId];
+                selectedObject = session.ModelObjects.Collect(parentObject)[objectId];
+            }
+
+            if (selectedObject == null || !IsEntityObject(selectedObject))
+                return result;
+
+            var entityPropertyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Entity.Physical.Veri_Degeri",
+                "Entity.Physical.Banka_Gorece_Degeri",
+                "Entity.Physical.Guvenlik_Sinifi_Degeri",
+                "Entity.Physical.Hassas_Veri_Mi",
+                "Entity.Physical.Erisilebilirlik",
+                "Entity.Physical.Butunluk",
+                "Entity.Physical.Bütünlük",
+                "Entity.Physical.Gizlilik_Seviyesi",
+                "Entity.Physical.Is_Sureci_Seviyesi",
+                "Entity.Physical.Sir_Kapsaminda_Veri_Mi"
+            };
+            var attributePropertyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Attribute.Physical.Hassas_Veri_Mi",
+                "Attribute.Physical.Kisisel_Veri_Mi"
+            };
+
+            ReadProperties(selectedObject, entityPropertyNames, result.EntityProperties);
+
+            foreach (SCAPI.ModelObject attribute in session.ModelObjects.Collect(selectedObject, "Attribute"))
+            {
+                if (attribute == null)
+                    continue;
+
+                var columnInfo = new ScapiColumnInfo
+                {
+                    ObjectId = Convert.ToString(attribute.ObjectId),
+                    Name = GetObjectName(attribute)
+                };
+                ReadProperties(attribute, attributePropertyNames, columnInfo.Properties);
+                result.Columns.Add(columnInfo);
+            }
+
+            return result;
         }
 
         private void ReadProperties(
