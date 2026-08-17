@@ -7,8 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Interop;
+using System.Windows.Forms;
 using Veloxap.AddIn.Erwin;
 
 namespace Veloxap.AddIn
@@ -57,19 +56,23 @@ namespace Veloxap.AddIn
         {
             SCAPI.Application app = new SCAPI.Application();
 
-            Window1 mainForm = new Window1();
-            AssignOwner(mainForm, ownerHandle);
-            mainForm.Init(ref app);
-            mainForm.ShowDialog();
+            using (var mainForm = new ErwinAddInForm(app))
+            {
+                if (ownerHandle == IntPtr.Zero)
+                    mainForm.ShowDialog();
+                else
+                    mainForm.ShowDialog(new NativeWindowOwner(ownerHandle));
+            }
         }
 
-        private static void AssignOwner(Window window, IntPtr ownerHandle)
+        private sealed class NativeWindowOwner : IWin32Window
         {
-            if (window == null || ownerHandle == IntPtr.Zero)
-                return;
+            internal NativeWindowOwner(IntPtr handle)
+            {
+                Handle = handle;
+            }
 
-            new WindowInteropHelper(window).Owner = ownerHandle;
-            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            public IntPtr Handle { get; }
         }
 
         private static IntPtr GetHostOwnerHandle()

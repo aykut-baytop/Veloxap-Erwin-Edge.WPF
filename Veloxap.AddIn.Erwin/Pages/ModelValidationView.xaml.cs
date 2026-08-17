@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Media;
 using Veloxap.AddIn.Erwin.Models;
@@ -429,13 +430,23 @@ namespace Veloxap.AddIn.Erwin.Pages
                 Height = 290,
                 MinWidth = 380,
                 MinHeight = 250,
-                WindowStartupLocation = owner == null
-                    ? WindowStartupLocation.CenterScreen
-                    : WindowStartupLocation.CenterOwner,
-                Owner = owner,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
                 ShowInTaskbar = false
             };
+
+            if (owner != null)
+            {
+                dialog.Owner = owner;
+            }
+            else
+            {
+                var hostSource = PresentationSource.FromVisual(this) as HwndSource;
+                if (hostSource != null)
+                    new WindowInteropHelper(dialog).Owner = hostSource.Handle;
+                else
+                    dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
 
             var root = new Grid
             {

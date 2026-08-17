@@ -70,6 +70,9 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Core" />
     <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="WindowsFormsIntegration" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Net.Http" />
@@ -119,6 +122,9 @@
     <Compile Include="Services\RuleService.cs" />
     <Compile Include="Services\TableUdpSecurityService.cs" />
     <Compile Include="VeloxapEDGErwinLib.cs" />
+    <Compile Include="ErwinAddInForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>

@@ -21,9 +21,9 @@ using Veloxap.AddIn.Erwin.Services;
 namespace Veloxap.AddIn.Erwin
 {
     /// <summary>
-    /// Interaction logic for Window1.xaml
+    /// WPF add-in content hosted by the WinForms shell shown by erwin.
     /// </summary>
-    public partial class Window1 : Window
+    public partial class Window1 : UserControl
     {
         private SCAPI.Application oApp;
         private VeloxapEDGErwinLib veloxapEDGErwinLib;
