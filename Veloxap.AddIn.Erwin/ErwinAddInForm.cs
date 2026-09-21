@@ -19,6 +19,7 @@ namespace Veloxap.AddIn.Erwin
                 throw new ArgumentNullException(nameof(app));
 
             Text = "Veloxap Erwin Add-In";
+            Icon = SystemIcons.Application;
             ClientSize = new Size(1100, 700);
             MinimumSize = new Size(950, 600);
             StartPosition = FormStartPosition.CenterParent;
