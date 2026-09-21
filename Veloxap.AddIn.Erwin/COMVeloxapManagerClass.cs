@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using Veloxap.AddIn.Erwin.Models;
+using Veloxap.AddIn.Erwin.Services;
 using VeloxapEDGErwinTools.AddIn;
 
 namespace Veloxap.AddIn
@@ -83,6 +84,7 @@ namespace Veloxap.AddIn
 
         private static string CreateModelSnapshot()
         {
+            var snapshotStopwatch = Stopwatch.StartNew();
             var snapshot = new ExternalModelSnapshot();
             SCAPI.Application application = new SCAPI.Application();
             var erwin = new VeloxapEDGErwinLib(ref application);
@@ -96,9 +98,12 @@ namespace Veloxap.AddIn
                     DisplayName = model.Item1,
                     ObjectId = model.Item2,
                     PersistenceObjectId = model.Item3,
-                    // Used by the Model UDP screen.
+                    // The full model graph used to be serialized here for every
+                    // model. That duplicates the Model & Tablo data below and
+                    // makes large models take an excessive time to open. The UI
+                    // only needs the model-level summary at startup.
                     Model = ModelSnapshotInfo.FromModelInfo(
-                        erwin.loadModelObject(model.Item2, model.Item3))
+                        erwin.loadModelSummary(model.Item2, model.Item3))
                 };
 
                 // Preserve the existing Model & Tablo Bilgileri workflow:
@@ -116,8 +121,20 @@ namespace Veloxap.AddIn
 
                 var modelObjects = erwin.getModelObjects(model.Item2, index) ??
                     new List<(string, string, string)>();
+
+                // Keep all data exactly as before, but read every entity through
+                // one SCAPI session instead of opening one session per entity.
+                var propertiesByObjectId = erwin.GetObjectPropertiesBatch(
+                    model.Item2,
+                    modelObjects.Select(modelObject => modelObject.Item3),
+                    index);
+
                 foreach (var modelObject in modelObjects)
                 {
+                    ObjectPropertiesResult properties;
+                    if (!propertiesByObjectId.TryGetValue(modelObject.Item3, out properties))
+                        properties = new ObjectPropertiesResult();
+
                     snapshotItem.ModelObjects.Add(new ExternalModelObjectSnapshot
                     {
                         ClassName = modelObject.Item1,
@@ -125,11 +142,7 @@ namespace Veloxap.AddIn
                         ObjectId = modelObject.Item3,
                         ParentObjectId = model.Item2,
                         IsRoot = false,
-                        Properties = erwin.GetObjectProperties(
-                            false,
-                            modelObject.Item3,
-                            model.Item2,
-                            index)
+                        Properties = properties
                     });
                 }
 
@@ -152,6 +165,11 @@ namespace Veloxap.AddIn
                 RecursionLimit = 100
             };
             File.WriteAllText(snapshotPath, serializer.Serialize(snapshot), Encoding.UTF8);
+            snapshotStopwatch.Stop();
+            ScapiTraceLogger.Info(
+                "UI host snapshot created: models=" + snapshot.Models.Count +
+                ", elapsedMs=" + snapshotStopwatch.ElapsedMilliseconds +
+                ", path=" + snapshotPath);
             return snapshotPath;
         }
 
