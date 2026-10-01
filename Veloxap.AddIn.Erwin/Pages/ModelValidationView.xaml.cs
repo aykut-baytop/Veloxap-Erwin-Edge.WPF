@@ -188,14 +188,14 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
         {
-           if (isInitializing || isUpdatingTargetVersion)
-               return;
+            if (isInitializing || isUpdatingTargetVersion)
+                return;
 
-           if (sender == cmbSourceVersion)
-               SelectPreviousTargetVersion();
+            if (sender == cmbSourceVersion)
+                SelectPreviousTargetVersion();
 
-           ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
-           await RefreshAlterDdlPreviewAsync();
+            ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
+            await RefreshAlterDdlPreviewAsync();
         }
 
         private async void BtnRunValidation_Click(object sender, RoutedEventArgs e)
@@ -271,7 +271,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 validationTabs.SelectedItem = tabValidationResults;
                 SetStatus("Tablo UDP degerleri hesaplanarak onay metni hazirlaniyor...");
 
-                string approvalDdl = await BuildApprovalDdlTextAsync(currentAlterDdl ?? string.Empty);
+                //string approvalDdl = await BuildApprovalDdlTextAsync(currentAlterDdl ?? string.Empty);
 
                 SetStatus("Onaya gonderiliyor...");
 
@@ -282,7 +282,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                     versionId,
                     targetVersionId,
                     description,
-                    approvalDdl);
+                    txtAlterDdl.Text);
 
                 if (response != null && !response.Success)
                 {
@@ -671,43 +671,43 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async Task RefreshAlterDdlPreviewAsync()
         {
-           var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
-           var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
+            var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
+            var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
 
-           if (sourceVersion == null || targetVersion == null)
-           {
-               currentAlterDdl = string.Empty;
-               txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
-               return;
-           }
+            if (sourceVersion == null || targetVersion == null)
+            {
+                currentAlterDdl = string.Empty;
+                txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
+                return;
+            }
 
-           try
-           {
-               currentAlterDdl = string.Empty;
-               txtAlterDdl.Text = "UDP degisiklikleri ve Alter DDL hazirlaniyor...";
+            try
+            {
+                currentAlterDdl = string.Empty;
+                txtAlterDdl.Text = "UDP degisiklikleri ve Alter DDL hazirlaniyor...";
 
-               Task<string> ddlTask = RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
-               Task<UdpDiffResult> udpDiffTask = RequestUdpDiffFromApiAsync(sourceVersion, targetVersion);
-               await Task.WhenAll(ddlTask, udpDiffTask);
+                Task<string> ddlTask = RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
+                Task<UdpDiffResult> udpDiffTask = RequestUdpDiffFromApiAsync(sourceVersion, targetVersion);
+                await Task.WhenAll(ddlTask, udpDiffTask);
 
-               string ddl = await ddlTask;
-               UdpDiffResult udpDiff = await udpDiffTask;
+                string ddl = await ddlTask;
+                UdpDiffResult udpDiff = await udpDiffTask;
 
-               currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
-                   ? string.Empty
-                   : ddl;
+                currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
+                    ? string.Empty
+                    : ddl;
 
-               string ddlText = string.IsNullOrWhiteSpace(ddl)
-                   ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
-                   : ddl;
-               txtAlterDdl.Text = CombineUdpDiffAndDdl(udpDiff, ddlText);
-           }
-           catch (Exception ex)
-           {
-               currentAlterDdl = string.Empty;
-               txtAlterDdl.Text = ex.ToString();
-               SetStatus("Alter DDL istegi sirasinda hata olustu.");
-           }
+                string ddlText = string.IsNullOrWhiteSpace(ddl)
+                    ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
+                    : ddl;
+                txtAlterDdl.Text = CombineUdpDiffAndDdl(udpDiff, ddlText);
+            }
+            catch (Exception ex)
+            {
+                currentAlterDdl = string.Empty;
+                txtAlterDdl.Text = ex.ToString();
+                SetStatus("Alter DDL istegi sirasinda hata olustu.");
+            }
         }
 
         private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
