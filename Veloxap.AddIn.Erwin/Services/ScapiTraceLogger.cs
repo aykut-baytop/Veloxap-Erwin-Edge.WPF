@@ -36,6 +36,22 @@ namespace Veloxap.AddIn.Erwin.Services
             Write("ERROR", message, exception);
         }
 
+        public static void Clear()
+        {
+            try
+            {
+                lock (SyncRoot)
+                {
+                    if (File.Exists(LogFilePath))
+                        File.WriteAllText(LogFilePath, string.Empty);
+                }
+            }
+            catch
+            {
+                // Log cleanup must never break the add-in startup flow.
+            }
+        }
+
         public static void Step(string operation, Stopwatch timer, string details)
         {
             WriteDuration("INFO", operation, timer, details);

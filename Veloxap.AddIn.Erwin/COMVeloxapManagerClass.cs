@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Veloxap.AddIn.Erwin;
+using Veloxap.AddIn.Erwin.Services;
 
 namespace Veloxap.AddIn
 {
@@ -54,6 +55,8 @@ namespace Veloxap.AddIn
 
         private static void RunWindow(IntPtr ownerHandle)
         {
+            ClearApplicationLogs();
+
             SCAPI.Application app = new SCAPI.Application();
 
             using (var mainForm = new ErwinAddInForm(app))
@@ -62,6 +65,19 @@ namespace Veloxap.AddIn
                     mainForm.ShowDialog();
                 else
                     mainForm.ShowDialog(new NativeWindowOwner(ownerHandle));
+            }
+        }
+
+        private static void ClearApplicationLogs()
+        {
+            try
+            {
+                ApiTraceLogger.Clear();
+                ScapiTraceLogger.Clear();
+            }
+            catch
+            {
+                // Log cleanup must never prevent the add-in from opening.
             }
         }
 

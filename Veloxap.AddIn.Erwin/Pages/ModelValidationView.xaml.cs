@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Veloxap.AddIn.Erwin.Models;
 using Veloxap.AddIn.Erwin.Services;
 
@@ -432,7 +433,11 @@ namespace Veloxap.AddIn.Erwin.Pages
                 MinHeight = 250,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
-                ShowInTaskbar = false
+                ShowInTaskbar = false,
+                Icon = Imaging.CreateBitmapSourceFromHIcon(
+                    System.Drawing.SystemIcons.Application.Handle,
+                    Int32Rect.Empty,
+                    BitmapSizeOptions.FromEmptyOptions())
             };
 
             if (owner != null)
