@@ -34,6 +34,8 @@ namespace Veloxap.AddIn.Erwin
             wpfContent.Init(ref app);
             wpfHost.Child = wpfContent;
             Controls.Add(wpfHost);
+
+            MessageBox.Show("test form");
         }
 
         protected override void Dispose(bool disposing)
