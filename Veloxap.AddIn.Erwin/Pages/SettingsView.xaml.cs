@@ -15,10 +15,11 @@ namespace Veloxap.AddIn.Erwin.Pages
     public partial class SettingsView : UserControl
     {
         private const string ApiBaseUrlKey = "ApiBaseUrl";
+        private const string AlterDdlUrlKey = "AlterDdlUrl";
         private const string AuthUsernameKey = "AuthUsername";
         private const string AuthPasswordKey = "AuthPassword";
         private const string MissingAuthCredentialsMessage = "Kullanici adi ve parola bilgilerini doldurun.";
-        private const int VisibleServiceSettingCount = 1;
+        private const int VisibleServiceSettingCount = 2;
 
         private List<AppConfigSetting> currentUserSettings;
         private List<AppConfigSetting> currentServiceSettings;
@@ -121,6 +122,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         private void LoadServiceFields()
         {
             txtApiBaseUrl.Text = GetServiceSettingValue(ApiBaseUrlKey);
+            txtAlterDdlUrl.Text = GetServiceSettingValue(AlterDdlUrlKey);
         }
 
         private string GetUserSettingValue(string key)
@@ -148,6 +150,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         private void UpdateServiceSettingsFromFields()
         {
             SetServiceSettingValue(ApiBaseUrlKey, txtApiBaseUrl.Text.Trim());
+            SetServiceSettingValue(AlterDdlUrlKey, txtAlterDdlUrl.Text.Trim());
         }
 
         private void SetUserSettingValue(string key, string value)

@@ -25,6 +25,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         private readonly string catalogLongId;
         private readonly Func<ModelInfo> fullModelLoader;
         private string currentAlterDdl;
+        private int alterDdlRequestId;
         private TableUdpStartupApplyResult tableUdpStartupResult;
         private bool isInitializing;
         private bool isUpdatingTargetVersion;
@@ -224,6 +225,12 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(currentAlterDdl))
+            {
+                SetStatus("Onaya gondermek icin MART Alter DDL metni yuklenmis olmali.");
+                return;
+            }
+
             var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
             if (sourceVersion == null)
             {
@@ -259,7 +266,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (!await EnsureFullModelLoadedAsync())
                 return;
 
-            string description = PromptForValidationDescription();
+            string description = PromptForValidationDescription(out string jiraNo);
             if (description == null)
             {
                 SetStatus("Onaya gonderme iptal edildi.");
@@ -273,7 +280,9 @@ namespace Veloxap.AddIn.Erwin.Pages
                 validationTabs.SelectedItem = tabValidationResults;
                 SetStatus("Tablo UDP degerleri hesaplanarak onay metni hazirlaniyor...");
 
-                string approvalDdl = await BuildApprovalDdlTextAsync(currentAlterDdl ?? string.Empty);
+                //string approvalDdl = await BuildApprovalDdlTextAsync(currentAlterDdl ?? string.Empty);
+                string ddl = txtAlterDdl.Text;
+                ddl = CombineDdlPrefix("-- Jira No: " + jiraNo, ddl);
 
                 SetStatus("Onaya gonderiliyor...");
 
@@ -284,7 +293,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                     versionId,
                     targetVersionId,
                     description,
-                    approvalDdl);
+                    ddl);
 
                 if (response != null && !response.Success)
                 {
@@ -421,16 +430,17 @@ namespace Veloxap.AddIn.Erwin.Pages
                    existingDdl.TrimStart();
         }
 
-        private string PromptForValidationDescription()
+        private string PromptForValidationDescription(out string jiraNo)
         {
+            jiraNo = null;
             var owner = Window.GetWindow(this);
             var dialog = new Window
             {
                 Title = "Validasyon Aciklamasi",
                 Width = 460,
-                Height = 290,
+                Height = 360,
                 MinWidth = 380,
-                MinHeight = 250,
+                MinHeight = 320,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
                 ShowInTaskbar = false,
@@ -459,9 +469,24 @@ namespace Veloxap.AddIn.Erwin.Pages
             };
 
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var jiraNoLabel = new TextBlock
+            {
+                Text = "Jira No (zorunlu)",
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var jiraNoBox = new TextBox
+            {
+                AcceptsReturn = false,
+                MinHeight = 28,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
 
             var label = new TextBlock
             {
@@ -480,7 +505,6 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             var validationMessage = new TextBlock
             {
-                Text = "Lutfen daha uzun bir aciklama girin.",
                 Foreground = System.Windows.Media.Brushes.Firebrick,
                 Margin = new Thickness(0, 8, 0, 0),
                 TextWrapping = TextWrapping.Wrap,
@@ -512,16 +536,30 @@ namespace Veloxap.AddIn.Erwin.Pages
                 IsEnabled = false
             };
 
-            descriptionBox.TextChanged += (sender, args) =>
+            TextChangedEventHandler onInputChanged = (sender, args) =>
             {
-                okButton.IsEnabled = !string.IsNullOrWhiteSpace(descriptionBox.Text);
+                okButton.IsEnabled = !string.IsNullOrWhiteSpace(jiraNoBox.Text) &&
+                                     !string.IsNullOrWhiteSpace(descriptionBox.Text);
                 validationMessage.Visibility = Visibility.Collapsed;
             };
 
+            jiraNoBox.TextChanged += onInputChanged;
+            descriptionBox.TextChanged += onInputChanged;
+
             okButton.Click += (sender, args) =>
             {
+                if (string.IsNullOrWhiteSpace(jiraNoBox.Text))
+                {
+                    validationMessage.Text = "Jira No zorunludur.";
+                    validationMessage.Visibility = Visibility.Visible;
+                    jiraNoBox.Focus();
+                    jiraNoBox.SelectAll();
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(descriptionBox.Text) || descriptionBox.Text.Trim().Length <= 5)
                 {
+                    validationMessage.Text = "Lutfen daha uzun bir aciklama girin.";
                     validationMessage.Visibility = Visibility.Visible;
                     descriptionBox.Focus();
                     descriptionBox.SelectAll();
@@ -534,22 +572,28 @@ namespace Veloxap.AddIn.Erwin.Pages
             buttons.Children.Add(cancelButton);
             buttons.Children.Add(okButton);
 
-            Grid.SetRow(label, 0);
-            Grid.SetRow(descriptionBox, 1);
-            Grid.SetRow(validationMessage, 2);
-            Grid.SetRow(buttons, 3);
+            Grid.SetRow(jiraNoLabel, 0);
+            Grid.SetRow(jiraNoBox, 1);
+            Grid.SetRow(label, 2);
+            Grid.SetRow(descriptionBox, 3);
+            Grid.SetRow(validationMessage, 4);
+            Grid.SetRow(buttons, 5);
 
+            root.Children.Add(jiraNoLabel);
+            root.Children.Add(jiraNoBox);
             root.Children.Add(label);
             root.Children.Add(descriptionBox);
             root.Children.Add(validationMessage);
             root.Children.Add(buttons);
 
             dialog.Content = root;
-            dialog.Loaded += (sender, args) => Keyboard.Focus(descriptionBox);
+            dialog.Loaded += (sender, args) => Keyboard.Focus(jiraNoBox);
 
-            return dialog.ShowDialog() == true
-                ? descriptionBox.Text.Trim()
-                : null;
+            if (dialog.ShowDialog() != true)
+                return null;
+
+            jiraNo = jiraNoBox.Text.Trim();
+            return descriptionBox.Text.Trim();
         }
 
         private async Task RunValidationAsync()
@@ -687,69 +731,91 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async Task RefreshAlterDdlPreviewAsync()
         {
-           var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
-           var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
+            int requestId = ++alterDdlRequestId;
+            var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
+            var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
+            currentAlterDdl = string.Empty;
 
-           if (sourceVersion == null || targetVersion == null)
-           {
-               currentAlterDdl = string.Empty;
-               txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
-               return;
-           }
+            if (sourceVersion == null)
+            {
+                txtAlterDdl.Text = "Kaynak versiyon secimi bekleniyor.";
+                return;
+            }
 
-           try
-           {
-               currentAlterDdl = string.Empty;
-               txtAlterDdl.Text = "UDP degisiklikleri ve Alter DDL hazirlaniyor...";
+            txtAlterDdl.Text = "UDP degisiklikleri ve MART Alter DDL metni yukleniyor...";
 
-               Task<string> ddlTask = RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
-               Task<UdpDiffResult> udpDiffTask = RequestUdpDiffFromApiAsync(sourceVersion, targetVersion);
-               await Task.WhenAll(ddlTask, udpDiffTask);
+            Task<string> ddlTask = RequestAlterDdlFromApiAsync(sourceVersion);
+            Task<UdpDiffResult> udpDiffTask = targetVersion == null
+                ? Task.FromResult(new UdpDiffResult(false, "UDP farki icin hedef versiyon secilmeli.", null))
+                : RequestUdpDiffFromApiAsync(sourceVersion, targetVersion);
 
-               string ddl = await ddlTask;
-               UdpDiffResult udpDiff = await udpDiffTask;
+            string ddl = string.Empty;
+            string ddlError = null;
+            try
+            {
+                ddl = await ddlTask;
+            }
+            catch (Exception ex)
+            {
+                ddlError = ex.Message;
+            }
 
-               currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
-                   ? string.Empty
-                   : ddl;
+            UdpDiffResult udpDiff;
+            try
+            {
+                udpDiff = await udpDiffTask;
+            }
+            catch (Exception ex)
+            {
+                udpDiff = new UdpDiffResult(false, ex.Message, null);
+            }
 
-               string ddlText = string.IsNullOrWhiteSpace(ddl)
-                   ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
-                   : ddl;
-               txtAlterDdl.Text = CombineUdpDiffAndDdl(udpDiff, ddlText);
-           }
-           catch (Exception ex)
-           {
-               currentAlterDdl = string.Empty;
-               txtAlterDdl.Text = ex.ToString();
-               SetStatus("Alter DDL istegi sirasinda hata olustu.");
-           }
+            if (requestId != alterDdlRequestId)
+                return;
+
+            currentAlterDdl = ddl ?? string.Empty;
+            string ddlText = ddlError != null
+                ? "MART Alter DDL metni alinamadi." + Environment.NewLine + ddlError
+                : string.IsNullOrWhiteSpace(ddl)
+                    ? BuildAlterDdlPlaceholder(sourceVersion)
+                    : ddl;
+            txtAlterDdl.Text = CombineUdpDiffAndDdl(udpDiff, ddlText);
+
+            if (ddlError != null)
+                SetStatus("Alter DDL istegi sirasinda hata olustu: " + ddlError);
+            else if (string.IsNullOrWhiteSpace(ddl))
+                SetStatus("Secili versiyon icin MART Alter DDL cevabi bos dondu.");
+            else
+                SetStatus(udpDiff != null && udpDiff.Success
+                    ? "MART Alter DDL ve UDP degisiklikleri hazirlandi."
+                    : "MART Alter DDL hazirlandi. UDP degisiklikleri alinamadi.");
         }
 
-        private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
+        private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion)
         {
             if (ruleService == null)
-                return string.Empty;
+                throw new InvalidOperationException("MART Alter DDL servisi kullanilabilir degil.");
 
-            if (!int.TryParse(sourceVersion.VersionNo, out int sourceVNo))
+            if (!int.TryParse(sourceVersion.VersionNo, out int sourceVNo) || sourceVNo < 1)
                 throw new InvalidOperationException("Kaynak versiyon numarasi okunamadi.");
 
-            int targetVNo = sourceVNo - 1;
-            if (targetVNo < 1)
-                throw new InvalidOperationException("Alter DDL icin onceki versiyon bulunamadi.");
+            string cLongId = ResolveCatalogLongId(sourceVersion);
+            if (string.IsNullOrWhiteSpace(cLongId))
+                throw new InvalidOperationException("Alter DDL icin model cLongId degeri okunamadi.");
 
-            string path = ExtractAlterDdlPath(sourceVersion.Locator);
-            if (string.IsNullOrWhiteSpace(path))
-                throw new InvalidOperationException("Alter DDL path degeri secili modelden okunamadi.");
+            // The DDL endpoint expects the stored version's numeric ID, not its version number or cLongId.
+            CatalogVersionOwnerInfo version = await ruleService.GetCatalogVersionOwnerAsync(
+                RuleApiSettings.GetMartCatalogVersionsUrlTemplate(),
+                cLongId,
+                "Version " + sourceVNo,
+                sourceVersion.VersionNo);
 
-            string ddl = await ruleService.GetAlterDdlAsync(
+            if (!int.TryParse(version.VersionId, out int versionId) || versionId <= 0)
+                throw new InvalidOperationException("Alter DDL icin MART versiyon ID'si okunamadi.");
+
+            return await ruleService.GetAlterDdlAsync(
                 RuleApiSettings.GetAlterDdlUrl(),
-                path,
-                sourceVNo,
-                targetVNo);
-
-            SetStatus("Alter DDL hazirlandi. Kaynak: " + sourceVNo + ", Hedef: " + targetVNo + ".");
-            return FormatDdlForDisplay(ddl);
+                versionId);
         }
 
         private async Task<UdpDiffResult> RequestUdpDiffFromApiAsync(
@@ -780,7 +846,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 sourceVNo,
                 targetVNo);
 
-            SetStatus("UDP degisiklikleri hazirlandi. Kaynak: " + sourceVNo + ", Hedef: " + targetVNo + ".");
             return result;
         }
 
@@ -840,83 +905,13 @@ namespace Veloxap.AddIn.Erwin.Pages
             return Uri.UnescapeDataString(path);
         }
 
-        private static string FormatDdlForDisplay(string ddl)
-        {
-            if (string.IsNullOrEmpty(ddl))
-                return string.Empty;
-
-            var builder = new StringBuilder(ddl.Length);
-
-            for (int i = 0; i < ddl.Length; i++)
-            {
-                char current = ddl[i];
-
-                if (current == '\r')
-                {
-                    if (i + 1 < ddl.Length && ddl[i + 1] == '\n')
-                        i++;
-
-                    builder.Append(Environment.NewLine);
-                    continue;
-                }
-
-                if (current == '\n')
-                {
-                    builder.Append(Environment.NewLine);
-                    continue;
-                }
-
-                if (current != '\\' || i == ddl.Length - 1)
-                {
-                    builder.Append(current);
-                    continue;
-                }
-
-                if (i + 3 < ddl.Length && ddl[i + 1] == 'r' && ddl[i + 2] == '\\' && ddl[i + 3] == 'n')
-                {
-                    builder.Append(Environment.NewLine);
-                    i += 3;
-                    continue;
-                }
-
-                char next = ddl[i + 1];
-                switch (next)
-                {
-                    case 'n':
-                        builder.Append(Environment.NewLine);
-                        i++;
-                        break;
-                    case 'r':
-                        builder.Append(Environment.NewLine);
-                        i++;
-                        break;
-                    case 't':
-                        builder.Append('\t');
-                        i++;
-                        break;
-                    case '\\':
-                        builder.Append('\\');
-                        i++;
-                        break;
-                    default:
-                        builder.Append(current);
-                        break;
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        private static string BuildAlterDdlPlaceholder(VersionOption sourceVersion, VersionOption targetVersion)
+        private static string BuildAlterDdlPlaceholder(VersionOption sourceVersion)
         {
             var builder = new StringBuilder();
 
-            builder.AppendLine("Alter DDL cevabi bos dondu.");
+            builder.AppendLine("Secili versiyon icin MART'ta kayitli Alter DDL metni bulunamadi.");
             builder.AppendLine();
             builder.AppendLine($"Kaynak: {sourceVersion.DisplayName}");
-            builder.AppendLine($"Hedef: {targetVersion.DisplayName}");
-            builder.AppendLine();
-            builder.AppendLine("API ddl alani dolu dondugunde sonuc burada gosterilecek.");
 
             return builder.ToString();
         }
@@ -931,7 +926,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                    Environment.NewLine +
                    "----------------------------------------" +
                    Environment.NewLine +
-                   (ddl ?? string.Empty).TrimStart();
+                   (ddl ?? string.Empty);
         }
 
         private static string FormatUdpDiffForDisplay(UdpDiffResult result)

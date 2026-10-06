@@ -223,6 +223,13 @@
 
                                         <TextBox x:Name="txtApiBaseUrl"
                                                  Style="{StaticResource SettingsTextBoxStyle}"/>
+
+                                        <TextBlock Text="MART Alter DDL adresi"
+                                                   Margin="0,12,0,6"
+                                                   Style="{StaticResource FieldLabelTextStyle}"/>
+
+                                        <TextBox x:Name="txtAlterDdlUrl"
+                                                 Style="{StaticResource SettingsTextBoxStyle}"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

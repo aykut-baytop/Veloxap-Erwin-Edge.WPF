@@ -53,52 +53,50 @@ namespace Veloxap.AddIn.Erwin.Services
 
         public async Task<string> GetAlterDdlAsync(
             string serviceUrl,
-            string path,
-            int sourceVNo,
-            int targetVNo)
+            int versionId)
         {
             if (string.IsNullOrWhiteSpace(serviceUrl))
                 throw new ArgumentException("Alter DDL servis URL'i bos olamaz.", nameof(serviceUrl));
 
-            if (string.IsNullOrWhiteSpace(path))
-                throw new ArgumentException("Alter DDL path degeri bos olamaz.", nameof(path));
+            if (versionId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(versionId), "MART versiyon ID'si pozitif olmali.");
 
-            var serializer = new JavaScriptSerializer
-            {
-                MaxJsonLength = int.MaxValue
-            };
-
-            string payload = serializer.Serialize(new Dictionary<string, object>
-            {
-                { "path", path },
-                { "sourceVNo", sourceVNo },
-                { "targetVNo", targetVNo }
-            });
+            string requestUrl = BuildSingleQueryUrl(
+                serviceUrl,
+                "id",
+                versionId.ToString(CultureInfo.InvariantCulture));
+            requestUrl = BuildSingleQueryUrl(requestUrl, "type", "ALTERDDL");
 
             ApiTraceLogger.Info(
                 "ALTER DDL REQUEST" + Environment.NewLine +
-                "Url: " + serviceUrl + Environment.NewLine +
-                "Body: " + payload);
+                "Url: " + requestUrl);
 
-            using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
+            using (var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false))
             {
-                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
                 string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                 ApiTraceLogger.Info(
                     "ALTER DDL RESPONSE" + Environment.NewLine +
-                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Url: " + requestUrl + Environment.NewLine +
                     "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
                     "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
                     "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
 
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = DeserializeJson(json) as Dictionary<string, object>;
+                    string message = GetString(error, "error", "message");
+                    throw new InvalidOperationException(
+                        "MART Alter DDL servisi hata dondu: " + (int)response.StatusCode + " " +
+                        response.ReasonPhrase +
+                        (string.IsNullOrWhiteSpace(message) ? string.Empty : ". " + message));
+                }
 
                 string ddl = ExtractDdl(json);
 
                 ApiTraceLogger.Info(
                     "ALTER DDL PARSE" + Environment.NewLine +
-                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Url: " + requestUrl + Environment.NewLine +
                     "DdlLength: " + (ddl == null ? 0 : ddl.Length));
 
                 return ddl ?? string.Empty;
@@ -530,148 +528,24 @@ namespace Veloxap.AddIn.Erwin.Services
             if (string.IsNullOrWhiteSpace(json))
                 return string.Empty;
 
-            try
+            var serializer = new JavaScriptSerializer
             {
-                var serializer = new JavaScriptSerializer
-                {
-                    MaxJsonLength = int.MaxValue
-                };
+                MaxJsonLength = int.MaxValue
+            };
 
-                object payload = serializer.DeserializeObject(json);
-                var directDdl = payload as string;
-                if (!string.IsNullOrWhiteSpace(directDdl))
-                    return directDdl;
+            var payload = serializer.DeserializeObject(json) as Dictionary<string, object>;
+            if (payload == null)
+                throw new InvalidOperationException("MART Alter DDL cevabi beklenen JSON nesnesini icermiyor.");
 
-                string ddl = ResolveDdl(payload);
-                return ddl ?? string.Empty;
-            }
-            catch (ArgumentException)
-            {
-                return ExtractDdlFromRawJson(json);
-            }
-            catch (InvalidOperationException)
-            {
-                return ExtractDdlFromRawJson(json);
-            }
-        }
-
-        private static string ResolveDdl(object payload)
-        {
-            var dictionary = payload as Dictionary<string, object>;
-            if (dictionary != null)
-            {
-                object ddlValue = GetDictionaryValue(
-                    dictionary,
-                    "ddl",
-                    "DDL",
-                    "alterDdl",
-                    "AlterDDL");
-
-                if (ddlValue != null)
-                    return Convert.ToString(ddlValue);
-
-                foreach (var value in dictionary.Values)
-                {
-                    string ddl = ResolveDdl(value);
-                    if (!string.IsNullOrWhiteSpace(ddl))
-                        return ddl;
-                }
-            }
-
-            var array = payload as object[];
-            if (array != null)
-            {
-                foreach (var value in array)
-                {
-                    string ddl = ResolveDdl(value);
-                    if (!string.IsNullOrWhiteSpace(ddl))
-                        return ddl;
-                }
-            }
-
-            return null;
-        }
-
-        private static string ExtractDdlFromRawJson(string json)
-        {
-            var match = Regex.Match(
-                json ?? string.Empty,
-                @"""ddl""\s*:\s*""(?<ddl>(?:\\.|[^""\\])*)""",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
-
-            return match.Success
-                ? DecodeJsonStringValue(match.Groups["ddl"].Value)
-                : string.Empty;
-        }
-
-        private static string DecodeJsonStringValue(string value)
-        {
-            if (string.IsNullOrEmpty(value))
+            // JSON deserialization decodes newlines and tabs once, preserving literal SQL backslashes.
+            object ddl = GetDictionaryValue(payload, "ALTERDDL");
+            if (ddl == null)
                 return string.Empty;
 
-            var builder = new StringBuilder(value.Length);
+            if (!(ddl is string))
+                throw new InvalidOperationException("MART cevabindaki ALTERDDL alani metin olmali.");
 
-            for (int i = 0; i < value.Length; i++)
-            {
-                char current = value[i];
-                if (current != '\\' || i == value.Length - 1)
-                {
-                    builder.Append(current);
-                    continue;
-                }
-
-                char next = value[++i];
-                switch (next)
-                {
-                    case '"':
-                        builder.Append('"');
-                        break;
-                    case '\\':
-                        builder.Append('\\');
-                        break;
-                    case '/':
-                        builder.Append('/');
-                        break;
-                    case 'b':
-                        builder.Append('\b');
-                        break;
-                    case 'f':
-                        builder.Append('\f');
-                        break;
-                    case 'n':
-                        builder.Append('\n');
-                        break;
-                    case 'r':
-                        builder.Append('\r');
-                        break;
-                    case 't':
-                        builder.Append('\t');
-                        break;
-                    case 'u':
-                        if (i + 4 < value.Length &&
-                            int.TryParse(
-                                value.Substring(i + 1, 4),
-                                NumberStyles.HexNumber,
-                                CultureInfo.InvariantCulture,
-                                out int codePoint))
-                        {
-                            builder.Append((char)codePoint);
-                            i += 4;
-                        }
-                        else
-                        {
-                            builder.Append("\\u");
-                        }
-
-                        break;
-                    default:
-                        builder.Append('\\');
-                        builder.Append(next);
-                        break;
-                }
-            }
-
-            return builder.ToString();
+            return (string)ddl;
         }
 
         private static List<CatalogLockInfo> ParseCatalogLocks(string json)
