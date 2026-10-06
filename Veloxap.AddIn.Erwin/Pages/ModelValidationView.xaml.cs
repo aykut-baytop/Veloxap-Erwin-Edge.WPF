@@ -815,7 +815,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             return await ruleService.GetAlterDdlAsync(
                 RuleApiSettings.GetAlterDdlUrl(),
-                versionId);
+                long.Parse(version.ContainerId));
         }
 
         private async Task<UdpDiffResult> RequestUdpDiffFromApiAsync(

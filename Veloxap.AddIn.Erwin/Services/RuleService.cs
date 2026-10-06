@@ -53,7 +53,7 @@ namespace Veloxap.AddIn.Erwin.Services
 
         public async Task<string> GetAlterDdlAsync(
             string serviceUrl,
-            int versionId)
+            long versionId)
         {
             if (string.IsNullOrWhiteSpace(serviceUrl))
                 throw new ArgumentException("Alter DDL servis URL'i bos olamaz.", nameof(serviceUrl));
@@ -452,7 +452,7 @@ namespace Veloxap.AddIn.Erwin.Services
 
             ApiTraceLogger.Info(
                 "MART CATALOG VERSION OWNER PARSE" + Environment.NewLine +
-                //"CatalogId: " + catalog.Id + Environment.NewLine +
+                "ContainerId: " + version.ContainerId+ Environment.NewLine +
                 "VersionId: " + (version.Id ?? string.Empty) + Environment.NewLine +
                 "VersionName: " + (version.Name ?? string.Empty) + Environment.NewLine +
                 "CreatedBy: " + (version.CreatedBy ?? string.Empty));
@@ -461,6 +461,7 @@ namespace Veloxap.AddIn.Erwin.Services
             {
                 //CatalogId = catalog.Id,
                 //CatalogName = catalog.Name,
+                ContainerId = version.ContainerId,
                 VersionId = version.Id,
                 VersionName = version.Name,
                 VersionNumber = version.VersionNumber,
@@ -871,7 +872,8 @@ namespace Veloxap.AddIn.Erwin.Services
                 CreatedDate = GetString(dictionary, "createdDate"),
                 Path = GetString(dictionary, "path"),
                 VersionNumber = GetString(dictionary, "versionNumber", "versionNo"),
-                CLongId = GetString(dictionary, "cLongId", "CLongId")
+                CLongId = GetString(dictionary, "cLongId", "CLongId"),
+                ContainerId = GetString(dictionary, "containerId", "containerID", "container")
             };
         }
 
@@ -1611,6 +1613,8 @@ namespace Veloxap.AddIn.Erwin.Services
         public string CLongId { get; set; }
 
         public string CreatedBy { get; set; }
+
+        public string ContainerId { get; set; }
     }
 
     internal sealed class CatalogItem
@@ -1637,6 +1641,7 @@ namespace Veloxap.AddIn.Erwin.Services
         public string VersionNumber { get; set; }
 
         public string CLongId { get; set; }
+        public string ContainerId { get; set; }
     }
 
     internal sealed class CatalogApprovalStatus
