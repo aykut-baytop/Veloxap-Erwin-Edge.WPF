@@ -436,7 +436,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             var owner = Window.GetWindow(this);
             var dialog = new Window
             {
-                Title = "Validasyon Aciklamasi",
+                Title = "Onay talebi",
                 Width = 460,
                 Height = 360,
                 MinWidth = 380,
@@ -490,7 +490,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             var label = new TextBlock
             {
-                Text = "Onaya gonderilecek validasyon aciklamasini girin.",
+                Text = "Onay'a gondermek icin aciklama giriniz. (Min. 5 karakter)",
                 Margin = new Thickness(0, 0, 0, 8),
                 TextWrapping = TextWrapping.Wrap
             };
