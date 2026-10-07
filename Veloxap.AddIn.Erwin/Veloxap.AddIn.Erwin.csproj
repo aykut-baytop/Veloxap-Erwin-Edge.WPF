@@ -80,6 +80,9 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Models\CustomUdpModel.cs" />
+    <Compile Include="Models\CustomUdpResponse.cs" />
+    <Compile Include="Models\GetCustomUdpRequest.cs" />
     <Compile Include="Models\ObjectPropertiesResult.cs" />
     <Compile Include="Models\CrossRuleValidationEngine.cs" />
     <Compile Include="Models\ModelInfo.cs" />
@@ -90,6 +93,7 @@
     <Compile Include="Models\Rule.cs" />
     <Compile Include="Models\RuleDependencyExtractor.cs" />
     <Compile Include="Models\RulesResponse.cs" />
+    <Compile Include="Models\VeloxapServiceBaseResponse.cs" />
     <Compile Include="Models\ViewModels\ModelInfoViewModel.cs" />
     <Compile Include="Pages\ModelInfoView.xaml.cs">
       <DependentUpon>ModelInfoView.xaml</DependentUpon>

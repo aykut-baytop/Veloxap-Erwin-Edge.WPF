@@ -101,7 +101,7 @@
 
     <Border Background="#F8FAFC"
             CornerRadius="12"
-            Padding="18">
+            Padding="18" Margin="-176,0,0,-45">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

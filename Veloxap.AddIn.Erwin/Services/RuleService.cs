@@ -164,6 +164,36 @@ namespace Veloxap.AddIn.Erwin.Services
             int versionId,
             int targetVersionId,
             string description,
+            string alterDdl,
+            CustomUdpModel jiraUdp)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Approval servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            if (jiraUdp == null)
+                throw new ArgumentNullException(nameof(jiraUdp));
+
+            var udpResponse = await PostCustomUdp(new List<CustomUdpModel> { jiraUdp }).ConfigureAwait(false);
+            if (udpResponse == null || !udpResponse.Success)
+            {
+                string message = udpResponse == null || string.IsNullOrWhiteSpace(udpResponse.Message)
+                    ? "Custom UDP servisi basarisiz dondu."
+                    : udpResponse.Message;
+
+                throw new InvalidOperationException("Jira No kaydedilemedi. " + message);
+            }
+
+            return await StartApprovalByCatalogAsync(
+                serviceUrl, cName, cLongId, versionId, targetVersionId, description, alterDdl).ConfigureAwait(false);
+        }
+
+        public async Task<ApprovalStartResult> StartApprovalByCatalogAsync(
+            string serviceUrl,
+            string cName,
+            string cLongId,
+            int versionId,
+            int targetVersionId,
+            string description,
             string alterDdl)
         {
             if (string.IsNullOrWhiteSpace(serviceUrl))
@@ -411,7 +441,6 @@ namespace Veloxap.AddIn.Erwin.Services
         }
 
         public async Task<CatalogVersionOwnerInfo> GetCatalogVersionOwnerAsync(
-            //string catalogsUrl,
             string catalogVersionsUrl,
             string cLongId,
             string versionName,
@@ -419,14 +448,8 @@ namespace Veloxap.AddIn.Erwin.Services
         {
             ScapiTraceLogger.Info($"GetCatalogVersionOwnerAsync method parametreleri : + {catalogVersionsUrl} - {cLongId} - {versionName} - {versionNumber}");
 
-            //if (string.IsNullOrWhiteSpace(catalogsUrl))
-            //    throw new ArgumentException("Mart catalog servis URL'i bos olamaz.", nameof(catalogsUrl));
-
             if (string.IsNullOrWhiteSpace(catalogVersionsUrl))
                 throw new ArgumentException("Mart catalog version servis URL'i bos olamaz.", nameof(catalogVersionsUrl));
-
-            //if (string.IsNullOrWhiteSpace(username))
-            //    throw new ArgumentException("Mart catalog kullanici adi bos olamaz.", nameof(username));
 
             if (string.IsNullOrWhiteSpace(cLongId))
                 throw new ArgumentException("cLongId bos olamaz.", nameof(cLongId));
@@ -886,6 +909,154 @@ namespace Veloxap.AddIn.Erwin.Services
             return (versions ?? Enumerable.Empty<CatalogVersionInfo>())
                 .Where(version => version != null && versionNumber == version.VersionNumber)
                 .FirstOrDefault();
+        }
+
+
+        public async Task<VeloxapServiceBaseResponse> PostCustomUdp(List<CustomUdpModel> customUdpModel)
+        {
+            if (customUdpModel == null)
+                throw new ArgumentNullException(nameof(customUdpModel));
+
+            if (customUdpModel.Any(item => item == null))
+                throw new ArgumentException("Custom UDP listesi null kayit iceremez.", nameof(customUdpModel));
+
+            var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+            string payload = serializer.Serialize(customUdpModel.Select(item => new Dictionary<string, object>
+            {
+                { "modelVersion", item.ModelVersion },
+                { "modelId", item.ModelId },
+                { "modelPath", item.ModelPath },
+                { "udpName", item.UdpName },
+                { "udpVal", item.UdpVal },
+                { "type", item.Type },
+                { "parentObject", item.ParentObject },
+                { "object", item.Object },
+                { "environment", item.Environment }
+            }).ToList());
+
+            using (var request = CreateCustomUdpRequest(HttpMethod.Post, RuleApiSettings.GetCustomUdpUrl()))
+            {
+                request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+                var response = await SendCustomUdpAsync(request).ConfigureAwait(false);
+
+                return new VeloxapServiceBaseResponse
+                {
+                    Success = GetNullableBool(response, "success") ?? false,
+                    Message = GetString(response, "message"),
+                    Data = GetDictionaryValue(response, "data")
+                };
+            }
+        }
+
+        public async Task<CustomUdpResponse> GetCustomUdp(GetCustomUdpRequest udpRequest)
+        {
+            if (udpRequest == null)
+                throw new ArgumentNullException(nameof(udpRequest));
+
+            string requestUrl = BuildSingleQueryUrl(
+                RuleApiSettings.GetCustomUdpUrl(), "ModelId", udpRequest.ModelId.ToString(CultureInfo.InvariantCulture));
+            requestUrl = BuildSingleQueryUrl(requestUrl, "UdpName", udpRequest.UdpName);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "Type", udpRequest.Type);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "ParentObject", udpRequest.ParentObject);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "Object", udpRequest.Object);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "Environment", udpRequest.Environment);
+
+            using (var request = CreateCustomUdpRequest(HttpMethod.Get, requestUrl))
+            {
+                var response = await SendCustomUdpAsync(request).ConfigureAwait(false);
+                var result = new CustomUdpResponse
+                {
+                    Success = GetNullableBool(response, "success") ?? false,
+                    Message = GetString(response, "message")
+                };
+
+                object data = GetDictionaryValue(response, "data");
+                if (data != null)
+                {
+                    var items = data as object[];
+                    if (items == null)
+                        throw new InvalidOperationException("Custom UDP servis cevabindaki data alani bir liste olmali.");
+
+                    result.Data = items.Select(ParseCustomUdpItem).ToList();
+                }
+
+                return result;
+            }
+        }
+
+        private static HttpRequestMessage CreateCustomUdpRequest(HttpMethod method, string url)
+        {
+            var request = new HttpRequestMessage(method, url);
+            request.Headers.Accept.ParseAdd("application/json");
+
+            string username = RuleApiSettings.GetAuthUsername();
+            if (!string.IsNullOrWhiteSpace(username))
+                request.Headers.Add("X-UserName", username);
+
+            // BearerTokenHandler supplies the token on the injected HttpClient.
+            return request;
+        }
+
+        private async Task<Dictionary<string, object>> SendCustomUdpAsync(HttpRequestMessage request)
+        {
+            ApiTraceLogger.Info(
+                "CUSTOM UDP REQUEST" + Environment.NewLine +
+                "Method: " + request.Method + Environment.NewLine +
+                "Url: " + request.RequestUri);
+
+            using (var response = await httpClient.SendAsync(request).ConfigureAwait(false))
+            {
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "CUSTOM UDP RESPONSE" + Environment.NewLine +
+                    "Url: " + request.RequestUri + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                var payload = DeserializeJson(json) as Dictionary<string, object>;
+                if (!response.IsSuccessStatusCode)
+                {
+                    string message = GetString(payload, "message", "error", "errorMessage", "resultMessage");
+                    if (string.IsNullOrWhiteSpace(message))
+                        message = ApiTraceLogger.Truncate(json, 2000);
+
+                    throw new InvalidOperationException(
+                        "Custom UDP servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase +
+                        (string.IsNullOrWhiteSpace(message) ? string.Empty : ". " + message));
+                }
+
+                if (payload == null)
+                    throw new InvalidOperationException("Custom UDP servisi gecerli bir JSON nesnesi dondurmedi.");
+
+                return payload;
+            }
+        }
+
+        private static CustomUdpDto ParseCustomUdpItem(object value)
+        {
+            var item = value as Dictionary<string, object>;
+            if (item == null)
+                throw new InvalidOperationException("Custom UDP servis cevabinda gecersiz kayit bulundu.");
+
+            return new CustomUdpDto
+            {
+                Id = Convert.ToInt64(GetDictionaryValue(item, "id"), CultureInfo.InvariantCulture),
+                ModelVersion = Convert.ToInt32(GetDictionaryValue(item, "modelVersion"), CultureInfo.InvariantCulture),
+                ModelId = Convert.ToInt64(GetDictionaryValue(item, "modelId"), CultureInfo.InvariantCulture),
+                ModelPath = GetString(item, "modelPath"),
+                UdpName = GetString(item, "udpName"),
+                UdpVal = GetDictionaryValue(item, "udpVal") as string,
+                Type = GetString(item, "type"),
+                ParentObject = GetString(item, "parentObject"),
+                Object = GetString(item, "object"),
+                Environment = GetString(item, "environment"),
+                CreateDate = FlexibleDateTimeConverter.Parse(GetDictionaryValue(item, "createDate")),
+                CreateUser = GetString(item, "createUser"),
+                UpdateUser = GetDictionaryValue(item, "updateUser") as string,
+                UpdateDate = FlexibleDateTimeConverter.Parse(GetDictionaryValue(item, "updateDate"))
+            };
         }
 
         private static bool LongIdsMatch(string left, string right)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -260,7 +261,8 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
             }
 
-            if (!await IsCurrentUserVersionOwnerAsync(cLongId, sourceVersion))
+            CatalogVersionOwnerInfo catalogVersion = await GetOwnedCatalogVersionAsync(cLongId, sourceVersion);
+            if (catalogVersion == null)
                 return;
 
             if (!await EnsureFullModelLoadedAsync())
@@ -278,13 +280,36 @@ namespace Veloxap.AddIn.Erwin.Pages
                 isSendingApproval = true;
                 SetApprovalBusy(true);
                 validationTabs.SelectedItem = tabValidationResults;
-                SetStatus("Tablo UDP degerleri hesaplanarak onay metni hazirlaniyor...");
+                SetStatus("Jira No kaydi ve onay metni hazirlaniyor...");
 
                 //string approvalDdl = await BuildApprovalDdlTextAsync(currentAlterDdl ?? string.Empty);
                 string ddl = txtAlterDdl.Text;
                 ddl = CombineDdlPrefix("-- Jira No: " + jiraNo, ddl);
 
-                SetStatus("Onaya gonderiliyor...");
+                if (!long.TryParse(catalogVersion.ContainerId, NumberStyles.Integer, CultureInfo.InvariantCulture,
+                    out long modelId) || modelId <= 0)
+                {
+                    throw new InvalidOperationException("Jira No kaydi icin MART model ID'si okunamadi.");
+                }
+
+                string modelPath = ExtractAlterDdlPath(sourceVersion.Locator);
+                if (string.IsNullOrWhiteSpace(modelPath))
+                    throw new InvalidOperationException("Jira No kaydi icin MART model yolu okunamadi.");
+
+                var jiraUdp = new CustomUdpModel
+                {
+                    ModelVersion = versionId,
+                    ModelId = modelId,
+                    ModelPath = modelPath,
+                    UdpName = "Jira_No",
+                    UdpVal = jiraNo,
+                    Type = "TICKET",
+                    ParentObject = "Model",
+                    Object = Guid.NewGuid().ToString("N"),
+                    Environment = "dev"
+                };
+
+                SetStatus("Jira No kaydedilerek onaya gonderiliyor...");
 
                 ApprovalStartResult response = await ruleService.StartApprovalByCatalogAsync(
                     RuleApiSettings.GetApprovalStartByCatalogUrl(),
@@ -293,7 +318,8 @@ namespace Veloxap.AddIn.Erwin.Pages
                     versionId,
                     targetVersionId,
                     description,
-                    ddl);
+                    ddl,
+                    jiraUdp);
 
                 if (response != null && !response.Success)
                 {
@@ -330,7 +356,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
         }
 
-        private async Task<bool> IsCurrentUserVersionOwnerAsync(
+        private async Task<CatalogVersionOwnerInfo> GetOwnedCatalogVersionAsync(
             string cLongId,
             VersionOption sourceVersion)
         {
@@ -344,7 +370,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
                 string versionOwner = ownerInfo == null ? string.Empty : ownerInfo.CreatedBy;
                 if (NamesMatch(versionOwner, RuleApiSettings.GetAuthUsername()))
-                    return true;
+                    return ownerInfo;
 
                 string displayedOwner = string.IsNullOrWhiteSpace(versionOwner)
                     ? "Bilinmeyen"
@@ -359,7 +385,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                     "Onaya Gönder",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-                return false;
+                return null;
             }
             catch (Exception ex)
             {
@@ -370,7 +396,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                     "Onaya Gönder",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-                return false;
+                return null;
             }
         }
 

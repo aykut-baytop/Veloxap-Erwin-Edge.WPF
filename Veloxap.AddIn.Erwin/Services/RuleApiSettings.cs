@@ -13,6 +13,7 @@ namespace Veloxap.AddIn.Erwin.Services
         private const string RulesByModelUrlKey = "ValidationRulesByModelUrl";
         private const string AlterDdlUrlKey = "AlterDdlUrl";
         private const string UdpDiffUrlKey = "UdpDiffUrl";
+        private const string CustomUdpUrlKey = "CustomUdpUrl";
         private const string ApprovalStartByCatalogUrlKey = "ApprovalStartByCatalogUrl";
         private const string CatalogLocksUrlKey = "CatalogLocksUrl";
         private const string CatalogUnlockUrlKey = "CatalogUnlockUrl";
@@ -68,6 +69,11 @@ namespace Veloxap.AddIn.Erwin.Services
         public static string GetUdpDiffUrl()
         {
             return GetServiceUrl(UdpDiffUrlKey);
+        }
+
+        public static string GetCustomUdpUrl()
+        {
+            return GetServiceUrl(CustomUdpUrlKey);
         }
 
         public static string GetApprovalStartByCatalogUrl()
@@ -126,6 +132,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 RulesByModelUrlKey,
                 AlterDdlUrlKey,
                 UdpDiffUrlKey,
+                CustomUdpUrlKey,
                 ApprovalStartByCatalogUrlKey,
                 CatalogLocksUrlKey,
                 CatalogUnlockUrlKey,
