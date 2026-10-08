@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -23,11 +24,12 @@ namespace Veloxap.AddIn
 
         public void Run()
         {
+            HostDpiAwareness.Preserve();
             IntPtr ownerHandle = GetHostOwnerHandle();
 
             if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
             {
-                RunWindow(ownerHandle);
+                RunForm(ownerHandle);
                 return;
             }
 
@@ -36,7 +38,7 @@ namespace Veloxap.AddIn
             {
                 try
                 {
-                    RunWindow(ownerHandle);
+                    RunForm(ownerHandle);
                 }
                 catch (Exception ex)
                 {
@@ -53,18 +55,21 @@ namespace Veloxap.AddIn
                 throw new InvalidOperationException("Veloxap EDGE WPF add-in failed to start.", startupError);
         }
 
-        private static void RunWindow(IntPtr ownerHandle)
+        // Keep WPF/ElementHost type loading behind the DPI bootstrap in Run.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RunForm(IntPtr ownerHandle)
         {
             ClearApplicationLogs();
 
-            SCAPI.Application app = new SCAPI.Application();
-
-            using (var mainForm = new ErwinAddInForm(app))
+            using (var mainForm = new ErwinAddInForm())
             {
                 if (ownerHandle == IntPtr.Zero)
                     mainForm.ShowDialog();
                 else
                     mainForm.ShowDialog(new NativeWindowOwner(ownerHandle));
+
+                if (mainForm.StartupError != null)
+                    throw new InvalidOperationException("Veloxap erwin add-in content failed to initialize.", mainForm.StartupError);
             }
         }
 

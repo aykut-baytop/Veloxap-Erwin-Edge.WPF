@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 
@@ -11,30 +12,64 @@ namespace Veloxap.AddIn.Erwin
     /// </summary>
     internal sealed class ErwinAddInForm : Form
     {
-        private readonly ElementHost wpfHost;
+        private ElementHost wpfHost;
+        private bool contentInitializationQueued;
 
-        internal ErwinAddInForm(SCAPI.Application app)
+        internal Exception StartupError { get; private set; }
+
+        internal ErwinAddInForm()
         {
-            if (app == null)
-                throw new ArgumentNullException(nameof(app));
-
             Text = "Veloxap Erwin Add-In";
             Icon = SystemIcons.Application;
+            AutoScaleMode = AutoScaleMode.None;
             ClientSize = new Size(1100, 700);
             MinimumSize = new Size(950, 600);
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+
+            if (contentInitializationQueued || IsDisposed || Disposing || !IsHandleCreated)
+                return;
+
+            contentInitializationQueued = true;
+            // Create the native form and enter its modal message loop first.
+            // WPF and asynchronous startup then run inside that form.
+            BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    InitializeWpfContent();
+                }
+                catch (Exception ex)
+                {
+                    StartupError = ex;
+                    Close();
+                }
+            }));
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void InitializeWpfContent()
+        {
+            if (IsDisposed || Disposing)
+                return;
 
             wpfHost = new ElementHost
             {
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                AutoSize = false
             };
 
             var wpfContent = new Window1();
-            wpfContent.Init(ref app);
             wpfHost.Child = wpfContent;
             Controls.Add(wpfHost);
 
+            var app = new SCAPI.Application();
+            wpfContent.Init(ref app);
         }
 
         protected override void Dispose(bool disposing)

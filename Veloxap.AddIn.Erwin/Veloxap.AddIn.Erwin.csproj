@@ -122,6 +122,7 @@
     <Compile Include="Services\RuleService.cs" />
     <Compile Include="Services\TableUdpSecurityService.cs" />
     <Compile Include="VeloxapEDGErwinLib.cs" />
+    <Compile Include="HostDpiAwareness.cs" />
     <Compile Include="ErwinAddInForm.cs">
       <SubType>Form</SubType>
     </Compile>

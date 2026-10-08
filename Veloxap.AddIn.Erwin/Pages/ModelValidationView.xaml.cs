@@ -10,7 +10,8 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using System.Windows.Forms.Integration;
+using Forms = System.Windows.Forms;
 using Veloxap.AddIn.Erwin.Models;
 using Veloxap.AddIn.Erwin.Services;
 
@@ -459,35 +460,10 @@ namespace Veloxap.AddIn.Erwin.Pages
         private string PromptForValidationDescription(out string jiraNo)
         {
             jiraNo = null;
-            var owner = Window.GetWindow(this);
-            var dialog = new Window
-            {
-                Title = "Onay talebi",
-                Width = 460,
-                Height = 360,
-                MinWidth = 380,
-                MinHeight = 320,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                ResizeMode = ResizeMode.NoResize,
-                ShowInTaskbar = false,
-                Icon = Imaging.CreateBitmapSourceFromHIcon(
-                    System.Drawing.SystemIcons.Application.Handle,
-                    Int32Rect.Empty,
-                    BitmapSizeOptions.FromEmptyOptions())
-            };
-
-            if (owner != null)
-            {
-                dialog.Owner = owner;
-            }
-            else
-            {
-                var hostSource = PresentationSource.FromVisual(this) as HwndSource;
-                if (hostSource != null)
-                    new WindowInteropHelper(dialog).Owner = hostSource.Handle;
-                else
-                    dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            }
+            var hostSource = PresentationSource.FromVisual(this) as HwndSource;
+            var owner = hostSource == null
+                ? null
+                : Forms.Control.FromChildHandle(hostSource.Handle)?.FindForm();
 
             var root = new Grid
             {
@@ -549,8 +525,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 Content = "Iptal",
                 Width = 86,
                 Height = 30,
-                Margin = new Thickness(0, 0, 8, 0),
-                IsCancel = true
+                Margin = new Thickness(0, 0, 8, 0)
             };
 
             var okButton = new Button
@@ -558,7 +533,6 @@ namespace Veloxap.AddIn.Erwin.Pages
                 Content = "Tamam",
                 Width = 86,
                 Height = 30,
-                IsDefault = true,
                 IsEnabled = false
             };
 
@@ -572,7 +546,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             jiraNoBox.TextChanged += onInputChanged;
             descriptionBox.TextChanged += onInputChanged;
 
-            okButton.Click += (sender, args) =>
+            Action<Forms.Form> confirm = dialog =>
             {
                 if (string.IsNullOrWhiteSpace(jiraNoBox.Text))
                 {
@@ -592,7 +566,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                     return;
                 }
 
-                dialog.DialogResult = true;
+                dialog.DialogResult = Forms.DialogResult.OK;
             };
 
             buttons.Children.Add(cancelButton);
@@ -612,14 +586,46 @@ namespace Veloxap.AddIn.Erwin.Pages
             root.Children.Add(validationMessage);
             root.Children.Add(buttons);
 
-            dialog.Content = root;
-            dialog.Loaded += (sender, args) => Keyboard.Focus(jiraNoBox);
+            using (var dialog = new Forms.Form
+            {
+                Text = "Onay talebi",
+                Size = new System.Drawing.Size(460, 360),
+                AutoScaleMode = Forms.AutoScaleMode.None,
+                FormBorderStyle = Forms.FormBorderStyle.FixedDialog,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ShowInTaskbar = false,
+                StartPosition = owner == null
+                    ? Forms.FormStartPosition.CenterScreen
+                    : Forms.FormStartPosition.CenterParent,
+                Icon = System.Drawing.SystemIcons.Application
+            })
+            using (var wpfHost = new ElementHost { Dock = Forms.DockStyle.Fill, Child = root })
+            {
+                dialog.Controls.Add(wpfHost);
+                cancelButton.Click += (sender, args) => dialog.DialogResult = Forms.DialogResult.Cancel;
+                okButton.Click += (sender, args) => confirm(dialog);
+                root.Loaded += (sender, args) => Keyboard.Focus(jiraNoBox);
+                root.PreviewKeyDown += (sender, args) =>
+                {
+                    if (args.Key == Key.Escape)
+                    {
+                        dialog.DialogResult = Forms.DialogResult.Cancel;
+                        args.Handled = true;
+                    }
+                    else if (args.Key == Key.Enter && !descriptionBox.IsKeyboardFocusWithin && okButton.IsEnabled)
+                    {
+                        confirm(dialog);
+                        args.Handled = true;
+                    }
+                };
 
-            if (dialog.ShowDialog() != true)
-                return null;
+                if (dialog.ShowDialog(owner) != Forms.DialogResult.OK)
+                    return null;
 
-            jiraNo = jiraNoBox.Text.Trim();
-            return descriptionBox.Text.Trim();
+                jiraNo = jiraNoBox.Text.Trim();
+                return descriptionBox.Text.Trim();
+            }
         }
 
         private async Task RunValidationAsync()
