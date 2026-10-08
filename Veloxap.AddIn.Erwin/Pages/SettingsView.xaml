@@ -101,7 +101,7 @@
 
     <Border Background="#F8FAFC"
             CornerRadius="12"
-            Padding="18" Margin="-176,0,0,-45">
+            Padding="18">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -138,10 +138,27 @@
                     </TextBlock>
                 </StackPanel>
 
-                <TextBlock x:Name="txtSettingCount"
-                           Grid.Column="1"
-                           Style="{StaticResource CountBadgeStyle}"
-                           VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock x:Name="txtSettingCount"
+                               Style="{StaticResource CountBadgeStyle}"/>
+
+                    <Button x:Name="btnClose"
+                            Content="&#xE8BB;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="14"
+                            Width="32"
+                            Height="32"
+                            Margin="12,0,0,0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#64748B"
+                            Cursor="Hand"
+                            ToolTip="Kapat"
+                            AutomationProperties.Name="Ayarları kapat"
+                            Click="BtnClose_Click"/>
+                </StackPanel>
             </Grid>
 
             <Border Grid.Row="2"

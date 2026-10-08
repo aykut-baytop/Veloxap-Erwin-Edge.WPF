@@ -47,6 +47,7 @@ namespace Veloxap.AddIn.Erwin
         private string loadedRulesModelKey;
         private string lastRuleRequestTrace;
         private TableUdpStartupApplyResult tableUdpStartupResult;
+        private RadioButton menuBeforeSettings;
 
         private bool isValidationActive;
         private bool isValidationOk;
@@ -133,7 +134,6 @@ namespace Veloxap.AddIn.Erwin
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            ClearMenuSelection();
             ShowSettingsView();
         }
 
@@ -148,7 +148,31 @@ namespace Veloxap.AddIn.Erwin
 
         private void ShowSettingsView()
         {
-            MainContent.Content = new SettingsView();
+            if (MainContent.Content is SettingsView)
+                return;
+
+            menuBeforeSettings = new[] { rbModelInfo, rbTableUdps, rbValidation, rbTest }
+                .FirstOrDefault(menu => menu.IsChecked == true) ?? rbTest;
+            ClearMenuSelection();
+
+            var settingsView = new SettingsView();
+            settingsView.CloseRequested += SettingsView_CloseRequested;
+            MainContent.Content = settingsView;
+        }
+
+        private void SettingsView_CloseRequested(object sender, EventArgs e)
+        {
+            if (!ReferenceEquals(MainContent.Content, sender))
+                return;
+
+            ((SettingsView)sender).CloseRequested -= SettingsView_CloseRequested;
+            RadioButton menu = menuBeforeSettings ?? rbTest;
+            menuBeforeSettings = null;
+
+            if (menu == rbValidation && !RuleApiSettings.AreAuthCredentialsConfigured())
+                menu = rbTest;
+
+            menu.IsChecked = true;
         }
 
         private bool EnsureAuthCredentialsConfigured(bool showMessage)
@@ -156,7 +180,6 @@ namespace Veloxap.AddIn.Erwin
             if (RuleApiSettings.AreAuthCredentialsConfigured())
                 return true;
 
-            ClearMenuSelection();
             ShowSettingsView();
 
             if (showMessage)

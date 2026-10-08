@@ -24,6 +24,8 @@ namespace Veloxap.AddIn.Erwin.Pages
         private List<AppConfigSetting> currentUserSettings;
         private List<AppConfigSetting> currentServiceSettings;
 
+        internal event EventHandler CloseRequested;
+
         public SettingsView()
         {
             InitializeComponent();
@@ -33,6 +35,11 @@ namespace Veloxap.AddIn.Erwin.Pages
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             SaveAppSettings();
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            CloseRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void BtnReload_Click(object sender, RoutedEventArgs e)
