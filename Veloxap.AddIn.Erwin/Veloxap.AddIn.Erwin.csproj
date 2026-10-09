@@ -84,7 +84,6 @@
     <Compile Include="Models\CustomUdpResponse.cs" />
     <Compile Include="Models\GetCustomUdpRequest.cs" />
     <Compile Include="Models\ObjectPropertiesResult.cs" />
-    <Compile Include="Models\CrossRuleValidationEngine.cs" />
     <Compile Include="Models\ModelInfo.cs" />
     <Compile Include="Models\ModelLoad.cs" />
     <Compile Include="Models\ModelObject.cs" />
@@ -114,6 +113,7 @@
       <DependentUpon>ValidationRulesView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Services\ApiTraceLogger.cs" />
+    <Compile Include="Services\CrossRuleValidationEngine_V2.cs" />
     <Compile Include="Services\ScapiTraceLogger.cs" />
     <Compile Include="Services\AuthTokenProvider.cs" />
     <Compile Include="Services\BearerTokenHandler.cs" />

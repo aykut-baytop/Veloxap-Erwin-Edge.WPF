@@ -659,7 +659,7 @@ namespace Veloxap.AddIn.Erwin.Pages
 
                 SetStatus("Validasyon calisiyor...");
                 var issues = await Task.Run(() =>
-                    CrossRuleValidationEngine.Validate(modelInfo, rules, runParallel: true));
+                    CrossRuleValidationEngine_V2.Validate(modelInfo, rules, runParallel: true));
 
                 isValidationOk = issues.Count == 0;
                 btnSendApproval.IsEnabled = isValidationOk;
