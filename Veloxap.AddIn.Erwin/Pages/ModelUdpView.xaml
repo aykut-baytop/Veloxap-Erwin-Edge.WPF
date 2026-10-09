@@ -21,61 +21,6 @@
             <Setter Property="Margin" Value="0,2,0,0"/>
         </Style>
 
-        <Style x:Key="ActionButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="42"/>
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="MinWidth" Value="42"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="#0F766E"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="HorizontalAlignment" Value="Right"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Root"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Opacity" Value="0.9"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Root" Property="Opacity" Value="0.78"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Root" Property="Background" Value="#D1D5DB"/>
-                                <Setter Property="Foreground" Value="#6B7280"/>
-                                <Setter Property="Cursor" Value="Arrow"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Width" Value="216"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="ActionButtonTextStyle" TargetType="TextBlock">
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Setter Property="Margin" Value="8,0,0,0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}"
-                             Value="True">
-                    <Setter Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
         <Style x:Key="UdpTreeItemStyle" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
@@ -101,13 +46,6 @@
     </UserControl.Resources>
 
     <Grid Background="White">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="18"/>
-            <ColumnDefinition x:Name="actionsColumn"
-                              Width="66"/>
-        </Grid.ColumnDefinitions>
-
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="12"/>
@@ -122,12 +60,6 @@
                 <ColumnDefinition Width="260"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Tablo UDP'leri"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       Foreground="#111827"
-                       VerticalAlignment="Center"/>
-
             <StackPanel Grid.Column="1">
                 <TextBlock Text="Arama"
                            Style="{StaticResource MutedTextStyle}"
@@ -141,88 +73,25 @@
                          Background="White"
                          Foreground="#111827"
                          TextChanged="TxtSearch_TextChanged"
-                         ToolTip="En az 3 karakterle tablo, kolon, UDP veya deger ara"/>
+                         ToolTip="En az 3 karakterle tablo, UDP veya deger ara"/>
             </StackPanel>
         </Grid>
 
-        <Border x:Name="actionsPanel"
-                Grid.Column="2"
-                Grid.RowSpan="5"
-                Background="#F8FAFC"
-                BorderBrush="#E5E7EB"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12"
-                MouseEnter="ActionsPanel_MouseEnter"
-                MouseLeave="ActionsPanel_MouseLeave">
-            <StackPanel>
-                <TextBlock x:Name="txtActionsTitle"
-                           Text="Tablo UDP'leri"
-                           FontSize="15"
-                           FontWeight="SemiBold"
-                           Foreground="#374151"
-                           Visibility="Collapsed"
-                           Margin="0,0,0,4"/>
-                <TextBlock x:Name="txtActionsSubtitle"
-                           Text="Islemler"
-                           Style="{StaticResource MutedTextStyle}"
-                           Visibility="Collapsed"
-                           Margin="0,0,0,12"/>
-
-                <Button x:Name="btnCalculateSecurity"
-                        Style="{StaticResource ActionButtonStyle}"
-                        Margin="0,0,0,10"
-                        Click="BtnCalculateSecurity_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE9D2;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="14"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock x:Name="txtCalculateSecurity"
-                                   Text="Veri Degeri Hesapla"
-                                   Style="{StaticResource ActionButtonTextStyle}"/>
-                    </StackPanel>
-                </Button>
-
-                <Button x:Name="btnCalculateBankRelative"
-                        Style="{StaticResource ActionButtonStyle}"
-                        Margin="0,0,0,10"
-                        Background="#2563EB"
-                        Click="BtnCalculateBankRelative_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE8EC;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="14"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock x:Name="txtCalculateBankRelative"
-                                   Text="Banka Gorece Hesapla"
-                                   Style="{StaticResource ActionButtonTextStyle}"/>
-                    </StackPanel>
-                </Button>
-
-                <Button x:Name="btnCalculateSecurityClass"
-                        Style="{StaticResource ActionButtonStyle}"
-                        Background="#B45309"
-                        Click="BtnCalculateSecurityClass_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE72E;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="14"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock x:Name="txtCalculateSecurityClass"
-                                   Text="Guvenlik Sinifi Hesapla"
-                                   Style="{StaticResource ActionButtonTextStyle}"/>
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-        </Border>
+        <ProgressBar x:Name="busyBar"
+                     Grid.Row="1"
+                     Height="3"
+                     IsIndeterminate="True"
+                     Visibility="Collapsed"
+                     Foreground="#2563EB"
+                     Background="#E5E7EB"/>
 
         <Border Grid.Row="2"
                 Background="#F8FAFC"
                 BorderBrush="#E5E7EB"
                 BorderThickness="1"
                 CornerRadius="8"
-                Padding="12">
+                Padding="12"
+                MaxHeight="70">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -307,12 +176,12 @@
                     </DockPanel>
                 </Border>
 
-                <Border Grid.Column="2"
+                <Border
                         Background="#F9FAFB"
                         BorderBrush="#E5E7EB"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Padding="12">
+                        Padding="12" Grid.ColumnSpan="3" Margin="297,0,0,0">
                     <DockPanel>
                         <TextBlock x:Name="txtDetailTitle"
                                    Text="UDP Detaylari"
@@ -335,14 +204,18 @@
                                   EnableColumnVirtualization="True"
                                   BorderThickness="0"
                                   Background="White"
-                                  AlternatingRowBackground="#F3F4F6">
+                                  AlternatingRowBackground="#F3F4F6"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Property"
                                                     Binding="{Binding Property}"
-                                                    Width="180"/>
+                                                    Width="220"
+                                                    MinWidth="180"/>
                                 <DataGridTextColumn Header="Value"
                                                     Binding="{Binding Value}"
-                                                    Width="*"/>
+                                                    Width="SizeToCells"
+                                                    MinWidth="360"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>

@@ -1,12 +1,16 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using Veloxap.AddIn.Erwin;
+using Veloxap.AddIn.Erwin.Services;
 
 namespace Veloxap.AddIn
 {
@@ -20,9 +24,12 @@ namespace Veloxap.AddIn
 
         public void Run()
         {
+            HostDpiAwareness.Preserve();
+            IntPtr ownerHandle = GetHostOwnerHandle();
+
             if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
             {
-                RunWindow();
+                RunForm(ownerHandle);
                 return;
             }
 
@@ -31,7 +38,7 @@ namespace Veloxap.AddIn
             {
                 try
                 {
-                    RunWindow();
+                    RunForm(ownerHandle);
                 }
                 catch (Exception ex)
                 {
@@ -48,14 +55,66 @@ namespace Veloxap.AddIn
                 throw new InvalidOperationException("Veloxap EDGE WPF add-in failed to start.", startupError);
         }
 
-        private static void RunWindow()
+        // Keep WPF/ElementHost type loading behind the DPI bootstrap in Run.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RunForm(IntPtr ownerHandle)
         {
-            SCAPI.Application app = new SCAPI.Application();
+            ClearApplicationLogs();
 
-            Window1 mainForm = new Window1();
-            mainForm.Init(ref app);
-            mainForm.ShowDialog();
+            using (var mainForm = new ErwinAddInForm())
+            {
+                if (ownerHandle == IntPtr.Zero)
+                    mainForm.ShowDialog();
+                else
+                    mainForm.ShowDialog(new NativeWindowOwner(ownerHandle));
+
+                if (mainForm.StartupError != null)
+                    throw new InvalidOperationException("Veloxap erwin add-in content failed to initialize.", mainForm.StartupError);
+            }
         }
+
+        private static void ClearApplicationLogs()
+        {
+            try
+            {
+                ApiTraceLogger.Clear();
+                ScapiTraceLogger.Clear();
+            }
+            catch
+            {
+                // Log cleanup must never prevent the add-in from opening.
+            }
+        }
+
+        private sealed class NativeWindowOwner : IWin32Window
+        {
+            internal NativeWindowOwner(IntPtr handle)
+            {
+                Handle = handle;
+            }
+
+            public IntPtr Handle { get; }
+        }
+
+        private static IntPtr GetHostOwnerHandle()
+        {
+            IntPtr foregroundWindow = GetForegroundWindow();
+            if (foregroundWindow == IntPtr.Zero)
+                return IntPtr.Zero;
+
+            uint windowProcessId;
+            GetWindowThreadProcessId(foregroundWindow, out windowProcessId);
+
+            return windowProcessId == (uint)Process.GetCurrentProcess().Id
+                ? foregroundWindow
+                : IntPtr.Zero;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
         [ComRegisterFunction]
         public static void Register(Type t)

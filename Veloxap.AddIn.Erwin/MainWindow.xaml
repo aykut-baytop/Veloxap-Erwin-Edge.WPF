@@ -1,18 +1,12 @@
-﻿<Window x:Class="Veloxap.AddIn.Erwin.Window1"
+<UserControl x:Class="Veloxap.AddIn.Erwin.Window1"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Veloxap.AddIn.Erwin"
         xmlns:pages="clr-namespace:Veloxap.AddIn.Erwin.Pages"
-        mc:Ignorable="d"
-        Title="Veloxap Erwin Add-In"
-        Height="700"
-        Width="1100"
-        MinHeight="600"
-        MinWidth="950"
-        WindowStartupLocation="CenterScreen">
-    <Window.Resources>
+        mc:Ignorable="d">
+    <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
 
@@ -20,15 +14,14 @@
 
             </ResourceDictionary.MergedDictionaries>
 
-            <Style x:Key="TopSettingsButtonStyle" TargetType="Button">
-                <Setter Property="Height" Value="38"/>
-                <Setter Property="Width" Value="40"/>
-                <Setter Property="MinWidth" Value="40"/>
+            <Style x:Key="MenuSettingsButtonStyle" TargetType="Button">
+                <Setter Property="Height" Value="26"/>
+                <Setter Property="Width" Value="28"/>
                 <Setter Property="Padding" Value="0"/>
                 <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="BorderBrush" Value="#CBD5E1"/>
-                <Setter Property="Background" Value="#F8FAFC"/>
-                <Setter Property="Foreground" Value="#111827"/>
+                <Setter Property="BorderBrush" Value="#3B5774"/>
+                <Setter Property="Background" Value="#1F3A5A"/>
+                <Setter Property="Foreground" Value="#E5EEF8"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Template">
                     <Setter.Value>
@@ -37,7 +30,7 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="8">
+                                    CornerRadius="6">
                                 <ContentPresenter HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
                                                   Margin="{TemplateBinding Padding}"/>
@@ -45,11 +38,11 @@
 
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Root" Property="Background" Value="#EFF6FF"/>
-                                    <Setter TargetName="Root" Property="BorderBrush" Value="#93C5FD"/>
+                                    <Setter TargetName="Root" Property="Background" Value="#29496B"/>
+                                    <Setter TargetName="Root" Property="BorderBrush" Value="#5F7EA0"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="Root" Property="Background" Value="#DBEAFE"/>
+                                    <Setter TargetName="Root" Property="Background" Value="#17304D"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -78,7 +71,7 @@
                 <Setter Property="Margin" Value="8,0,8,7"/>
             </Style>
         </ResourceDictionary>
-    </Window.Resources>
+    </UserControl.Resources>
     <Grid Background="{StaticResource AppShellBackgroundBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="225"/>
@@ -148,7 +141,7 @@
                                    Foreground="White"
                                    FontSize="19"
                                    FontWeight="SemiBold"/>
-                        <TextBlock Text="Erwin Add-In v1"
+                        <TextBlock Text="Erwin Add-In v6.1"
                                    Foreground="{StaticResource MenuMutedForegroundBrush}"
                                    FontSize="12"
                                    Margin="0,2,0,0"/>
@@ -172,25 +165,39 @@
                           ItemContainerStyle="{StaticResource MainModelComboBoxItemStyle}"
                           ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
 
-                <TextBlock Text="Navigasyon"
-                           Style="{StaticResource MenuSectionLabelStyle}"/>
+                <Grid Margin="8,0,8,7">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <RadioButton x:Name="rbModelInfo"
-             GroupName="MainMenu"
-             Style="{StaticResource SideMenuButtonStyle}"
-             IsChecked="True">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE946;" Style="{StaticResource SideMenuIconStyle}"/>
-                        <TextBlock Text="Model Bilgileri" Style="{StaticResource SideMenuTextStyle}"/>
-                    </StackPanel>
-                </RadioButton>
+                    <TextBlock Text="Navigasyon"
+                               Style="{StaticResource MenuSectionLabelStyle}"
+                               Margin="0"
+                               VerticalAlignment="Center"/>
 
-                <RadioButton x:Name="rbCompare"
+                    <Button x:Name="btnSettings"
+                            Grid.Column="1"
+                            Style="{StaticResource MenuSettingsButtonStyle}"
+                            Click="BtnSettings_Click"
+                            ToolTip="Ayarlar"
+                            AutomationProperties.Name="Ayarlar">
+                        <TextBlock Text="&#xE713;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Button>
+                </Grid>
+                <RadioButton x:Name="rbTest"
+                             IsChecked="True"
              GroupName="MainMenu"
              Style="{StaticResource SideMenuButtonStyle}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE8AB;" Style="{StaticResource SideMenuIconStyle}"/>
-                        <TextBlock Text="Model Karsilastirma" Style="{StaticResource SideMenuTextStyle}"/>
+                        <TextBlock Text="&#xE946;" Style="{StaticResource SideMenuIconStyle}"/>
+
+                        <TextBlock Text="Model Bilgileri" Style="{StaticResource SideMenuTextStyle}"/>
                     </StackPanel>
                 </RadioButton>
                 <RadioButton x:Name="rbValidation"
@@ -203,10 +210,21 @@
                 </RadioButton>
                 <RadioButton x:Name="rbTableUdps"
              GroupName="MainMenu"
-             Style="{StaticResource SideMenuButtonStyle}">
+             Style="{StaticResource SideMenuButtonStyle}"
+             Visibility="Collapsed">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE80A;" Style="{StaticResource SideMenuIconStyle}"/>
                         <TextBlock Text="Tablo UDP'leri" Style="{StaticResource SideMenuTextStyle}"/>
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton x:Name="rbModelInfo"
+             GroupName="MainMenu"
+                            Visibility="Hidden"
+             Style="{StaticResource SideMenuButtonStyle}"
+             IsChecked="False">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE946;" Style="{StaticResource SideMenuIconStyle}"/>
+                        <TextBlock Text="Model Bilgileri" Style="{StaticResource SideMenuTextStyle}"/>
                     </StackPanel>
                 </RadioButton>
             </StackPanel>
@@ -261,29 +279,15 @@
             </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Button x:Name="btnSettings"
-                        HorizontalAlignment="Right"
-                        Style="{StaticResource TopSettingsButtonStyle}"
-                        Click="BtnSettings_Click"
-                        ToolTip="Ayarlar"
-                        AutomationProperties.Name="Ayarlar">
-                    <TextBlock Text="&#xE713;"
-                               FontFamily="Segoe MDL2 Assets"
-                               FontSize="16"
-                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                </Button>
-
                 <!--<pages:ModelInfoView/>-->
-                <ContentControl x:Name="MainContent" Grid.Row="2"/>
+                <ContentControl x:Name="MainContent"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch"/>
                 <!--<ContentControl Content="{Binding SelectedPage}"/>-->
             </Grid>
         </Border>
     </Grid>
-</Window>
+</UserControl>

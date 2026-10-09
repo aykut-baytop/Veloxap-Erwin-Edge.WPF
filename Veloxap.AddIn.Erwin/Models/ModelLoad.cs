@@ -1,233 +1,380 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Veloxap.AddIn.Erwin.Models
 {
     internal class ModelLoad
     {
-        private SCAPI.Application oApplication;
+        private static readonly string[] DefaultObjectClasses =
+        {
+            "Entity",
+            "Relationship",
+            "Attribute",
+            "Sequence",
+            "Key_Group",
+            "Key_Group_Member"
+        };
 
+        private readonly SCAPI.Application oApplication;
 
         public ModelLoad(ref SCAPI.Application oApp)
         {
             oApplication = oApp;
-
-
         }
-        public ModelLoad( )
+
+        public ModelLoad(SCAPI.Application oApp)
+        {
+            oApplication = oApp;
+        }
+
+        public ModelLoad()
         {
             oApplication = new SCAPI.Application();
-
-
         }
+
+        public List<ModelObject> loadTableSummaries(SCAPI.PersistenceUnit oPersistenceUnit)
+        {
+            var tables = new List<ModelObject>();
+
+            if (oPersistenceUnit == null || oApplication == null)
+                return tables;
+
+            SCAPI.Session session = null;
+
+            try
+            {
+                session = oApplication.Sessions.Add();
+                session.Open(oPersistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
+
+                foreach (SCAPI.ModelObject entity in Collect(session, session.ModelObjects.Root, "Entity"))
+                    tables.Add(CreateModelObject(entity));
+            }
+            catch
+            {
+            }
+            finally
+            {
+                CloseSession(oApplication, session);
+            }
+
+            return tables;
+        }
+
+        public ModelObject loadTableUdpObject(
+            SCAPI.PersistenceUnit oPersistenceUnit,
+            string tableObjectId,
+            string tableName)
+        {
+            if (oPersistenceUnit == null || oApplication == null)
+                return null;
+
+            SCAPI.Session session = null;
+
+            try
+            {
+                session = oApplication.Sessions.Add();
+                session.Open(oPersistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
+
+                SCAPI.ModelObject entity = FindEntity(
+                    session,
+                    tableObjectId,
+                    tableName);
+
+                if (entity == null)
+                    return null;
+
+                ModelObject table = CreateModelObject(entity);
+                table.setoObjectProperty(ReadObjectProperties(entity));
+                table.setoModelObjects(LoadChildObjects(session, entity, new[] { "Attribute" }, 1));
+
+                return table;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                CloseSession(oApplication, session);
+            }
+        }
+
+        public ModelInfo loadModelSummary(SCAPI.PersistenceUnit oPersistenceUnit)
+        {
+            return LoadModel(oPersistenceUnit, ModelLoadMode.Summary);
+        }
+
+        public ModelInfo loadTableUdpModel(SCAPI.PersistenceUnit oPersistenceUnit)
+        {
+            return LoadModel(oPersistenceUnit, ModelLoadMode.TableUdpsOnly);
+        }
+
         public ModelInfo loadModel(SCAPI.PersistenceUnit oPersistenceUnit)
         {
-            ModelInfo mModel = new ModelInfo();
-
-
-            SCAPI.ModelObjects oSelectedCollection;
-            SCAPI.Session oSession;
-
-           
-            SCAPI.SC_SessionLevel eLevel;
-
-
-            if (oPersistenceUnit != null)
-            {
-
-                //
-                /*
-                 *  Filtrelerde kullanilan properitiesleri listeye ekleyerek sadece 
-                 *  onlari yukleyecegiz.
-                 *  
-                 *  
-                 *  
-                 */
-                eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-                oSession = oApplication.Sessions.Add();
-
-           
-                oSession.Open(oPersistenceUnit, eLevel);
-
-                var objectlist = new[] { "Entity", "Relationship", "Attribute", "Sequence", "Key_Group", "Key_Group_Member" };
-                oSelectedCollection = oSession.ModelObjects.Collect(oSession.ModelObjects.Root, null, 1);
-
-                // Model genel bilgileri
-                mModel.setoName(oPersistenceUnit.Name);
-                mModel.setoObjectId(oSession.ModelObjects.Root.ObjectId);
-                mModel.setoLocation(oPersistenceUnit.PropertyBag["Locator"].Value["Locator"]);
-
-
-                // Model Object Property
-                List<ObjectProperty> mObjectProperties = loadObjectProperities(true, oSession.ModelObjects.Root.ObjectId, null, oPersistenceUnit);
-                mModel.setoObjectProperty(mObjectProperties);
-
-
-                List<ModelObject> mModelObjects = new List<ModelObject>();
-
-
-                foreach (SCAPI.ModelObject oObject in oSelectedCollection)
-                {
-                    ModelObject mModelObject = new ModelObject();
-
-                    if (objectlist.Contains(oObject.ClassName))
-                    {
-                        mModelObject.setoObjectId(oObject.ObjectId);
-                        mModelObject.setoClassName(oObject.ClassName);
-                        mModelObject.setoName(oObject.Name);
-
-
-                        // Model Object main properities (etc: D_Arac ve D_Arac ozellikleri)
-                        List<ObjectProperty> mObjectProperty = loadObjectProperities(false, oObject.ObjectId, oSession.ModelObjects.Root.ObjectId, oPersistenceUnit);
-
-
-                        // D_Arac tablosunun sutunlari ve sutunlarin ozellikleri
-                        mModelObject.setoModelObjects(loadSubModelObject(oObject.ObjectId, oPersistenceUnit));
-
-
-
-                        mModelObject.setoObjectProperty(mObjectProperty);
-
-
-                        mModelObjects.Add(mModelObject);
-
-
-
-                    }
-
-
-                }
-
-                // Model Object
-                mModel.setoModelObject(mModelObjects);
-
-                oApplication.Sessions.Clear();
-            }
-            return mModel;
+            return LoadModel(oPersistenceUnit, ModelLoadMode.Full);
         }
-        private List<ModelObject> loadSubModelObject(string objectId, SCAPI.PersistenceUnit oPersistenceUnit)
+
+        private ModelInfo LoadModel(
+            SCAPI.PersistenceUnit oPersistenceUnit,
+            ModelLoadMode mode)
         {
-            List<ModelObject> mModelObjects = new List<ModelObject>();
+            var model = new ModelInfo();
 
+            if (oPersistenceUnit == null || oApplication == null)
+                return model;
 
-            SCAPI.ModelObjects oSelectedCollection;
-            SCAPI.Session oSession;
-
-            SCAPI.SC_SessionLevel eLevel;
-
-
-
-            eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-            oSession = oApplication.Sessions.Add();
-
-            oSession.Open(oPersistenceUnit, eLevel);
-
-            var objectlist = new[] { "Entity", "Relationship", "Attribute", "Sequence", "Key_Group", "Key_Group_Member" };
-            oSelectedCollection = oSession.ModelObjects.Collect(objectId, null, 1);
-
-
-
-
-            foreach (SCAPI.ModelObject oObject in oSelectedCollection)
-            {
-                ModelObject mModelObject = new ModelObject();
-
-                if (objectlist.Contains(oObject.ClassName))
-                {
-                    mModelObject.setoObjectId(oObject.ObjectId);
-                    mModelObject.setoClassName(oObject.ClassName);
-                    mModelObject.setoName(oObject.Name);
-
-
-                    List<ObjectProperty> mObjectProperty = loadObjectProperities(false, oObject.ObjectId, oSession.ModelObjects.Root.ObjectId, oPersistenceUnit);
-                    mModelObject.setoObjectProperty(mObjectProperty);
-                    mModelObjects.Add(mModelObject);
-
-
-
-                }
-
-
-            }
-
-
-            return mModelObjects;
-        }
-        private List<ObjectProperty> loadObjectProperities(bool isRoot, object objectId, object parentObjectId, SCAPI.PersistenceUnit oPersistenceUnit)
-        {
-
-            List<ObjectProperty> mObjectProperties = new List<ObjectProperty>();
-
-            SCAPI.Session oSession;
-            SCAPI.ModelObject oRootObject;
-            SCAPI.ModelObject oObject;
-
-            SCAPI.SC_SessionLevel eLevel;
-
-            eLevel = SCAPI.SC_SessionLevel.SCD_SL_M0;
-            oSession = oApplication.Sessions.Add();
+            SCAPI.Session session = null;
 
             try
             {
-                oSession.Open(oPersistenceUnit, eLevel);
+                session = oApplication.Sessions.Add();
+                session.Open(oPersistenceUnit, SCAPI.SC_SessionLevel.SCD_SL_M0);
 
+                SCAPI.ModelObject root = session.ModelObjects.Root;
+                model.setoName(oPersistenceUnit.Name);
+                model.setoObjectId(root.ObjectId);
+                model.setoLocation(ReadLocation(oPersistenceUnit));
+                model.setoObjectProperty(ReadObjectProperties(root));
 
-                if (isRoot)
-                    oRootObject = oSession.ModelObjects.Root;
-                else
-                    oRootObject = oSession.ModelObjects[parentObjectId];
+                if (mode == ModelLoadMode.Summary)
+                    return model;
 
+                model.setoModelObject(
+                    mode == ModelLoadMode.TableUdpsOnly
+                        ? LoadTableUdpObjects(session, root)
+                        : LoadChildObjects(session, root, DefaultObjectClasses, 2));
 
+                return model;
+            }
+            catch
+            {
+                return model;
+            }
+            finally
+            {
+                CloseSession(oApplication, session);
+            }
+        }
 
-                oObject = oSession.ModelObjects.Collect(oRootObject)[objectId];
+        private static List<ModelObject> LoadTableUdpObjects(
+            SCAPI.Session session,
+            SCAPI.ModelObject root)
+        {
+            var tables = new List<ModelObject>();
 
+            foreach (SCAPI.ModelObject entity in Collect(session, root, "Entity"))
+            {
+                ModelObject table = CreateModelObject(entity);
+                table.setoObjectProperty(ReadObjectProperties(entity));
+                table.setoModelObjects(LoadChildObjects(session, entity, new[] { "Attribute" }, 1));
+                tables.Add(table);
+            }
 
-                if (oObject != null)
+            return tables;
+        }
+
+        private static List<ModelObject> LoadChildObjects(
+            SCAPI.Session session,
+            SCAPI.ModelObject parent,
+            string[] allowedClasses,
+            int remainingDepth)
+        {
+            var modelObjects = new List<ModelObject>();
+
+            if (session == null || parent == null || remainingDepth <= 0)
+                return modelObjects;
+
+            foreach (SCAPI.ModelObject scapiObject in Collect(session, parent, null))
+            {
+                if (!IsAllowedClass(scapiObject, allowedClasses))
+                    continue;
+
+                ModelObject modelObject = CreateModelObject(scapiObject);
+                modelObject.setoObjectProperty(ReadObjectProperties(scapiObject));
+                modelObject.setoModelObjects(LoadChildObjects(
+                    session,
+                    scapiObject,
+                    allowedClasses,
+                    remainingDepth - 1));
+                modelObjects.Add(modelObject);
+            }
+
+            return modelObjects;
+        }
+
+        private static List<SCAPI.ModelObject> Collect(
+            SCAPI.Session session,
+            SCAPI.ModelObject parent,
+            string className)
+        {
+            var objects = new List<SCAPI.ModelObject>();
+
+            if (session == null || parent == null)
+                return objects;
+
+            try
+            {
+                SCAPI.ModelObjects selectedCollection = session.ModelObjects.Collect(
+                    parent.ObjectId,
+                    className,
+                    1);
+
+                foreach (SCAPI.ModelObject scapiObject in selectedCollection)
+                    objects.Add(scapiObject);
+            }
+            catch
+            {
+            }
+
+            return objects;
+        }
+
+        private static SCAPI.ModelObject FindEntity(
+            SCAPI.Session session,
+            string tableObjectId,
+            string tableName)
+        {
+            if (session == null)
+                return null;
+
+            if (!string.IsNullOrWhiteSpace(tableObjectId))
+            {
+                try
                 {
-                    foreach (SCAPI.ModelProperty oProperty in oObject.Properties)
-                    {
-                        ObjectProperty mObjectProperty = new ObjectProperty();
-                        try
-                        {
-
-                            string type = PropertyDataType(oProperty);
-                            string format = oProperty.FormatAsString();
-                            string val = RetrieveValue(oProperty);
-
-
-                            mObjectProperty.setoPropertyClassID(oProperty.ClassId);
-                            mObjectProperty.setoPropertyClassName(oProperty.ClassName);
-                            mObjectProperty.setoPropertyType(type);
-                            mObjectProperty.setoPropertyValue(val);
-                            mObjectProperty.setoPropertyFormatAsString(format);
-
-                            mObjectProperties.Add(mObjectProperty);
-
-
-                        }
-                        catch (Exception e) { }
-
-
-                    }
-
-
-
+                    return session.ModelObjects[tableObjectId];
+                }
+                catch
+                {
                 }
             }
-            catch (Exception e)
-            {
 
+            try
+            {
+                foreach (SCAPI.ModelObject entity in Collect(session, session.ModelObjects.Root, "Entity"))
+                {
+                    if (!string.IsNullOrWhiteSpace(tableObjectId) &&
+                        string.Equals(entity.ObjectId, tableObjectId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return entity;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(tableName) &&
+                        string.Equals(entity.Name, tableName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return entity;
+                    }
+                }
             }
-            return mObjectProperties;
+            catch
+            {
+            }
+
+            return null;
         }
-        private string RetrieveValue(SCAPI.ModelProperty oProperty, int nIndex = -1)
+
+        private static bool IsAllowedClass(
+            SCAPI.ModelObject scapiObject,
+            string[] allowedClasses)
+        {
+            if (scapiObject == null || allowedClasses == null)
+                return false;
+
+            return allowedClasses.Contains(
+                scapiObject.ClassName,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static ModelObject CreateModelObject(SCAPI.ModelObject scapiObject)
+        {
+            var modelObject = new ModelObject();
+
+            if (scapiObject == null)
+                return modelObject;
+
+            modelObject.setoObjectId(scapiObject.ObjectId);
+            modelObject.setoClassName(scapiObject.ClassName);
+            modelObject.setoName(scapiObject.Name);
+
+            return modelObject;
+        }
+
+        private static List<ObjectProperty> ReadObjectProperties(SCAPI.ModelObject scapiObject)
+        {
+            var properties = new List<ObjectProperty>();
+
+            if (scapiObject == null)
+                return properties;
+
+            try
+            {
+                foreach (SCAPI.ModelProperty scapiProperty in scapiObject.Properties)
+                {
+                    try
+                    {
+                        var property = new ObjectProperty();
+                        property.setoPropertyClassID(scapiProperty.ClassId);
+                        property.setoPropertyClassName(scapiProperty.ClassName);
+                        property.setoPropertyType(PropertyDataType(scapiProperty));
+                        property.setoPropertyValue(RetrieveValue(scapiProperty));
+                        property.setoPropertyFormatAsString(scapiProperty.FormatAsString());
+                        properties.Add(property);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return properties;
+        }
+
+        private static string ReadLocation(SCAPI.PersistenceUnit persistenceUnit)
         {
             try
             {
+                return persistenceUnit.PropertyBag["Locator"].Value["Locator"];
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
 
+        private static void CloseSession(
+            SCAPI.Application application,
+            SCAPI.Session session)
+        {
+            if (session == null)
+                return;
+
+            try
+            {
+                session.Close();
+            }
+            catch
+            {
+            }
+
+            if (application == null)
+                return;
+
+            try
+            {
+                application.Sessions.Remove(session);
+            }
+            catch
+            {
+            }
+        }
+
+        private static string RetrieveValue(SCAPI.ModelProperty oProperty, int nIndex = -1)
+        {
+            try
+            {
                 bool isScalar = (oProperty.Flags & SCAPI.SC_ModelPropertyFlags.SCD_MPF_SCALAR) != 0;
 
                 SCAPI.SC_ValueTypes valueType = isScalar
@@ -262,7 +409,7 @@ namespace Veloxap.AddIn.Erwin.Models
                     case SCAPI.SC_ValueTypes.SCVT_BSTR:
                     case SCAPI.SC_ValueTypes.SCVT_GUID:
                     case SCAPI.SC_ValueTypes.SCVT_OBJID:
-                        return value?.ToString() ?? string.Empty;
+                        return value == null ? string.Empty : value.ToString();
 
                     case SCAPI.SC_ValueTypes.SCVT_BLOB:
                         return "<blob>";
@@ -270,88 +417,63 @@ namespace Veloxap.AddIn.Erwin.Models
                     case SCAPI.SC_ValueTypes.SCVT_RECT:
                         {
                             int[] array = (int[])value;
-                            return $"({array[0]},{array[1]},{array[2]},{array[3]})";
+                            return string.Format("({0},{1},{2},{3})", array[0], array[1], array[2], array[3]);
                         }
 
                     case SCAPI.SC_ValueTypes.SCVT_POINT:
                         {
                             int[] array = (int[])value;
-                            return $"({array[0]},{array[1]})";
+                            return string.Format("({0},{1})", array[0], array[1]);
                         }
 
                     case SCAPI.SC_ValueTypes.SCVT_SIZE:
                         {
                             int[] array = (int[])value;
-                            return $"{array[0]}x{array[1]}";
+                            return string.Format("{0}x{1}", array[0], array[1]);
                         }
 
                     default:
-                        return "";// $"<error: variant type - {value?.GetType().Name ?? "<null>"} SCAPI type - {(int)valueType}>";
+                        return string.Empty;
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                string className;
-                try
-                {
-                    className = oProperty.ClassName;
-                }
-                catch
-                {
-                    className = "<unknown>";
-                }
-
-                return "";//$"Failed to populate property {className} with error {ex.Message}";
+                return string.Empty;
             }
         }
 
-        private string PropertyDataType(SCAPI.ModelProperty oProperty)
+        private static string PropertyDataType(SCAPI.ModelProperty oProperty)
         {
-            string dataType = "";
             try
             {
-                var flags = oProperty.Flags;
-
-
                 string[] valueTypeNames =
                 {
-            "Null","I2","I4","UI1","R4","R8","Bool","$$","IU","ID",
-            "Date","Str","UI2","UI4","Guid","Id","Blob","Def","I1",
-            "IT","UIT","Rect","Pnt","I8","UI8","Size"
-        };
+                    "Null", "I2", "I4", "UI1", "R4", "R8", "Bool", "$$", "IU", "ID",
+                    "Date", "Str", "UI2", "UI4", "Guid", "Id", "Blob", "Def", "I1",
+                    "IT", "UIT", "Rect", "Pnt", "I8", "UI8", "Size"
+                };
 
-                bool isScalar = (flags & SCAPI.SC_ModelPropertyFlags.SCD_MPF_SCALAR) != 0;
-
+                bool isScalar = (oProperty.Flags & SCAPI.SC_ModelPropertyFlags.SCD_MPF_SCALAR) != 0;
                 SCAPI.SC_ValueTypes valueType = isScalar
                     ? oProperty.DataType
                     : oProperty.DataType[0];
 
                 int typeIndex = (int)valueType;
-
-                if (typeIndex >= 0 && typeIndex < valueTypeNames.Length)
-                    dataType = valueTypeNames[typeIndex];
-                else
-                    dataType = $"Unknown ({typeIndex})";
-
-
-
+                return typeIndex >= 0 && typeIndex < valueTypeNames.Length
+                    ? valueTypeNames[typeIndex]
+                    : "Unknown (" + typeIndex + ")";
             }
-            catch (Exception ex)
+            catch
             {
-                string className;
-                try
-                {
-                    className = oProperty.ClassName;
-                }
-                catch
-                {
-                    className = "<unknown>";
-                }
-
-                //return  $"Failed to collect flags for a property of {className} class with error {ex.Message}";
+                return string.Empty;
             }
-            return dataType;
         }
 
+        private enum ModelLoadMode
+        {
+            Summary,
+            TableUdpsOnly,
+            Full
+        }
     }
 }

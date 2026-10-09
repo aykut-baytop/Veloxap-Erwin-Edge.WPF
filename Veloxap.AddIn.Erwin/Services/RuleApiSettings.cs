@@ -12,8 +12,15 @@ namespace Veloxap.AddIn.Erwin.Services
         private const string AuthPasswordKey = "AuthPassword";
         private const string RulesByModelUrlKey = "ValidationRulesByModelUrl";
         private const string AlterDdlUrlKey = "AlterDdlUrl";
+        private const string UdpDiffUrlKey = "UdpDiffUrl";
+        private const string CustomUdpUrlKey = "CustomUdpUrl";
         private const string ApprovalStartByCatalogUrlKey = "ApprovalStartByCatalogUrl";
-        private const string EnableModelComparisonKey = "EnableModelComparison";
+        private const string CatalogLocksUrlKey = "CatalogLocksUrl";
+        private const string CatalogUnlockUrlKey = "CatalogUnlockUrl";
+        private const string CatalogDeleteUrlKey = "CatalogDeleteUrl";
+        private const string ApprovalStatusByCatalogUrlKey = "ApprovalStatusByCatalogUrl";
+        private const string MartCatalogsUrlKey = "MartCatalogsUrl";
+        private const string MartCatalogVersionsUrlKey = "MartCatalogVersionsUrl";
 
         public static string GetApiBaseUrl()
         {
@@ -59,9 +66,59 @@ namespace Veloxap.AddIn.Erwin.Services
             return GetServiceUrl(AlterDdlUrlKey);
         }
 
+        public static string GetUdpDiffUrl()
+        {
+            return GetServiceUrl(UdpDiffUrlKey);
+        }
+
+        public static string GetCustomUdpUrl()
+        {
+            return GetServiceUrl(CustomUdpUrlKey);
+        }
+
         public static string GetApprovalStartByCatalogUrl()
         {
             return GetServiceUrl(ApprovalStartByCatalogUrlKey);
+        }
+
+        public static string GetCatalogLocksUrl()
+        {
+            return GetServiceUrl(CatalogLocksUrlKey);
+        }
+
+        public static string GetCatalogUnlockUrl()
+        {
+            return GetServiceUrl(CatalogUnlockUrlKey);
+        }
+
+        public static string GetCatalogDeleteUrl()
+        {
+            return GetServiceUrl(CatalogDeleteUrlKey);
+        }
+
+        public static string GetApprovalStatusByCatalogUrl()
+        {
+            return GetServiceUrl(ApprovalStatusByCatalogUrlKey);
+        }
+
+        public static string GetMartCatalogsUrl()
+        {
+            return GetServiceUrl(MartCatalogsUrlKey);
+        }
+
+        public static string GetMartCatalogVersionsUrl(string catalogId)
+        {
+            string serviceUrl = GetMartCatalogVersionsUrlTemplate();
+            string safeCatalogId = (catalogId ?? string.Empty).Trim();
+
+            return serviceUrl
+                .Replace("{catalogId}", safeCatalogId)
+                .Replace("{0}", safeCatalogId);
+        }
+
+        public static string GetMartCatalogVersionsUrlTemplate()
+        {
+            return GetServiceUrl(MartCatalogVersionsUrlKey);
         }
 
         public static List<string> GetAppSettingKeys()
@@ -74,19 +131,15 @@ namespace Veloxap.AddIn.Erwin.Services
                 AuthPasswordKey,
                 RulesByModelUrlKey,
                 AlterDdlUrlKey,
+                UdpDiffUrlKey,
+                CustomUdpUrlKey,
                 ApprovalStartByCatalogUrlKey,
-                EnableModelComparisonKey
+                CatalogLocksUrlKey,
+                CatalogUnlockUrlKey,
+                ApprovalStatusByCatalogUrlKey,
+                MartCatalogsUrlKey,
+                MartCatalogVersionsUrlKey
             };
-        }
-
-        public static bool IsModelComparisonEnabled()
-        {
-            string configured = GetOptionalSetting(EnableModelComparisonKey);
-            bool parsed;
-            if (bool.TryParse(configured, out parsed))
-                return parsed;
-
-            return false;
         }
 
         private static string GetServiceUrl(string key)

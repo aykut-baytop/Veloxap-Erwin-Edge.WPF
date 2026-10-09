@@ -53,15 +53,65 @@ namespace Veloxap.AddIn.Erwin.Services
 
         public async Task<string> GetAlterDdlAsync(
             string serviceUrl,
-            string path,
-            int sourceVNo,
-            int targetVNo)
+            long versionId)
         {
             if (string.IsNullOrWhiteSpace(serviceUrl))
                 throw new ArgumentException("Alter DDL servis URL'i bos olamaz.", nameof(serviceUrl));
 
-            if (string.IsNullOrWhiteSpace(path))
-                throw new ArgumentException("Alter DDL path degeri bos olamaz.", nameof(path));
+            if (versionId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(versionId), "MART versiyon ID'si pozitif olmali.");
+
+            string requestUrl = BuildSingleQueryUrl(
+                serviceUrl,
+                "id",
+                versionId.ToString(CultureInfo.InvariantCulture));
+            requestUrl = BuildSingleQueryUrl(requestUrl, "type", "ALTERDDL");
+
+            ApiTraceLogger.Info(
+                "ALTER DDL REQUEST" + Environment.NewLine +
+                "Url: " + requestUrl);
+
+            using (var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false))
+            {
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "ALTER DDL RESPONSE" + Environment.NewLine +
+                    "Url: " + requestUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = DeserializeJson(json) as Dictionary<string, object>;
+                    string message = GetString(error, "error", "message");
+                    throw new InvalidOperationException(
+                        "MART Alter DDL servisi hata dondu: " + (int)response.StatusCode + " " +
+                        response.ReasonPhrase +
+                        (string.IsNullOrWhiteSpace(message) ? string.Empty : ". " + message));
+                }
+
+                string ddl = ExtractDdl(json);
+
+                ApiTraceLogger.Info(
+                    "ALTER DDL PARSE" + Environment.NewLine +
+                    "Url: " + requestUrl + Environment.NewLine +
+                    "DdlLength: " + (ddl == null ? 0 : ddl.Length));
+
+                return ddl ?? string.Empty;
+            }
+        }
+
+        public async Task<UdpDiffResult> GetUdpDiffAsync(
+            string serviceUrl,
+            string catalogName,
+            string catalogPath,
+            int sourceVersion,
+            int targetVersion)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("UDP fark servis URL'i bos olamaz.", nameof(serviceUrl));
 
             var serializer = new JavaScriptSerializer
             {
@@ -70,13 +120,14 @@ namespace Veloxap.AddIn.Erwin.Services
 
             string payload = serializer.Serialize(new Dictionary<string, object>
             {
-                { "path", path },
-                { "sourceVNo", sourceVNo },
-                { "targetVNo", targetVNo }
+                { "catalogName", catalogName ?? string.Empty },
+                { "catalogPath", catalogPath ?? string.Empty },
+                { "sourceVersion", sourceVersion },
+                { "targetVersion", targetVersion }
             });
 
             ApiTraceLogger.Info(
-                "ALTER DDL REQUEST" + Environment.NewLine +
+                "UDP DIFF REQUEST" + Environment.NewLine +
                 "Url: " + serviceUrl + Environment.NewLine +
                 "Body: " + payload);
 
@@ -86,7 +137,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                 ApiTraceLogger.Info(
-                    "ALTER DDL RESPONSE" + Environment.NewLine +
+                    "UDP DIFF RESPONSE" + Environment.NewLine +
                     "Url: " + serviceUrl + Environment.NewLine +
                     "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
                     "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
@@ -94,18 +145,49 @@ namespace Veloxap.AddIn.Erwin.Services
 
                 response.EnsureSuccessStatusCode();
 
-                string ddl = ExtractDdl(json);
+                UdpDiffResult result = ParseUdpDiffResult(json);
 
                 ApiTraceLogger.Info(
-                    "ALTER DDL PARSE" + Environment.NewLine +
+                    "UDP DIFF PARSE" + Environment.NewLine +
                     "Url: " + serviceUrl + Environment.NewLine +
-                    "DdlLength: " + (ddl == null ? 0 : ddl.Length));
+                    "Success: " + result.Success + Environment.NewLine +
+                    "ItemCount: " + result.Items.Count);
 
-                return ddl ?? string.Empty;
+                return result;
             }
         }
 
-        public async Task<string> StartApprovalByCatalogAsync(
+        public async Task<ApprovalStartResult> StartApprovalByCatalogAsync(
+            string serviceUrl,
+            string cName,
+            string cLongId,
+            int versionId,
+            int targetVersionId,
+            string description,
+            string alterDdl,
+            CustomUdpModel jiraUdp)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Approval servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            if (jiraUdp == null)
+                throw new ArgumentNullException(nameof(jiraUdp));
+
+            var udpResponse = await PostCustomUdp(new List<CustomUdpModel> { jiraUdp }).ConfigureAwait(false);
+            if (udpResponse == null || !udpResponse.Success)
+            {
+                string message = udpResponse == null || string.IsNullOrWhiteSpace(udpResponse.Message)
+                    ? "Custom UDP servisi basarisiz dondu."
+                    : udpResponse.Message;
+
+                throw new InvalidOperationException("Jira No kaydedilemedi. " + message);
+            }
+
+            return await StartApprovalByCatalogAsync(
+                serviceUrl, cName, cLongId, versionId, targetVersionId, description, alterDdl).ConfigureAwait(false);
+        }
+
+        public async Task<ApprovalStartResult> StartApprovalByCatalogAsync(
             string serviceUrl,
             string cName,
             string cLongId,
@@ -150,9 +232,319 @@ namespace Veloxap.AddIn.Erwin.Services
                     "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
                     "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
 
-                response.EnsureSuccessStatusCode();
-                return json ?? string.Empty;
+                ApprovalStartResult result = ParseApprovalStartResult(json);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorMessage = result == null || string.IsNullOrWhiteSpace(result.Message)
+                        ? "Approval servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                        : result.Message;
+
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                return result ?? new ApprovalStartResult(true, string.Empty, json ?? string.Empty);
             }
+        }
+
+        public async Task<CatalogLocksResult> GetCatalogLocksAsync(
+            string serviceUrl,
+            string cName,
+            string cLongId)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Catalog lock servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            string requestUrl = BuildCatalogQueryUrl(serviceUrl, cName, cLongId);
+
+            ApiTraceLogger.Info(
+                "CATALOG LOCKS REQUEST" + Environment.NewLine +
+                "Url: " + requestUrl);
+
+            var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false);
+            string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+            ApiTraceLogger.Info(
+                "CATALOG LOCKS RESPONSE" + Environment.NewLine +
+                "Url: " + requestUrl + Environment.NewLine +
+                "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+            CatalogLocksResult result = ParseCatalogLocksResult(json);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorMessage = result == null || string.IsNullOrWhiteSpace(result.Message)
+                    ? "Catalog lock servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                    : result.Message;
+
+                throw new InvalidOperationException(errorMessage);
+            }
+
+            var locks = result == null ? new List<CatalogLockInfo>() : result.Locks;
+
+            ApiTraceLogger.Info(
+                "CATALOG LOCKS PARSE" + Environment.NewLine +
+                "Url: " + requestUrl + Environment.NewLine +
+                "Success: " + (result == null || result.Success ? "true" : "false") + Environment.NewLine +
+                "Message: " + (result == null ? string.Empty : result.Message) + Environment.NewLine +
+                "ParsedLockCount: " + locks.Count);
+
+            return result ?? new CatalogLocksResult(true, string.Empty, locks, json ?? string.Empty);
+        }
+
+        public async Task<string> UnlockCatalogAsync(
+            string serviceUrl,
+            string cName,
+            string cLongId,
+            string lockId)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Catalog unlock servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            if (string.IsNullOrWhiteSpace(lockId))
+                throw new ArgumentException("lockId bos olamaz.", nameof(lockId));
+
+            var serializer = new JavaScriptSerializer
+            {
+                MaxJsonLength = int.MaxValue
+            };
+
+            string payload = serializer.Serialize(new Dictionary<string, object>
+            {
+                { "cName", cName ?? string.Empty },
+                { "cLongId", cLongId ?? string.Empty },
+                { "lockId", lockId ?? string.Empty }
+            });
+
+            ApiTraceLogger.Info(
+                "CATALOG UNLOCK REQUEST" + Environment.NewLine +
+                "Url: " + serviceUrl + Environment.NewLine +
+                "Body: " + payload);
+
+            using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
+            {
+                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "CATALOG UNLOCK RESPONSE" + Environment.NewLine +
+                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                string message = ExtractResponseMessage(json);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorMessage = string.IsNullOrWhiteSpace(message)
+                        ? "Catalog unlock servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                        : message;
+
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                return message ?? string.Empty;
+            }
+        }
+
+        public async Task<string> DeleteCatalogAsync(
+    string serviceUrl,
+    string cName,
+    string cLongId)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Catalog delete servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            var serializer = new JavaScriptSerializer
+            {
+                MaxJsonLength = int.MaxValue
+            };
+
+            string payload = serializer.Serialize(new Dictionary<string, object>
+            {
+                { "cName", cName ?? string.Empty },
+                { "cLongId", cLongId ?? string.Empty },
+                { "itemType", "V" },
+                { "itemName", "V" +  cName.Split(' ')[1].Trim() + " - " + cName}
+            });
+
+            ApiTraceLogger.Info(
+                "CATALOG delete REQUEST" + Environment.NewLine +
+                "Url: " + serviceUrl + Environment.NewLine +
+                "Body: " + payload);
+
+            using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
+            {
+                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "CATALOG delete RESPONSE" + Environment.NewLine +
+                    "Url: " + serviceUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                string message = ExtractResponseMessage(json);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorMessage = string.IsNullOrWhiteSpace(message)
+                        ? "Catalog delete servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase
+                        : message;
+
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                return message ?? string.Empty;
+            }
+        }
+
+        public async Task<CatalogApprovalStatus> GetApprovalStatusByCatalogAsync(
+            string serviceUrl,
+            string cName,
+            string cLongId)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentException("Approval status servis URL'i bos olamaz.", nameof(serviceUrl));
+
+            string requestUrl = BuildCatalogQueryUrl(serviceUrl, cName, cLongId);
+
+            ApiTraceLogger.Info(
+                "APPROVAL STATUS REQUEST" + Environment.NewLine +
+                "Url: " + requestUrl);
+
+            var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false);
+            string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+            ApiTraceLogger.Info(
+                "APPROVAL STATUS RESPONSE" + Environment.NewLine +
+                "Url: " + requestUrl + Environment.NewLine +
+                "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+            response.EnsureSuccessStatusCode();
+
+            var status = ParseApprovalStatus(json);
+
+            ApiTraceLogger.Info(
+                "APPROVAL STATUS PARSE" + Environment.NewLine +
+                "Url: " + requestUrl + Environment.NewLine +
+                "Status: " + (status == null ? string.Empty : status.Status) + Environment.NewLine +
+                "StepCount: " + (status == null || status.Steps == null ? 0 : status.Steps.Count));
+
+            return status ?? new CatalogApprovalStatus();
+        }
+
+        public async Task<CatalogVersionOwnerInfo> GetCatalogVersionOwnerAsync(
+            string catalogVersionsUrl,
+            string cLongId,
+            string versionName,
+            string versionNumber)
+        {
+            ScapiTraceLogger.Info($"GetCatalogVersionOwnerAsync method parametreleri : + {catalogVersionsUrl} - {cLongId} - {versionName} - {versionNumber}");
+
+            if (string.IsNullOrWhiteSpace(catalogVersionsUrl))
+                throw new ArgumentException("Mart catalog version servis URL'i bos olamaz.", nameof(catalogVersionsUrl));
+
+            if (string.IsNullOrWhiteSpace(cLongId))
+                throw new ArgumentException("cLongId bos olamaz.", nameof(cLongId));
+
+            string versionsRequestUrl = BuildCatalogVersionsUrl(catalogVersionsUrl, cLongId);
+
+            var versionsResponse = await httpClient.GetAsync(versionsRequestUrl).ConfigureAwait(false);
+            string versionsJson = await versionsResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+            ApiTraceLogger.Info(
+                "MART CATALOG VERSIONS RESPONSE" + Environment.NewLine +
+                "Url: " + versionsRequestUrl + Environment.NewLine +
+                "Status: " + (int)versionsResponse.StatusCode + " " + versionsResponse.ReasonPhrase + Environment.NewLine +
+                "BodyLength: " + (versionsJson == null ? 0 : versionsJson.Length) + Environment.NewLine +
+                "BodyPreview: " + ApiTraceLogger.Truncate(versionsJson, 2000));
+
+            versionsResponse.EnsureSuccessStatusCode();
+
+            List<CatalogVersionInfo> versions = ResolveCatalogVersions(DeserializeJson(versionsJson)).ToList();
+            CatalogVersionInfo version = FindCatalogVersion(versions, cLongId, versionName, versionNumber);
+            if (version == null)
+                throw new InvalidOperationException("Secili version icin mart catalog version kaydi bulunamadi.");
+
+            ApiTraceLogger.Info(
+                "MART CATALOG VERSION OWNER PARSE" + Environment.NewLine +
+                "ContainerId: " + version.ContainerId+ Environment.NewLine +
+                "VersionId: " + (version.Id ?? string.Empty) + Environment.NewLine +
+                "VersionName: " + (version.Name ?? string.Empty) + Environment.NewLine +
+                "CreatedBy: " + (version.CreatedBy ?? string.Empty));
+
+            return new CatalogVersionOwnerInfo
+            {
+                //CatalogId = catalog.Id,
+                //CatalogName = catalog.Name,
+                ContainerId = version.ContainerId,
+                VersionId = version.Id,
+                VersionName = version.Name,
+                VersionNumber = version.VersionNumber,
+                CLongId = version.CLongId,
+                CreatedBy = version.CreatedBy
+            };
+        }
+
+        private static string BuildCatalogQueryUrl(string baseUrl, string cName, string cLongId)
+        {
+            string separator = baseUrl.Contains("?")
+                ? (baseUrl.EndsWith("?") || baseUrl.EndsWith("&") ? string.Empty : "&")
+                : "?";
+
+            return baseUrl
+                + separator
+                + "cName="
+                + Uri.EscapeDataString(cName ?? string.Empty)
+                + "&cLongId="
+                + Uri.EscapeDataString(cLongId ?? string.Empty);
+        }
+
+        private static string BuildSingleQueryUrl(string baseUrl, string key, string value)
+        {
+            string separator = baseUrl.Contains("?")
+                ? (baseUrl.EndsWith("?") || baseUrl.EndsWith("&") ? string.Empty : "&")
+                : "?";
+
+            return baseUrl
+                + separator
+                + Uri.EscapeDataString(key ?? string.Empty)
+                + "="
+                + Uri.EscapeDataString(value ?? string.Empty);
+        }
+
+        private static string BuildCatalogVersionsUrl(string catalogVersionsUrl, string cLongId)
+        {
+            string baseUrl = (catalogVersionsUrl ?? string.Empty).Trim();
+            string safeLongId = (cLongId ?? string.Empty).Trim();
+            string encodedLongId = Uri.EscapeDataString(safeLongId);
+
+            if (baseUrl.Contains("{cLongId}") ||
+                baseUrl.Contains("{catalogId}") ||
+                baseUrl.Contains("{0}"))
+            {
+                return baseUrl
+                    .Replace("{cLongId}", encodedLongId)
+                    .Replace("{catalogId}", encodedLongId)
+                    .Replace("{0}", encodedLongId);
+            }
+
+            if (baseUrl.EndsWith("=", StringComparison.Ordinal))
+                return baseUrl + encodedLongId;
+
+            if (baseUrl.EndsWith("&", StringComparison.Ordinal) ||
+                baseUrl.EndsWith("?", StringComparison.Ordinal))
+                return baseUrl + "cLongId=" + encodedLongId;
+
+            string separator = baseUrl.Contains("?") ? "&" : "?";
+            return baseUrl + separator + "cLongId=" + encodedLongId;
         }
 
         private static string ExtractDdl(string json)
@@ -160,51 +552,565 @@ namespace Veloxap.AddIn.Erwin.Services
             if (string.IsNullOrWhiteSpace(json))
                 return string.Empty;
 
-            try
+            var serializer = new JavaScriptSerializer
             {
-                var serializer = new JavaScriptSerializer
-                {
-                    MaxJsonLength = int.MaxValue
-                };
+                MaxJsonLength = int.MaxValue
+            };
 
-                object payload = serializer.DeserializeObject(json);
-                var directDdl = payload as string;
-                if (!string.IsNullOrWhiteSpace(directDdl))
-                    return directDdl;
+            var payload = serializer.DeserializeObject(json) as Dictionary<string, object>;
+            if (payload == null)
+                throw new InvalidOperationException("MART Alter DDL cevabi beklenen JSON nesnesini icermiyor.");
 
-                string ddl = ResolveDdl(payload);
-                return ddl ?? string.Empty;
-            }
-            catch (ArgumentException)
-            {
-                return ExtractDdlFromRawJson(json);
-            }
-            catch (InvalidOperationException)
-            {
-                return ExtractDdlFromRawJson(json);
-            }
+            // JSON deserialization decodes newlines and tabs once, preserving literal SQL backslashes.
+            object ddl = GetDictionaryValue(payload, "ALTERDDL");
+            if (ddl == null)
+                return string.Empty;
+
+            if (!(ddl is string))
+                throw new InvalidOperationException("MART cevabindaki ALTERDDL alani metin olmali.");
+
+            return (string)ddl;
         }
 
-        private static string ResolveDdl(object payload)
+        private static List<CatalogLockInfo> ParseCatalogLocks(string json)
+        {
+            object payload = DeserializeJson(json);
+            return ResolveCatalogLockItems(payload)
+                .Select(ToCatalogLockInfo)
+                .Where(item => item != null)
+                .ToList();
+        }
+
+        private static CatalogLocksResult ParseCatalogLocksResult(string json)
+        {
+            object payload = DeserializeJson(json);
+            Dictionary<string, object> dictionary = payload as Dictionary<string, object>;
+            bool? success = dictionary == null ? null : GetNullableBool(dictionary, "success");
+            string message = ExtractResponseMessage(payload);
+            List<CatalogLockInfo> locks = ResolveCatalogLockItems(payload)
+                .Select(ToCatalogLockInfo)
+                .Where(item => item != null)
+                .ToList();
+
+            return new CatalogLocksResult(
+                success.HasValue ? success.Value : true,
+                message,
+                locks,
+                json ?? string.Empty);
+        }
+
+        private static UdpDiffResult ParseUdpDiffResult(string json)
+        {
+            object payload = DeserializeJson(json);
+            var dictionary = payload as Dictionary<string, object>;
+            bool? success = dictionary == null ? null : GetNullableBool(dictionary, "success");
+            string message = dictionary == null ? string.Empty : GetString(dictionary, "message");
+            object itemsValue = dictionary == null ? null : GetDictionaryValue(dictionary, "items");
+            var items = (itemsValue as object[] ?? new object[0])
+                .OfType<Dictionary<string, object>>()
+                .Select(item => new UdpDiffItem
+                {
+                    ChangeType = GetString(item, "changeType"),
+                    ChangeReason = GetString(item, "changeReason"),
+                    ObjectType = GetString(item, "objectType"),
+                    ModelName = GetString(item, "modelName"),
+                    TableName = GetString(item, "tableName"),
+                    ColumnName = GetString(item, "columnName"),
+                    UdpName = GetString(item, "udpName"),
+                    PreviousContent = GetString(item, "previousContent"),
+                    CurrentContent = GetString(item, "currentContent")
+                })
+                .ToList();
+
+            return new UdpDiffResult(success.HasValue ? success.Value : true, message, items);
+        }
+
+        private static IEnumerable<object> ResolveCatalogLockItems(object payload)
+        {
+            var array = payload as object[];
+            if (array != null)
+            {
+                var directLocks = array
+                    .OfType<Dictionary<string, object>>()
+                    .Where(IsCatalogLockDictionary)
+                    .Cast<object>()
+                    .ToList();
+
+                if (directLocks.Count > 0)
+                    return directLocks;
+
+                var nestedLocks = new List<object>();
+                foreach (var value in array)
+                    nestedLocks.AddRange(ResolveCatalogLockItems(value));
+
+                return nestedLocks;
+            }
+
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                if (IsCatalogLockDictionary(dictionary))
+                    return new[] { payload };
+
+                object locksValue = GetDictionaryValue(dictionary, "getCatalogLocks", "locks", "catalogLocks");
+                var locks = ResolveCatalogLockItems(locksValue).ToList();
+                if (locks.Count > 0)
+                    return locks;
+
+                foreach (var value in dictionary.Values)
+                {
+                    var nestedLocks = ResolveCatalogLockItems(value).ToList();
+                    if (nestedLocks.Count > 0)
+                        return nestedLocks;
+                }
+
+                return Enumerable.Empty<object>();
+            }
+
+            var nestedPayload = DeserializeNestedJson(payload as string);
+            return nestedPayload == null
+                ? Enumerable.Empty<object>()
+                : ResolveCatalogLockItems(nestedPayload);
+        }
+
+        private static bool IsCatalogLockDictionary(Dictionary<string, object> dictionary)
+        {
+            return GetDictionaryValue(dictionary, "lockId", "lock", "session", "sessionId", "time") != null;
+        }
+
+        private static CatalogLockInfo ToCatalogLockInfo(object item)
+        {
+            var dictionary = item as Dictionary<string, object>;
+            if (dictionary == null)
+                return null;
+
+            var lockInfo = new CatalogLockInfo
+            {
+                LockId = GetString(dictionary, "lockId", "id"),
+                Session = GetString(dictionary, "session", "user", "userName"),
+                Lock = GetString(dictionary, "lock", "lockType", "type"),
+                Time = GetString(dictionary, "time", "createdAt", "createdDate"),
+                SessionId = GetString(dictionary, "sessionId")
+            };
+
+            return string.IsNullOrWhiteSpace(lockInfo.LockId)
+                && string.IsNullOrWhiteSpace(lockInfo.Session)
+                && string.IsNullOrWhiteSpace(lockInfo.Lock)
+                && string.IsNullOrWhiteSpace(lockInfo.Time)
+                ? null
+                : lockInfo;
+        }
+
+        private static CatalogApprovalStatus ParseApprovalStatus(string json)
+        {
+            object payload = DeserializeJson(json);
+            var status = new CatalogApprovalStatus
+            {
+                Status = ResolveApprovalStatusText(payload),
+                Message = ResolveApprovalMessageText(payload),
+                StepText = ResolveApprovalStepText(payload),
+                CurrentApprovalOrder = ResolveCurrentApprovalOrder(payload),
+                ApprovalProcessStarted = ResolveApprovalProcessStarted(payload)
+            };
+
+            foreach (var step in ResolveApprovalStepItems(payload)
+                .Select(ToApprovalStep)
+                .Where(step => step != null))
+            {
+                step.StepNumber = status.Steps.Count + 1;
+                if (string.IsNullOrWhiteSpace(step.StepName))
+                    step.StepName = "Step " + step.StepNumber;
+
+                status.Steps.Add(step);
+            }
+
+            AddCurrentApprovalStep(status, payload);
+
+            return status;
+        }
+
+        private static ApprovalStartResult ParseApprovalStartResult(string json)
+        {
+            object payload = DeserializeJson(json);
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary == null)
+            {
+                var nestedPayload = DeserializeNestedJson(payload as string);
+                dictionary = nestedPayload as Dictionary<string, object>;
+            }
+
+            Dictionary<string, object> data = ResolveApprovalStartDataDictionary(dictionary);
+            if (data == null)
+            {
+                return new ApprovalStartResult(
+                    true,
+                    ResolveApprovalStartMessage(dictionary),
+                    json ?? string.Empty);
+            }
+
+            bool? success = GetNullableBool(data, "success");
+            string message = GetString(data, "message", "errorMessage", "resultMessage");
+
+            return new ApprovalStartResult(
+                success.HasValue ? success.Value : true,
+                message,
+                json ?? string.Empty);
+        }
+
+        private static Dictionary<string, object> ResolveApprovalStartDataDictionary(Dictionary<string, object> dictionary)
+        {
+            if (dictionary == null)
+                return null;
+
+            var data = GetDictionaryValue(dictionary, "data");
+            var dataDictionary = data as Dictionary<string, object>;
+            if (dataDictionary != null)
+                return dataDictionary;
+
+            var nestedDataDictionary = DeserializeNestedJson(data as string) as Dictionary<string, object>;
+            if (nestedDataDictionary != null)
+                return nestedDataDictionary;
+
+            return null;
+        }
+
+        private static string ResolveApprovalStartMessage(Dictionary<string, object> dictionary)
+        {
+            if (dictionary == null)
+                return string.Empty;
+
+            string message = GetString(dictionary, "message", "errorMessage", "resultMessage");
+            if (!string.IsNullOrWhiteSpace(message))
+                return message;
+
+            var data = ResolveApprovalStartDataDictionary(dictionary);
+            return data == null
+                ? string.Empty
+                : GetString(data, "message", "errorMessage", "resultMessage");
+        }
+
+        private static CatalogItem FindCatalogByLongId(object payload, string cLongId)
         {
             var dictionary = payload as Dictionary<string, object>;
             if (dictionary != null)
             {
-                object ddlValue = GetDictionaryValue(
-                    dictionary,
-                    "ddl",
-                    "DDL",
-                    "alterDdl",
-                    "AlterDDL");
+                string itemLongId = GetString(dictionary, "cLongId", "CLongId");
+                if (LongIdsMatch(itemLongId, cLongId))
+                {
+                    return new CatalogItem
+                    {
+                        Id = GetString(dictionary, "id", "catalogId", "modelId"),
+                        Name = GetString(dictionary, "name", "catalogName"),
+                        CLongId = itemLongId
+                    };
+                }
 
-                if (ddlValue != null)
-                    return Convert.ToString(ddlValue);
+                foreach (string key in new[] { "data", "subFolders", "children", "items", "folders" })
+                {
+                    CatalogItem nestedItem = FindCatalogByLongId(GetDictionaryValue(dictionary, key), cLongId);
+                    if (nestedItem != null)
+                        return nestedItem;
+                }
 
                 foreach (var value in dictionary.Values)
                 {
-                    string ddl = ResolveDdl(value);
-                    if (!string.IsNullOrWhiteSpace(ddl))
-                        return ddl;
+                    CatalogItem nestedItem = FindCatalogByLongId(value, cLongId);
+                    if (nestedItem != null)
+                        return nestedItem;
+                }
+
+                return null;
+            }
+
+            var array = payload as object[];
+            if (array != null)
+            {
+                foreach (var value in array)
+                {
+                    CatalogItem nestedItem = FindCatalogByLongId(value, cLongId);
+                    if (nestedItem != null)
+                        return nestedItem;
+                }
+            }
+
+            var nestedPayload = DeserializeNestedJson(payload as string);
+            return nestedPayload == null
+                ? null
+                : FindCatalogByLongId(nestedPayload, cLongId);
+        }
+
+        private static IEnumerable<CatalogVersionInfo> ResolveCatalogVersions(object payload)
+        {
+            var array = payload as object[];
+            if (array != null)
+            {
+                foreach (var value in array)
+                {
+                    foreach (CatalogVersionInfo version in ResolveCatalogVersions(value))
+                        yield return version;
+                }
+
+                yield break;
+            }
+
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                if (IsCatalogVersionDictionary(dictionary))
+                {
+                    yield return ToCatalogVersionInfo(dictionary);
+                    yield break;
+                }
+
+                foreach (string key in new[] { "data", "versions", "items", "result" })
+                {
+                    foreach (CatalogVersionInfo version in ResolveCatalogVersions(GetDictionaryValue(dictionary, key)))
+                        yield return version;
+                }
+
+                yield break;
+            }
+
+            var nestedPayload = DeserializeNestedJson(payload as string);
+            if (nestedPayload == null)
+                yield break;
+
+            foreach (CatalogVersionInfo version in ResolveCatalogVersions(nestedPayload))
+                yield return version;
+        }
+
+        private static bool IsCatalogVersionDictionary(Dictionary<string, object> dictionary)
+        {
+            return GetDictionaryValue(dictionary, "versionNumber", "createdBy") != null
+                && GetDictionaryValue(dictionary, "id", "name", "cLongId") != null;
+        }
+
+        private static CatalogVersionInfo ToCatalogVersionInfo(Dictionary<string, object> dictionary)
+        {
+            return new CatalogVersionInfo
+            {
+                Id = GetString(dictionary, "id", "versionId"),
+                Name = GetString(dictionary, "name", "versionName"),
+                CreatedBy = GetString(dictionary, "createdBy", "creator", "owner"),
+                CreatedDate = GetString(dictionary, "createdDate"),
+                Path = GetString(dictionary, "path"),
+                VersionNumber = GetString(dictionary, "versionNumber", "versionNo"),
+                CLongId = GetString(dictionary, "cLongId", "CLongId"),
+                ContainerId = GetString(dictionary, "containerId", "containerID", "container")
+            };
+        }
+
+        private static CatalogVersionInfo FindCatalogVersion(
+            IEnumerable<CatalogVersionInfo> versions,
+            string cLongId,
+            string versionName,
+            string versionNumber)
+        {
+            return (versions ?? Enumerable.Empty<CatalogVersionInfo>())
+                .Where(version => version != null && versionNumber == version.VersionNumber)
+                .FirstOrDefault();
+        }
+
+
+        public async Task<VeloxapServiceBaseResponse> PostCustomUdp(List<CustomUdpModel> customUdpModel)
+        {
+            if (customUdpModel == null)
+                throw new ArgumentNullException(nameof(customUdpModel));
+
+            if (customUdpModel.Any(item => item == null))
+                throw new ArgumentException("Custom UDP listesi null kayit iceremez.", nameof(customUdpModel));
+
+            var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+            string payload = serializer.Serialize(customUdpModel.Select(item => new Dictionary<string, object>
+            {
+                { "modelVersion", item.ModelVersion },
+                { "modelId", item.ModelId },
+                { "modelPath", item.ModelPath },
+                { "udpName", item.UdpName },
+                { "udpVal", item.UdpVal },
+                { "type", item.Type },
+                { "parentObject", item.ParentObject },
+                { "object", item.Object },
+                { "environment", item.Environment }
+            }).ToList());
+
+            using (var request = CreateCustomUdpRequest(HttpMethod.Post, RuleApiSettings.GetCustomUdpUrl()))
+            {
+                request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+                var response = await SendCustomUdpAsync(request).ConfigureAwait(false);
+
+                return new VeloxapServiceBaseResponse
+                {
+                    Success = GetNullableBool(response, "success") ?? false,
+                    Message = GetString(response, "message"),
+                    Data = GetDictionaryValue(response, "data")
+                };
+            }
+        }
+
+        public async Task<CustomUdpResponse> GetCustomUdp(GetCustomUdpRequest udpRequest)
+        {
+            if (udpRequest == null)
+                throw new ArgumentNullException(nameof(udpRequest));
+
+            string requestUrl = BuildSingleQueryUrl(
+                RuleApiSettings.GetCustomUdpUrl(), "ModelId", udpRequest.ModelId.ToString(CultureInfo.InvariantCulture));
+            requestUrl = BuildSingleQueryUrl(requestUrl, "UdpName", udpRequest.UdpName);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "Type", udpRequest.Type);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "ParentObject", udpRequest.ParentObject);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "Object", udpRequest.Object);
+            requestUrl = BuildSingleQueryUrl(requestUrl, "Environment", udpRequest.Environment);
+
+            using (var request = CreateCustomUdpRequest(HttpMethod.Get, requestUrl))
+            {
+                var response = await SendCustomUdpAsync(request).ConfigureAwait(false);
+                var result = new CustomUdpResponse
+                {
+                    Success = GetNullableBool(response, "success") ?? false,
+                    Message = GetString(response, "message")
+                };
+
+                object data = GetDictionaryValue(response, "data");
+                if (data != null)
+                {
+                    var items = data as object[];
+                    if (items == null)
+                        throw new InvalidOperationException("Custom UDP servis cevabindaki data alani bir liste olmali.");
+
+                    result.Data = items.Select(ParseCustomUdpItem).ToList();
+                }
+
+                return result;
+            }
+        }
+
+        private static HttpRequestMessage CreateCustomUdpRequest(HttpMethod method, string url)
+        {
+            var request = new HttpRequestMessage(method, url);
+            request.Headers.Accept.ParseAdd("application/json");
+
+            string username = RuleApiSettings.GetAuthUsername();
+            if (!string.IsNullOrWhiteSpace(username))
+                request.Headers.Add("X-UserName", username);
+
+            // BearerTokenHandler supplies the token on the injected HttpClient.
+            return request;
+        }
+
+        private async Task<Dictionary<string, object>> SendCustomUdpAsync(HttpRequestMessage request)
+        {
+            ApiTraceLogger.Info(
+                "CUSTOM UDP REQUEST" + Environment.NewLine +
+                "Method: " + request.Method + Environment.NewLine +
+                "Url: " + request.RequestUri);
+
+            using (var response = await httpClient.SendAsync(request).ConfigureAwait(false))
+            {
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "CUSTOM UDP RESPONSE" + Environment.NewLine +
+                    "Url: " + request.RequestUri + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+
+                var payload = DeserializeJson(json) as Dictionary<string, object>;
+                if (!response.IsSuccessStatusCode)
+                {
+                    string message = GetString(payload, "message", "error", "errorMessage", "resultMessage");
+                    if (string.IsNullOrWhiteSpace(message))
+                        message = ApiTraceLogger.Truncate(json, 2000);
+
+                    throw new InvalidOperationException(
+                        "Custom UDP servisi hata dondu: " + (int)response.StatusCode + " " + response.ReasonPhrase +
+                        (string.IsNullOrWhiteSpace(message) ? string.Empty : ". " + message));
+                }
+
+                if (payload == null)
+                    throw new InvalidOperationException("Custom UDP servisi gecerli bir JSON nesnesi dondurmedi.");
+
+                return payload;
+            }
+        }
+
+        private static CustomUdpDto ParseCustomUdpItem(object value)
+        {
+            var item = value as Dictionary<string, object>;
+            if (item == null)
+                throw new InvalidOperationException("Custom UDP servis cevabinda gecersiz kayit bulundu.");
+
+            return new CustomUdpDto
+            {
+                Id = Convert.ToInt64(GetDictionaryValue(item, "id"), CultureInfo.InvariantCulture),
+                ModelVersion = Convert.ToInt32(GetDictionaryValue(item, "modelVersion"), CultureInfo.InvariantCulture),
+                ModelId = Convert.ToInt64(GetDictionaryValue(item, "modelId"), CultureInfo.InvariantCulture),
+                ModelPath = GetString(item, "modelPath"),
+                UdpName = GetString(item, "udpName"),
+                UdpVal = GetDictionaryValue(item, "udpVal") as string,
+                Type = GetString(item, "type"),
+                ParentObject = GetString(item, "parentObject"),
+                Object = GetString(item, "object"),
+                Environment = GetString(item, "environment"),
+                CreateDate = FlexibleDateTimeConverter.Parse(GetDictionaryValue(item, "createDate")),
+                CreateUser = GetString(item, "createUser"),
+                UpdateUser = GetDictionaryValue(item, "updateUser") as string,
+                UpdateDate = FlexibleDateTimeConverter.Parse(GetDictionaryValue(item, "updateDate"))
+            };
+        }
+
+        private static bool LongIdsMatch(string left, string right)
+        {
+            string normalizedLeft = NormalizeLongId(left);
+            string normalizedRight = NormalizeLongId(right);
+
+            if (string.IsNullOrWhiteSpace(normalizedLeft) ||
+                string.IsNullOrWhiteSpace(normalizedRight))
+            {
+                return false;
+            }
+
+            return string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeLongId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            return new string(value.Where(character => !char.IsWhiteSpace(character)).ToArray());
+        }
+
+        private static string NormalizeText(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? string.Empty
+                : value.Trim();
+        }
+
+        private static string ResolveApprovalStatusText(object payload)
+        {
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                string status = GetString(
+                    dictionary,
+                    "approvalStatus",
+                    "approvalState",
+                    "statusName",
+                    "approvalProcessText",
+                    "currentStatus",
+                    "state",
+                    "status");
+
+                if (!string.IsNullOrWhiteSpace(status))
+                    return status;
+
+                foreach (var value in dictionary.Values)
+                {
+                    status = ResolveApprovalStatusText(value);
+                    if (!string.IsNullOrWhiteSpace(status))
+                        return status;
                 }
             }
 
@@ -213,95 +1119,398 @@ namespace Veloxap.AddIn.Erwin.Services
             {
                 foreach (var value in array)
                 {
-                    string ddl = ResolveDdl(value);
-                    if (!string.IsNullOrWhiteSpace(ddl))
-                        return ddl;
+                    string status = ResolveApprovalStatusText(value);
+                    if (!string.IsNullOrWhiteSpace(status))
+                        return status;
                 }
             }
 
-            return null;
+            var nestedPayload = DeserializeNestedJson(payload as string);
+            return nestedPayload == null
+                ? string.Empty
+                : ResolveApprovalStatusText(nestedPayload);
         }
 
-        private static string ExtractDdlFromRawJson(string json)
+        private static IEnumerable<object> ResolveApprovalStepItems(object payload)
         {
-            var match = Regex.Match(
-                json ?? string.Empty,
-                @"""ddl""\s*:\s*""(?<ddl>(?:\\.|[^""\\])*)""",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+            var array = payload as object[];
+            if (array != null)
+            {
+                var steps = new List<object>();
+                foreach (var value in array)
+                    steps.AddRange(ResolveApprovalStepItems(value));
 
-            return match.Success
-                ? DecodeJsonStringValue(match.Groups["ddl"].Value)
-                : string.Empty;
+                return steps;
+            }
+
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                if (IsApprovalStepDictionary(dictionary))
+                    return new[] { payload };
+
+                var directSteps = new List<object>();
+                foreach (var key in new[]
+                {
+                    "steps",
+                    "approvalSteps",
+                    "history",
+                    "approvalHistory",
+                    "pendingApprovals",
+                    "approvers",
+                    "items",
+                    "getApprovalStatus",
+                    "getApprovalSteps"
+                })
+                {
+                    directSteps.AddRange(ResolveApprovalStepItems(GetDictionaryValue(dictionary, key)));
+                }
+
+                if (directSteps.Count > 0)
+                    return directSteps;
+
+                foreach (var pair in dictionary)
+                {
+                    if (string.Equals(pair.Key, "currentApprovers", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var nestedSteps = ResolveApprovalStepItems(pair.Value).ToList();
+                    if (nestedSteps.Count > 0)
+                        return nestedSteps;
+                }
+
+                return Enumerable.Empty<object>();
+            }
+
+            var nestedPayload = DeserializeNestedJson(payload as string);
+            return nestedPayload == null
+                ? Enumerable.Empty<object>()
+                : ResolveApprovalStepItems(nestedPayload);
         }
 
-        private static string DecodeJsonStringValue(string value)
+        private static bool IsApprovalStepDictionary(Dictionary<string, object> dictionary)
         {
-            if (string.IsNullOrEmpty(value))
+            return GetDictionaryValue(
+                dictionary,
+                "actionDate",
+                "approvedBy",
+                "rejectedBy",
+                "pendingApprover",
+                "pendingApproverName",
+                "approver",
+                "approverName",
+                "assignee",
+                "assigneeName",
+                "user",
+                "userName") != null;
+        }
+
+        private static CatalogApprovalStep ToApprovalStep(object item)
+        {
+            var dictionary = item as Dictionary<string, object>;
+            if (dictionary == null)
+                return null;
+
+            var step = new CatalogApprovalStep
+            {
+                StepName = GetString(dictionary, "stepName", "step", "level", "sequence", "order", "currentApprovalOrder"),
+                ApproverName = GetString(
+                    dictionary,
+                    "pendingApprover",
+                    "pendingApproverName",
+                    "approver",
+                    "approverName",
+                    "assignee",
+                    "assigneeName",
+                    "user",
+                    "userName",
+                    "username",
+                    "displayName",
+                    "fullName",
+                    "approvedBy",
+                    "rejectedBy"),
+                Status = GetString(dictionary, "status", "state", "approvalStatus", "statusName"),
+                GroupName = GetString(dictionary, "groupName", "currentGroupName", "approvalGroupName"),
+                Message = GetString(dictionary, "message", "waitingAtText", "description", "comment", "actionDescription"),
+                ApprovedBy = GetString(dictionary, "approvedBy"),
+                RejectedBy = GetString(dictionary, "rejectedBy")
+            };
+
+            if (string.IsNullOrWhiteSpace(step.ApproverName))
+                step.ApproverName = GetString(dictionary, "name");
+
+            if (string.IsNullOrWhiteSpace(step.StepName))
+                step.StepName = GetString(dictionary, "stepText");
+
+            return string.IsNullOrWhiteSpace(step.StepName)
+                && string.IsNullOrWhiteSpace(step.ApproverName)
+                && string.IsNullOrWhiteSpace(step.Status)
+                && string.IsNullOrWhiteSpace(step.GroupName)
+                && string.IsNullOrWhiteSpace(step.Message)
+                ? null
+                : step;
+        }
+
+        private static void AddCurrentApprovalStep(CatalogApprovalStatus status, object payload)
+        {
+            if (status == null)
+                return;
+
+            var dictionary = FindApprovalDataDictionary(payload);
+            if (dictionary == null)
+                return;
+
+            string currentMessage = GetString(dictionary, "waitingAtText", "message");
+            string currentGroup = GetString(dictionary, "currentGroupName", "groupName");
+            string currentStatus = GetString(dictionary, "statusName", "status", "approvalStatus");
+            string currentOrder = GetString(dictionary, "currentApprovalOrder", "stepText");
+            string approvers = BuildApproverNames(GetDictionaryValue(dictionary, "currentApprovers"));
+
+            bool hasCurrentStep =
+                !string.IsNullOrWhiteSpace(currentMessage) ||
+                !string.IsNullOrWhiteSpace(currentGroup) ||
+                !string.IsNullOrWhiteSpace(approvers);
+
+            if (!hasCurrentStep)
+                return;
+
+            bool alreadyExists = status.Steps.Any(step =>
+                step != null &&
+                string.Equals(step.Message, currentMessage, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(step.GroupName, currentGroup, StringComparison.OrdinalIgnoreCase));
+
+            if (alreadyExists)
+                return;
+
+            var currentStep = new CatalogApprovalStep
+            {
+                StepNumber = status.Steps.Count + 1,
+                StepName = string.IsNullOrWhiteSpace(currentOrder) ? "Current Step" : "Step " + currentOrder,
+                ApproverName = approvers,
+                Status = currentStatus,
+                GroupName = currentGroup,
+                Message = currentMessage
+            };
+
+            status.Steps.Add(currentStep);
+        }
+
+        private static Dictionary<string, object> FindApprovalDataDictionary(object payload)
+        {
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                if (GetDictionaryValue(
+                    dictionary,
+                    "approvalProcessStarted",
+                    "currentApprovalOrder",
+                    "currentApprovers",
+                    "workflowId") != null)
+                {
+                    return dictionary;
+                }
+
+                object data = GetDictionaryValue(dictionary, "data", "result", "approval");
+                var dataDictionary = FindApprovalDataDictionary(data);
+                if (dataDictionary != null)
+                    return dataDictionary;
+
+                foreach (var value in dictionary.Values)
+                {
+                    dataDictionary = FindApprovalDataDictionary(value);
+                    if (dataDictionary != null)
+                        return dataDictionary;
+                }
+            }
+
+            var array = payload as object[];
+            if (array != null)
+            {
+                foreach (var value in array)
+                {
+                    var dataDictionary = FindApprovalDataDictionary(value);
+                    if (dataDictionary != null)
+                        return dataDictionary;
+                }
+            }
+
+            var nestedPayload = DeserializeNestedJson(payload as string);
+            return nestedPayload == null
+                ? null
+                : FindApprovalDataDictionary(nestedPayload);
+        }
+
+        private static string ResolveApprovalMessageText(object payload)
+        {
+            var dictionary = FindApprovalDataDictionary(payload);
+            if (dictionary == null)
                 return string.Empty;
 
-            var builder = new StringBuilder(value.Length);
+            return GetString(dictionary, "waitingAtText", "message", "approvalProcessText");
+        }
 
-            for (int i = 0; i < value.Length; i++)
+        private static string ExtractResponseMessage(string json)
+        {
+            return ExtractResponseMessage(DeserializeJson(json));
+        }
+
+        private static string ExtractResponseMessage(object payload)
+        {
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
             {
-                char current = value[i];
-                if (current != '\\' || i == value.Length - 1)
-                {
-                    builder.Append(current);
-                    continue;
-                }
+                string message = GetString(dictionary, "message", "errorMessage", "resultMessage");
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
 
-                char next = value[++i];
-                switch (next)
-                {
-                    case '"':
-                        builder.Append('"');
-                        break;
-                    case '\\':
-                        builder.Append('\\');
-                        break;
-                    case '/':
-                        builder.Append('/');
-                        break;
-                    case 'b':
-                        builder.Append('\b');
-                        break;
-                    case 'f':
-                        builder.Append('\f');
-                        break;
-                    case 'n':
-                        builder.Append('\n');
-                        break;
-                    case 'r':
-                        builder.Append('\r');
-                        break;
-                    case 't':
-                        builder.Append('\t');
-                        break;
-                    case 'u':
-                        if (i + 4 < value.Length &&
-                            int.TryParse(
-                                value.Substring(i + 1, 4),
-                                NumberStyles.HexNumber,
-                                CultureInfo.InvariantCulture,
-                                out int codePoint))
-                        {
-                            builder.Append((char)codePoint);
-                            i += 4;
-                        }
-                        else
-                        {
-                            builder.Append("\\u");
-                        }
+                object data = GetDictionaryValue(dictionary, "data", "result");
+                message = ExtractResponseMessage(data);
+                if (!string.IsNullOrWhiteSpace(message))
+                    return message;
+            }
 
-                        break;
-                    default:
-                        builder.Append('\\');
-                        builder.Append(next);
-                        break;
+            var array = payload as object[];
+            if (array != null)
+            {
+                foreach (var value in array)
+                {
+                    string message = ExtractResponseMessage(value);
+                    if (!string.IsNullOrWhiteSpace(message))
+                        return message;
                 }
             }
 
-            return builder.ToString();
+            object nestedPayload = DeserializeNestedJson(payload as string);
+            return nestedPayload == null
+                ? string.Empty
+                : ExtractResponseMessage(nestedPayload);
+        }
+
+        private static string ResolveApprovalStepText(object payload)
+        {
+            var dictionary = FindApprovalDataDictionary(payload);
+            if (dictionary == null)
+                return string.Empty;
+
+            return GetString(dictionary, "stepText");
+        }
+
+        private static string ResolveCurrentApprovalOrder(object payload)
+        {
+            var dictionary = FindApprovalDataDictionary(payload);
+            if (dictionary == null)
+                return string.Empty;
+
+            return GetString(dictionary, "currentApprovalOrder");
+        }
+
+        private static bool? ResolveApprovalProcessStarted(object payload)
+        {
+            var dictionary = FindApprovalDataDictionary(payload);
+            if (dictionary == null)
+                return null;
+
+            return GetNullableBool(dictionary, "approvalProcessStarted");
+        }
+
+        private static string BuildApproverNames(object value)
+        {
+            var names = ResolveApproverNames(value)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return names.Count == 0
+                ? string.Empty
+                : string.Join(", ", names);
+        }
+
+        private static IEnumerable<string> ResolveApproverNames(object value)
+        {
+            var array = value as object[];
+            if (array != null)
+            {
+                foreach (var item in array)
+                {
+                    foreach (string name in ResolveApproverNames(item))
+                        yield return name;
+                }
+
+                yield break;
+            }
+
+            var dictionary = value as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                string name = GetString(dictionary, "displayName", "username", "userName", "name", "fullName");
+                if (!string.IsNullOrWhiteSpace(name))
+                    yield return name;
+
+                yield break;
+            }
+
+            string text = value == null ? string.Empty : Convert.ToString(value);
+            if (!string.IsNullOrWhiteSpace(text))
+                yield return text;
+        }
+
+        private static object DeserializeJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+
+            try
+            {
+                var serializer = new JavaScriptSerializer
+                {
+                    MaxJsonLength = int.MaxValue
+                };
+
+                return serializer.DeserializeObject(json);
+            }
+            catch (ArgumentException)
+            {
+                return DeserializeNestedJson(json);
+            }
+            catch (InvalidOperationException)
+            {
+                return DeserializeNestedJson(json);
+            }
+        }
+
+        private static object DeserializeNestedJson(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            string json = value.Trim();
+            int pipeIndex = json.IndexOf('|');
+            if (pipeIndex >= 0 && pipeIndex < json.Length - 1)
+                json = json.Substring(pipeIndex + 1).Trim();
+
+            if (!json.StartsWith("{", StringComparison.Ordinal) &&
+                !json.StartsWith("[", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            try
+            {
+                var serializer = new JavaScriptSerializer
+                {
+                    MaxJsonLength = int.MaxValue
+                };
+
+                return serializer.DeserializeObject(json);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
         }
 
         private static List<Rule> ParseRules(string json)
@@ -435,6 +1644,51 @@ namespace Veloxap.AddIn.Erwin.Services
             return value == null ? string.Empty : Convert.ToString(value);
         }
 
+        private static bool? GetNullableBool(Dictionary<string, object> dictionary, params string[] keys)
+        {
+            object value = GetDictionaryValue(dictionary, keys);
+            if (value == null)
+                return null;
+
+            try
+            {
+                if (value is bool)
+                    return (bool)value;
+
+                string text = Convert.ToString(value);
+                bool parsed;
+                if (bool.TryParse(text, out parsed))
+                    return parsed;
+
+                int number;
+                if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out number))
+                    return number != 0;
+
+                if (string.Equals(text, "yes", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(text, "evet", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                if (string.Equals(text, "no", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(text, "hayir", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(text, "hayır", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
+            catch (InvalidCastException)
+            {
+                return null;
+            }
+
+            return null;
+        }
+
         private static object GetDictionaryValue(Dictionary<string, object> dictionary, params string[] keys)
         {
             if (dictionary == null || keys == null)
@@ -448,5 +1702,171 @@ namespace Veloxap.AddIn.Erwin.Services
 
             return null;
         }
+    }
+
+    internal sealed class CatalogLockInfo
+    {
+        public string LockId { get; set; }
+
+        public string Session { get; set; }
+
+        public string Lock { get; set; }
+
+        public string Time { get; set; }
+
+        public string SessionId { get; set; }
+    }
+
+    internal sealed class UdpDiffResult
+    {
+        public UdpDiffResult(bool success, string message, List<UdpDiffItem> items)
+        {
+            Success = success;
+            Message = message ?? string.Empty;
+            Items = items ?? new List<UdpDiffItem>();
+        }
+
+        public bool Success { get; private set; }
+
+        public string Message { get; private set; }
+
+        public List<UdpDiffItem> Items { get; private set; }
+    }
+
+    internal sealed class UdpDiffItem
+    {
+        public string ChangeType { get; set; }
+        public string ChangeReason { get; set; }
+        public string ObjectType { get; set; }
+        public string ModelName { get; set; }
+        public string TableName { get; set; }
+        public string ColumnName { get; set; }
+        public string UdpName { get; set; }
+        public string PreviousContent { get; set; }
+        public string CurrentContent { get; set; }
+    }
+
+    internal sealed class CatalogLocksResult
+    {
+        public CatalogLocksResult(
+            bool success,
+            string message,
+            List<CatalogLockInfo> locks,
+            string rawResponse)
+        {
+            Success = success;
+            Message = message ?? string.Empty;
+            Locks = locks ?? new List<CatalogLockInfo>();
+            RawResponse = rawResponse ?? string.Empty;
+        }
+
+        public bool Success { get; private set; }
+
+        public string Message { get; private set; }
+
+        public List<CatalogLockInfo> Locks { get; private set; }
+
+        public string RawResponse { get; private set; }
+    }
+
+    internal sealed class CatalogVersionOwnerInfo
+    {
+        public string CatalogId { get; set; }
+
+        public string CatalogName { get; set; }
+
+        public string VersionId { get; set; }
+
+        public string VersionName { get; set; }
+
+        public string VersionNumber { get; set; }
+
+        public string CLongId { get; set; }
+
+        public string CreatedBy { get; set; }
+
+        public string ContainerId { get; set; }
+    }
+
+    internal sealed class CatalogItem
+    {
+        public string Id { get; set; }
+
+        public string Name { get; set; }
+
+        public string CLongId { get; set; }
+    }
+
+    internal sealed class CatalogVersionInfo
+    {
+        public string Id { get; set; }
+
+        public string Name { get; set; }
+
+        public string CreatedBy { get; set; }
+
+        public string CreatedDate { get; set; }
+
+        public string Path { get; set; }
+
+        public string VersionNumber { get; set; }
+
+        public string CLongId { get; set; }
+        public string ContainerId { get; set; }
+    }
+
+    internal sealed class CatalogApprovalStatus
+    {
+        public CatalogApprovalStatus()
+        {
+            Steps = new List<CatalogApprovalStep>();
+        }
+
+        public string Status { get; set; }
+
+        public string Message { get; set; }
+
+        public string StepText { get; set; }
+
+        public string CurrentApprovalOrder { get; set; }
+
+        public bool? ApprovalProcessStarted { get; set; }
+
+        public List<CatalogApprovalStep> Steps { get; private set; }
+    }
+
+    internal sealed class ApprovalStartResult
+    {
+        public ApprovalStartResult(bool success, string message, string rawResponse)
+        {
+            Success = success;
+            Message = message ?? string.Empty;
+            RawResponse = rawResponse ?? string.Empty;
+        }
+
+        public bool Success { get; private set; }
+
+        public string Message { get; private set; }
+
+        public string RawResponse { get; private set; }
+    }
+
+    internal sealed class CatalogApprovalStep
+    {
+        public int StepNumber { get; set; }
+
+        public string StepName { get; set; }
+
+        public string ApproverName { get; set; }
+
+        public string Status { get; set; }
+
+        public string GroupName { get; set; }
+
+        public string Message { get; set; }
+
+        public string ApprovedBy { get; set; }
+
+        public string RejectedBy { get; set; }
     }
 }

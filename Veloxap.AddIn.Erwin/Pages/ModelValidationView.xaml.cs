@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Forms.Integration;
+using Forms = System.Windows.Forms;
 using Veloxap.AddIn.Erwin.Models;
 using Veloxap.AddIn.Erwin.Services;
 
@@ -14,17 +19,23 @@ namespace Veloxap.AddIn.Erwin.Pages
 {
     public partial class ModelValidationView : UserControl
     {
-        private readonly ModelInfo modelInfo;
-        private readonly List<string> validationRules;
-        private readonly List<Rule> validationRuleItems;
+        private ModelInfo modelInfo;
+        private List<string> validationRules;
+        private List<Rule> validationRuleItems;
         private readonly RuleService ruleService;
         private readonly string catalogName;
         private readonly string catalogLongId;
+        private readonly Func<ModelInfo> fullModelLoader;
         private string currentAlterDdl;
+        private int alterDdlRequestId;
+        private TableUdpStartupApplyResult tableUdpStartupResult;
         private bool isInitializing;
         private bool isUpdatingTargetVersion;
         private bool isValidationOk;
+        private bool isValidationRunning;
         private bool isSendingApproval;
+        private bool isTableUdpStartupRunning;
+        private bool hasLoadedFullModel;
 
         public ModelValidationView()
             : this(null, null, null, null, null)
@@ -59,6 +70,54 @@ namespace Veloxap.AddIn.Erwin.Pages
             string catalogLongId,
             IEnumerable<Rule> validationRuleItems,
             bool showRulesTab)
+            : this(
+                modelInfo,
+                validationRules,
+                ruleService,
+                catalogName,
+                catalogLongId,
+                validationRuleItems,
+                showRulesTab,
+                null,
+                false)
+        {
+        }
+
+        internal ModelValidationView(
+            ModelInfo modelInfo,
+            IEnumerable<string> validationRules,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId,
+            IEnumerable<Rule> validationRuleItems,
+            bool showRulesTab,
+            TableUdpStartupApplyResult tableUdpStartupResult,
+            bool isTableUdpStartupRunning)
+            : this(
+                modelInfo,
+                validationRules,
+                ruleService,
+                catalogName,
+                catalogLongId,
+                validationRuleItems,
+                showRulesTab,
+                tableUdpStartupResult,
+                isTableUdpStartupRunning,
+                null)
+        {
+        }
+
+        internal ModelValidationView(
+            ModelInfo modelInfo,
+            IEnumerable<string> validationRules,
+            RuleService ruleService,
+            string catalogName,
+            string catalogLongId,
+            IEnumerable<Rule> validationRuleItems,
+            bool showRulesTab,
+            TableUdpStartupApplyResult tableUdpStartupResult,
+            bool isTableUdpStartupRunning,
+            Func<ModelInfo> fullModelLoader)
         {
             InitializeComponent();
 
@@ -70,12 +129,39 @@ namespace Veloxap.AddIn.Erwin.Pages
             this.ruleService = ruleService;
             this.catalogName = catalogName;
             this.catalogLongId = catalogLongId;
+            this.fullModelLoader = fullModelLoader;
+            this.tableUdpStartupResult = tableUdpStartupResult;
+            this.isTableUdpStartupRunning = isTableUdpStartupRunning;
+            hasLoadedFullModel = fullModelLoader == null || HasModelObjects(modelInfo);
 
             LoadValidationRulesTab();
+            //UpdateTableUdpStartupResultPanel();
             if (showRulesTab)
                 validationTabs.SelectedItem = tabValidationRules;
 
             LoadVersionSelectors();
+            ResetValidationState("Validasyon bekleniyor.");
+        }
+
+        internal void SetTableUdpStartupResult(
+            TableUdpStartupApplyResult result,
+            bool isRunning)
+        {
+            tableUdpStartupResult = result;
+            isTableUdpStartupRunning = isRunning;
+            //UpdateTableUdpStartupResultPanel();
+        }
+
+        internal void SetValidationRules(
+            IEnumerable<string> validationRules,
+            IEnumerable<Rule> validationRuleItems)
+        {
+            this.validationRules = validationRules?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
+                ?? new List<string>();
+            this.validationRuleItems = validationRuleItems?.Where(rule => rule != null).ToList()
+                ?? new List<Rule>();
+
+            LoadValidationRulesTab();
             ResetValidationState("Validasyon bekleniyor.");
         }
 
@@ -107,19 +193,19 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async void VersionSelection_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (isInitializing || isUpdatingTargetVersion)
-                return;
+           if (isInitializing || isUpdatingTargetVersion)
+               return;
 
-            if (sender == cmbSourceVersion)
-                SelectPreviousTargetVersion();
+           if (sender == cmbSourceVersion)
+               SelectPreviousTargetVersion();
 
-            ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
-            await RefreshAlterDdlPreviewAsync();
+           ResetValidationState("Versiyon secimi degisti. Validasyon tekrar calistirilmali.");
+           await RefreshAlterDdlPreviewAsync();
         }
 
-        private void BtnRunValidation_Click(object sender, RoutedEventArgs e)
+        private async void BtnRunValidation_Click(object sender, RoutedEventArgs e)
         {
-            RunValidation();
+            await RunValidationAsync();
         }
 
         private async void BtnSendApproval_Click(object sender, RoutedEventArgs e)
@@ -138,6 +224,12 @@ namespace Veloxap.AddIn.Erwin.Pages
             if (ruleService == null)
             {
                 SetStatus("Approval servisi kullanilabilir degil.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(currentAlterDdl))
+            {
+                SetStatus("Onaya gondermek icin MART Alter DDL metni yuklenmis olmali.");
                 return;
             }
 
@@ -170,7 +262,14 @@ namespace Veloxap.AddIn.Erwin.Pages
                 return;
             }
 
-            string description = PromptForValidationDescription();
+            CatalogVersionOwnerInfo catalogVersion = await GetOwnedCatalogVersionAsync(cLongId, sourceVersion);
+            if (catalogVersion == null)
+                return;
+
+            if (!await EnsureFullModelLoadedAsync())
+                return;
+
+            string description = PromptForValidationDescription(out string jiraNo);
             if (description == null)
             {
                 SetStatus("Onaya gonderme iptal edildi.");
@@ -180,54 +279,191 @@ namespace Veloxap.AddIn.Erwin.Pages
             try
             {
                 isSendingApproval = true;
-                btnSendApproval.IsEnabled = false;
-                SetStatus("Onaya gonderiliyor...");
+                SetApprovalBusy(true);
+                validationTabs.SelectedItem = tabValidationResults;
+                SetStatus("Jira No kaydi ve onay metni hazirlaniyor...");
 
-                string response = await ruleService.StartApprovalByCatalogAsync(
+                //string approvalDdl = await BuildApprovalDdlTextAsync(currentAlterDdl ?? string.Empty);
+                string ddl = txtAlterDdl.Text;
+                ddl = CombineDdlPrefix("-- Jira No: " + jiraNo, ddl);
+
+                if (!long.TryParse(catalogVersion.ContainerId, NumberStyles.Integer, CultureInfo.InvariantCulture,
+                    out long modelId) || modelId <= 0)
+                {
+                    throw new InvalidOperationException("Jira No kaydi icin MART model ID'si okunamadi.");
+                }
+
+                string modelPath = ExtractAlterDdlPath(sourceVersion.Locator);
+                if (string.IsNullOrWhiteSpace(modelPath))
+                    throw new InvalidOperationException("Jira No kaydi icin MART model yolu okunamadi.");
+
+                var jiraUdp = new CustomUdpModel
+                {
+                    ModelVersion = versionId,
+                    ModelId = modelId,
+                    ModelPath = modelPath,
+                    UdpName = "Jira_No",
+                    UdpVal = jiraNo,
+                    Type = "TICKET",
+                    ParentObject = "Model",
+                    Object = Guid.NewGuid().ToString("N"),
+                    Environment = "dev"
+                };
+
+                SetStatus("Jira No kaydedilerek onaya gonderiliyor...");
+
+                ApprovalStartResult response = await ruleService.StartApprovalByCatalogAsync(
                     RuleApiSettings.GetApprovalStartByCatalogUrl(),
                     cName,
                     cLongId,
                     versionId,
                     targetVersionId,
                     description,
-                    currentAlterDdl ?? string.Empty);
+                    ddl,
+                    jiraUdp);
 
-                SetStatus(
-                    "Onaya gonderildi. cName: " + cName +
-                    ", cLongId: " + cLongId +
-                    ", versionId: " + versionId +
-                    ", targetVersionId: " + targetVersionId +
-                    ", responseLength: " + (response == null ? 0 : response.Length) + ".");
+                if (response != null && !response.Success)
+                {
+                    string message = string.IsNullOrWhiteSpace(response.Message)
+                        ? "Approval servisi basarisiz dondu."
+                        : response.Message;
+
+                    SetStatus("Onaya gonderme basarisiz: " + message);
+                    txtValidationResults.Text = message;
+                    return;
+                }
+
+                string successMessage = response == null || string.IsNullOrWhiteSpace(response.Message)
+                    ? "Onaya gonderildi"
+                    : response.Message;
+
+                SetStatus(successMessage);
+                //SetStatus(
+                //    "Onaya gonderildi. cName: " + cName +
+                //    ", cLongId: " + cLongId +
+                //    ", versionId: " + versionId +
+                //    ", targetVersionId: " + targetVersionId +
+                //    ", responseLength: " + (response == null ? 0 : response.RawResponse.Length) + ".");
             }
             catch (Exception ex)
             {
-                SetStatus("Onaya gonderme istegi sirasinda hata olustu.");
-                txtValidationResults.Text = ex.ToString();
+                SetStatus("Onaya gonderme istegi sirasinda hata olustu: " + ex.Message);
+                txtValidationResults.Text = ex.Message;
             }
             finally
             {
                 isSendingApproval = false;
-                btnSendApproval.IsEnabled = isValidationOk;
+                SetApprovalBusy(false);
             }
         }
 
-        private string PromptForValidationDescription()
+        private async Task<CatalogVersionOwnerInfo> GetOwnedCatalogVersionAsync(
+            string cLongId,
+            VersionOption sourceVersion)
         {
-            var owner = Window.GetWindow(this);
-            var dialog = new Window
+            try
             {
-                Title = "Validasyon Aciklamasi",
-                Width = 460,
-                Height = 290,
-                MinWidth = 380,
-                MinHeight = 250,
-                WindowStartupLocation = owner == null
-                    ? WindowStartupLocation.CenterScreen
-                    : WindowStartupLocation.CenterOwner,
-                Owner = owner,
-                ResizeMode = ResizeMode.NoResize,
-                ShowInTaskbar = false
-            };
+                CatalogVersionOwnerInfo ownerInfo = await ruleService.GetCatalogVersionOwnerAsync(
+                    RuleApiSettings.GetMartCatalogVersionsUrlTemplate(),
+                    cLongId,
+                    "Version " + sourceVersion.VersionNo,
+                    sourceVersion.VersionNo);
+
+                string versionOwner = ownerInfo == null ? string.Empty : ownerInfo.CreatedBy;
+                if (NamesMatch(versionOwner, RuleApiSettings.GetAuthUsername()))
+                    return ownerInfo;
+
+                string displayedOwner = string.IsNullOrWhiteSpace(versionOwner)
+                    ? "Bilinmeyen"
+                    : versionOwner.Trim();
+                string warningMessage =
+                    "Versiyon sahibi \"" + displayedOwner +
+                    "\" kullanıcısı olduğundan onay'a gönderme işleminize devam edilemedi";
+
+                SetStatus(warningMessage);
+                MessageBox.Show(
+                    warningMessage,
+                    "Onaya Gönder",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                string warningMessage = "Versiyon sahibi kontrol edilemedi: " + ex.Message;
+                SetStatus(warningMessage);
+                MessageBox.Show(
+                    warningMessage,
+                    "Onaya Gönder",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return null;
+            }
+        }
+
+        private static bool NamesMatch(string left, string right)
+        {
+            string normalizedLeft = NormalizeUserName(left);
+            string normalizedRight = NormalizeUserName(right);
+
+            return !string.IsNullOrWhiteSpace(normalizedLeft) &&
+                   !string.IsNullOrWhiteSpace(normalizedRight) &&
+                   string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeUserName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string normalized = value.Trim();
+            int domainIndex = normalized.LastIndexOf('\\');
+            if (domainIndex >= 0 && domainIndex < normalized.Length - 1)
+                normalized = normalized.Substring(domainIndex + 1);
+
+            int mailIndex = normalized.IndexOf('@');
+            if (mailIndex > 0)
+                normalized = normalized.Substring(0, mailIndex);
+
+            return normalized.Trim();
+        }
+
+        private async Task<string> BuildApprovalDdlTextAsync(string existingDdl)
+        {
+            TableUdpApprovalScriptResult result = await Task.Run(() =>
+                TableUdpSecurityService.BuildApprovalScript(modelInfo));
+
+            if (result == null || string.IsNullOrWhiteSpace(result.ScriptText))
+                return existingDdl ?? string.Empty;
+
+            SetStatus(
+                result.ChangeCount +
+                " UDP farki onay metninin basina eklendi. Onaya gonderiliyor...");
+
+            return CombineDdlPrefix(result.ScriptText, existingDdl);
+        }
+
+        private static string CombineDdlPrefix(string prefix, string existingDdl)
+        {
+            if (string.IsNullOrWhiteSpace(prefix))
+                return existingDdl ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(existingDdl))
+                return prefix.TrimEnd();
+
+            return prefix.TrimEnd() +
+                   Environment.NewLine +
+                   Environment.NewLine +
+                   existingDdl.TrimStart();
+        }
+
+        private string PromptForValidationDescription(out string jiraNo)
+        {
+            jiraNo = null;
+            var hostSource = PresentationSource.FromVisual(this) as HwndSource;
+            var owner = hostSource == null
+                ? null
+                : Forms.Control.FromChildHandle(hostSource.Handle)?.FindForm();
 
             var root = new Grid
             {
@@ -235,13 +471,28 @@ namespace Veloxap.AddIn.Erwin.Pages
             };
 
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+            var jiraNoLabel = new TextBlock
+            {
+                Text = "Jira No (zorunlu)",
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var jiraNoBox = new TextBox
+            {
+                AcceptsReturn = false,
+                MinHeight = 28,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
             var label = new TextBlock
             {
-                Text = "Onaya gonderilecek validasyon aciklamasini girin.",
+                Text = "Onay'a gondermek icin aciklama giriniz. (Min. 5 karakter)",
                 Margin = new Thickness(0, 0, 0, 8),
                 TextWrapping = TextWrapping.Wrap
             };
@@ -256,7 +507,6 @@ namespace Veloxap.AddIn.Erwin.Pages
 
             var validationMessage = new TextBlock
             {
-                Text = "Lutfen daha uzun bir aciklama girin.",
                 Foreground = System.Windows.Media.Brushes.Firebrick,
                 Margin = new Thickness(0, 8, 0, 0),
                 TextWrapping = TextWrapping.Wrap,
@@ -275,8 +525,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 Content = "Iptal",
                 Width = 86,
                 Height = 30,
-                Margin = new Thickness(0, 0, 8, 0),
-                IsCancel = true
+                Margin = new Thickness(0, 0, 8, 0)
             };
 
             var okButton = new Button
@@ -284,77 +533,139 @@ namespace Veloxap.AddIn.Erwin.Pages
                 Content = "Tamam",
                 Width = 86,
                 Height = 30,
-                IsDefault = true,
                 IsEnabled = false
             };
 
-            descriptionBox.TextChanged += (sender, args) =>
+            TextChangedEventHandler onInputChanged = (sender, args) =>
             {
-                okButton.IsEnabled = !string.IsNullOrWhiteSpace(descriptionBox.Text);
+                okButton.IsEnabled = !string.IsNullOrWhiteSpace(jiraNoBox.Text) &&
+                                     !string.IsNullOrWhiteSpace(descriptionBox.Text);
                 validationMessage.Visibility = Visibility.Collapsed;
             };
 
-            okButton.Click += (sender, args) =>
+            jiraNoBox.TextChanged += onInputChanged;
+            descriptionBox.TextChanged += onInputChanged;
+
+            Action<Forms.Form> confirm = dialog =>
             {
+                if (string.IsNullOrWhiteSpace(jiraNoBox.Text))
+                {
+                    validationMessage.Text = "Jira No zorunludur.";
+                    validationMessage.Visibility = Visibility.Visible;
+                    jiraNoBox.Focus();
+                    jiraNoBox.SelectAll();
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(descriptionBox.Text) || descriptionBox.Text.Trim().Length <= 5)
                 {
+                    validationMessage.Text = "Lutfen daha uzun bir aciklama girin.";
                     validationMessage.Visibility = Visibility.Visible;
                     descriptionBox.Focus();
                     descriptionBox.SelectAll();
                     return;
                 }
 
-                dialog.DialogResult = true;
+                dialog.DialogResult = Forms.DialogResult.OK;
             };
 
             buttons.Children.Add(cancelButton);
             buttons.Children.Add(okButton);
 
-            Grid.SetRow(label, 0);
-            Grid.SetRow(descriptionBox, 1);
-            Grid.SetRow(validationMessage, 2);
-            Grid.SetRow(buttons, 3);
+            Grid.SetRow(jiraNoLabel, 0);
+            Grid.SetRow(jiraNoBox, 1);
+            Grid.SetRow(label, 2);
+            Grid.SetRow(descriptionBox, 3);
+            Grid.SetRow(validationMessage, 4);
+            Grid.SetRow(buttons, 5);
 
+            root.Children.Add(jiraNoLabel);
+            root.Children.Add(jiraNoBox);
             root.Children.Add(label);
             root.Children.Add(descriptionBox);
             root.Children.Add(validationMessage);
             root.Children.Add(buttons);
 
-            dialog.Content = root;
-            dialog.Loaded += (sender, args) => Keyboard.Focus(descriptionBox);
+            using (var dialog = new Forms.Form
+            {
+                Text = "Onay talebi",
+                Size = new System.Drawing.Size(460, 360),
+                AutoScaleMode = Forms.AutoScaleMode.None,
+                FormBorderStyle = Forms.FormBorderStyle.FixedDialog,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ShowInTaskbar = false,
+                StartPosition = owner == null
+                    ? Forms.FormStartPosition.CenterScreen
+                    : Forms.FormStartPosition.CenterParent,
+                Icon = System.Drawing.SystemIcons.Application
+            })
+            using (var wpfHost = new ElementHost { Dock = Forms.DockStyle.Fill, Child = root })
+            {
+                dialog.Controls.Add(wpfHost);
+                cancelButton.Click += (sender, args) => dialog.DialogResult = Forms.DialogResult.Cancel;
+                okButton.Click += (sender, args) => confirm(dialog);
+                root.Loaded += (sender, args) => Keyboard.Focus(jiraNoBox);
+                root.PreviewKeyDown += (sender, args) =>
+                {
+                    if (args.Key == Key.Escape)
+                    {
+                        dialog.DialogResult = Forms.DialogResult.Cancel;
+                        args.Handled = true;
+                    }
+                    else if (args.Key == Key.Enter && !descriptionBox.IsKeyboardFocusWithin && okButton.IsEnabled)
+                    {
+                        confirm(dialog);
+                        args.Handled = true;
+                    }
+                };
 
-            return dialog.ShowDialog() == true
-                ? descriptionBox.Text.Trim()
-                : null;
+                if (dialog.ShowDialog(owner) != Forms.DialogResult.OK)
+                    return null;
+
+                jiraNo = jiraNoBox.Text.Trim();
+                return descriptionBox.Text.Trim();
+            }
         }
 
-        private void RunValidation()
+        private async Task RunValidationAsync()
         {
-            if (modelInfo == null)
-            {
-                ResetValidationState("Secili model bulunamadi.");
-                txtValidationResults.Text = "Validasyon calistirmak icin once bir model secilmeli.";
+            if (isValidationRunning)
                 return;
-            }
-
-            var rules = GetValidationRules().ToList();
-            if (rules.Count == 0)
-            {
-                ResetValidationState("Validasyon kurali bulunamadi.");
-                txtValidationResults.Text =
-                    "Kural listesi bos. ValidationRulesView veya kalici kural kaynagi baglandiginda bu test calisacak.";
-                return;
-            }
 
             try
             {
+                isValidationRunning = true;
+                SetValidationBusy(true);
+
+                if (!await EnsureFullModelLoadedAsync())
+                    return;
+
+                if (modelInfo == null)
+                {
+                    ResetValidationState("Secili model bulunamadi.");
+                    txtValidationResults.Text = "Validasyon calistirmak icin once bir model secilmeli.";
+                    return;
+                }
+
+                var rules = GetValidationRules().ToList();
+                if (rules.Count == 0)
+                {
+                    ResetValidationState("Validasyon kurali bulunamadi.");
+                    txtValidationResults.Text =
+                        "Kural listesi bos. ValidationRulesView veya kalici kural kaynagi baglandiginda bu test calisacak.";
+                    return;
+                }
+
                 SetStatus("Validasyon calisiyor...");
-                var issues = CrossRuleValidationEngine.Validate(modelInfo, rules, runParallel: true);
+                var issues = await Task.Run(() =>
+                    CrossRuleValidationEngine_V2.Validate(modelInfo, rules, runParallel: true));
 
                 isValidationOk = issues.Count == 0;
                 btnSendApproval.IsEnabled = isValidationOk;
 
                 txtValidationResults.Text = FormatValidationResults(issues);
+                validationTabs.SelectedItem = tabValidationResults;
                 SetStatus(FormatValidationSummary(issues));
             }
             catch (Exception ex)
@@ -362,6 +673,42 @@ namespace Veloxap.AddIn.Erwin.Pages
                 ResetValidationState("Validasyon sirasinda hata olustu.");
                 txtValidationResults.Text = ex.ToString();
             }
+            finally
+            {
+                isValidationRunning = false;
+                SetValidationBusy(false);
+            }
+        }
+
+        private async Task<bool> EnsureFullModelLoadedAsync()
+        {
+            if (hasLoadedFullModel || fullModelLoader == null)
+                return modelInfo != null;
+
+            try
+            {
+                SetStatus("Tam model validasyon icin yukleniyor...");
+                await Task.Delay(1);
+
+                ModelInfo loadedModel = fullModelLoader();
+                if (loadedModel != null)
+                    modelInfo = loadedModel;
+
+                hasLoadedFullModel = true;
+                return modelInfo != null;
+            }
+            catch (Exception ex)
+            {
+                ResetValidationState("Tam model yuklenirken hata olustu.");
+                txtValidationResults.Text = ex.ToString();
+                return false;
+            }
+        }
+
+        private static bool HasModelObjects(ModelInfo modelInfo)
+        {
+            var modelObjects = modelInfo?.getoModelObject();
+            return modelObjects != null && modelObjects.Count > 0;
         }
 
         private IEnumerable<string> GetValidationRules()
@@ -416,62 +763,122 @@ namespace Veloxap.AddIn.Erwin.Pages
 
         private async Task RefreshAlterDdlPreviewAsync()
         {
+            int requestId = ++alterDdlRequestId;
             var sourceVersion = cmbSourceVersion.SelectedItem as VersionOption;
             var targetVersion = cmbTargetVersion.SelectedItem as VersionOption;
+            currentAlterDdl = string.Empty;
 
-            if (sourceVersion == null || targetVersion == null)
+            if (sourceVersion == null)
             {
-                currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = "Kaynak ve hedef versiyon secimi bekleniyor.";
+                txtAlterDdl.Text = "Kaynak versiyon secimi bekleniyor.";
                 return;
             }
 
+            txtAlterDdl.Text = "UDP degisiklikleri ve MART Alter DDL metni yukleniyor...";
+
+            Task<string> ddlTask = RequestAlterDdlFromApiAsync(sourceVersion);
+            Task<UdpDiffResult> udpDiffTask = targetVersion == null
+                ? Task.FromResult(new UdpDiffResult(false, "UDP farki icin hedef versiyon secilmeli.", null))
+                : RequestUdpDiffFromApiAsync(sourceVersion, targetVersion);
+
+            string ddl = string.Empty;
+            string ddlError = null;
             try
             {
-                currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = "Alter DDL hazirlaniyor...";
-                string ddl = await RequestAlterDdlFromApiAsync(sourceVersion, targetVersion);
-
-                currentAlterDdl = string.IsNullOrWhiteSpace(ddl)
-                    ? string.Empty
-                    : ddl;
-
-                txtAlterDdl.Text = string.IsNullOrWhiteSpace(ddl)
-                    ? BuildAlterDdlPlaceholder(sourceVersion, targetVersion)
-                    : ddl;
+                ddl = await ddlTask;
             }
             catch (Exception ex)
             {
-                currentAlterDdl = string.Empty;
-                txtAlterDdl.Text = ex.ToString();
-                SetStatus("Alter DDL istegi sirasinda hata olustu.");
+                ddlError = ex.Message;
             }
+
+            UdpDiffResult udpDiff;
+            try
+            {
+                udpDiff = await udpDiffTask;
+            }
+            catch (Exception ex)
+            {
+                udpDiff = new UdpDiffResult(false, ex.Message, null);
+            }
+
+            if (requestId != alterDdlRequestId)
+                return;
+
+            currentAlterDdl = ddl ?? string.Empty;
+            string ddlText = ddlError != null
+                ? "MART Alter DDL metni alinamadi." + Environment.NewLine + ddlError
+                : string.IsNullOrWhiteSpace(ddl)
+                    ? BuildAlterDdlPlaceholder(sourceVersion)
+                    : ddl;
+            txtAlterDdl.Text = CombineUdpDiffAndDdl(udpDiff, ddlText);
+
+            if (ddlError != null)
+                SetStatus("Alter DDL istegi sirasinda hata olustu: " + ddlError);
+            else if (string.IsNullOrWhiteSpace(ddl))
+                SetStatus("Secili versiyon icin MART Alter DDL cevabi bos dondu.");
+            else
+                SetStatus(udpDiff != null && udpDiff.Success
+                    ? "MART Alter DDL ve UDP degisiklikleri hazirlandi."
+                    : "MART Alter DDL hazirlandi. UDP degisiklikleri alinamadi.");
         }
 
-        private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion, VersionOption targetVersion)
+        private async Task<string> RequestAlterDdlFromApiAsync(VersionOption sourceVersion)
         {
             if (ruleService == null)
-                return string.Empty;
+                throw new InvalidOperationException("MART Alter DDL servisi kullanilabilir degil.");
 
-            if (!int.TryParse(sourceVersion.VersionNo, out int sourceVNo))
+            if (!int.TryParse(sourceVersion.VersionNo, out int sourceVNo) || sourceVNo < 1)
                 throw new InvalidOperationException("Kaynak versiyon numarasi okunamadi.");
 
-            int targetVNo = sourceVNo - 1;
-            if (targetVNo < 1)
-                throw new InvalidOperationException("Alter DDL icin onceki versiyon bulunamadi.");
+            string cLongId = ResolveCatalogLongId(sourceVersion);
+            if (string.IsNullOrWhiteSpace(cLongId))
+                throw new InvalidOperationException("Alter DDL icin model cLongId degeri okunamadi.");
 
-            string path = ExtractAlterDdlPath(sourceVersion.Locator);
-            if (string.IsNullOrWhiteSpace(path))
-                throw new InvalidOperationException("Alter DDL path degeri secili modelden okunamadi.");
+            // The DDL endpoint expects the stored version's numeric ID, not its version number or cLongId.
+            CatalogVersionOwnerInfo version = await ruleService.GetCatalogVersionOwnerAsync(
+                RuleApiSettings.GetMartCatalogVersionsUrlTemplate(),
+                cLongId,
+                "Version " + sourceVNo,
+                sourceVersion.VersionNo);
 
-            string ddl = await ruleService.GetAlterDdlAsync(
+            if (!int.TryParse(version.VersionId, out int versionId) || versionId <= 0)
+                throw new InvalidOperationException("Alter DDL icin MART versiyon ID'si okunamadi.");
+
+            return await ruleService.GetAlterDdlAsync(
                 RuleApiSettings.GetAlterDdlUrl(),
-                path,
+                long.Parse(version.ContainerId));
+        }
+
+        private async Task<UdpDiffResult> RequestUdpDiffFromApiAsync(
+            VersionOption sourceVersion,
+            VersionOption targetVersion)
+        {
+            if (ruleService == null)
+                return new UdpDiffResult(false, "UDP fark servisi kullanilabilir degil.", null);
+
+            if (!int.TryParse(sourceVersion.VersionNo, out int sourceVNo))
+                throw new InvalidOperationException("UDP farki icin kaynak versiyon numarasi okunamadi.");
+
+            if (!int.TryParse(targetVersion.VersionNo, out int targetVNo))
+                throw new InvalidOperationException("UDP farki icin hedef versiyon numarasi okunamadi.");
+
+            string catalogPath = ExtractAlterDdlPath(sourceVersion.Locator);
+            if (string.IsNullOrWhiteSpace(catalogPath))
+                throw new InvalidOperationException("UDP farki icin katalog yolu secili modelden okunamadi.");
+
+            string resolvedCatalogName = ResolveCatalogName();
+            if (string.IsNullOrWhiteSpace(resolvedCatalogName))
+                throw new InvalidOperationException("UDP farki icin katalog adi okunamadi.");
+
+            UdpDiffResult result = await ruleService.GetUdpDiffAsync(
+                RuleApiSettings.GetUdpDiffUrl(),
+                catalogPath.Split('/').LastOrDefault(),
+                catalogPath,
                 sourceVNo,
                 targetVNo);
 
-            SetStatus("Alter DDL hazirlandi. Kaynak: " + sourceVNo + ", Hedef: " + targetVNo + ".");
-            return FormatDdlForDisplay(ddl);
+            return result;
         }
 
         private void SelectPreviousTargetVersion()
@@ -530,85 +937,88 @@ namespace Veloxap.AddIn.Erwin.Pages
             return Uri.UnescapeDataString(path);
         }
 
-        private static string FormatDdlForDisplay(string ddl)
+        private static string BuildAlterDdlPlaceholder(VersionOption sourceVersion)
         {
-            if (string.IsNullOrEmpty(ddl))
-                return string.Empty;
+            var builder = new StringBuilder();
 
-            var builder = new StringBuilder(ddl.Length);
+            builder.AppendLine("Secili versiyon icin MART'ta kayitli Alter DDL metni bulunamadi.");
+            builder.AppendLine();
+            builder.AppendLine($"Kaynak: {sourceVersion.DisplayName}");
 
-            for (int i = 0; i < ddl.Length; i++)
+            return builder.ToString();
+        }
+
+        private static string CombineUdpDiffAndDdl(UdpDiffResult udpDiff, string ddl)
+        {
+            return FormatUdpDiffForDisplay(udpDiff).TrimEnd() +
+                   Environment.NewLine + Environment.NewLine +
+                   "----------------------------------------" +
+                   Environment.NewLine +
+                   "ALTER DDL" +
+                   Environment.NewLine +
+                   "----------------------------------------" +
+                   Environment.NewLine +
+                   (ddl ?? string.Empty);
+        }
+
+        private static string FormatUdpDiffForDisplay(UdpDiffResult result)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("UDP DEGISIKLIKLERI");
+            builder.AppendLine("----------------------------------------");
+
+            if (result == null)
             {
-                char current = ddl[i];
+                builder.AppendLine("UDP degisiklik bilgisi alinamadi.");
+                return builder.ToString();
+            }
 
-                if (current == '\r')
-                {
-                    if (i + 1 < ddl.Length && ddl[i + 1] == '\n')
-                        i++;
+            if (!result.Success)
+            {
+                builder.AppendLine("UDP degisiklik bilgisi alinamadi.");
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                    builder.AppendLine("Mesaj: " + result.Message);
 
-                    builder.Append(Environment.NewLine);
-                    continue;
-                }
+                return builder.ToString();
+            }
 
-                if (current == '\n')
-                {
-                    builder.Append(Environment.NewLine);
-                    continue;
-                }
+            if (result.Items == null || result.Items.Count == 0)
+            {
+                builder.AppendLine("UDP degisikligi bulunamadi.");
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                    builder.AppendLine("Mesaj: " + result.Message);
 
-                if (current != '\\' || i == ddl.Length - 1)
-                {
-                    builder.Append(current);
-                    continue;
-                }
+                return builder.ToString();
+            }
 
-                if (i + 3 < ddl.Length && ddl[i + 1] == 'r' && ddl[i + 2] == '\\' && ddl[i + 3] == 'n')
-                {
-                    builder.Append(Environment.NewLine);
-                    i += 3;
-                    continue;
-                }
+            builder.AppendLine("Toplam UDP degisikligi: " + result.Items.Count);
+            builder.AppendLine();
 
-                char next = ddl[i + 1];
-                switch (next)
-                {
-                    case 'n':
-                        builder.Append(Environment.NewLine);
-                        i++;
-                        break;
-                    case 'r':
-                        builder.Append(Environment.NewLine);
-                        i++;
-                        break;
-                    case 't':
-                        builder.Append('\t');
-                        i++;
-                        break;
-                    case '\\':
-                        builder.Append('\\');
-                        i++;
-                        break;
-                    default:
-                        builder.Append(current);
-                        break;
-                }
+            for (int index = 0; index < result.Items.Count; index++)
+            {
+                UdpDiffItem item = result.Items[index];
+                builder.AppendLine((index + 1) + ". UDP Degisikligi");
+                AppendUdpDiffField(builder, "Degisiklik tipi", item.ChangeType);
+                AppendUdpDiffField(builder, "Degisiklik nedeni", item.ChangeReason);
+                AppendUdpDiffField(builder, "Nesne tipi", item.ObjectType);
+                AppendUdpDiffField(builder, "Model", item.ModelName);
+                AppendUdpDiffField(builder, "Tablo", item.TableName);
+                AppendUdpDiffField(builder, "Kolon", item.ColumnName);
+                AppendUdpDiffField(builder, "UDP adi", item.UdpName?.Split('.')?.LastOrDefault());
+                AppendUdpDiffField(builder, "Onceki icerik", item.PreviousContent);
+                AppendUdpDiffField(builder, "Guncel icerik", item.CurrentContent);
+
+                if (index < result.Items.Count - 1)
+                    builder.AppendLine();
             }
 
             return builder.ToString();
         }
 
-        private static string BuildAlterDdlPlaceholder(VersionOption sourceVersion, VersionOption targetVersion)
+        private static void AppendUdpDiffField(StringBuilder builder, string label, string value)
         {
-            var builder = new StringBuilder();
-
-            builder.AppendLine("Alter DDL cevabi bos dondu.");
-            builder.AppendLine();
-            builder.AppendLine($"Kaynak: {sourceVersion.DisplayName}");
-            builder.AppendLine($"Hedef: {targetVersion.DisplayName}");
-            builder.AppendLine();
-            builder.AppendLine("API ddl alani dolu dondugunde sonuc burada gosterilecek.");
-
-            return builder.ToString();
+            if (!string.IsNullOrWhiteSpace(value))
+                builder.AppendLine("  " + label + ": " + value);
         }
 
         private void ResetValidationState(string message)
@@ -618,9 +1028,99 @@ namespace Veloxap.AddIn.Erwin.Pages
             SetStatus(message);
         }
 
+        private void SetApprovalBusy(bool value)
+        {
+            if (btnRunValidation != null)
+                btnRunValidation.IsEnabled = !value;
+
+            if (btnSendApproval != null)
+                btnSendApproval.IsEnabled = !value && isValidationOk;
+
+            if (approvalBusyBar != null)
+                approvalBusyBar.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+
+            Mouse.OverrideCursor = value ? Cursors.Wait : null;
+        }
+
+        private void SetValidationBusy(bool value)
+        {
+            if (btnRunValidation != null)
+                btnRunValidation.IsEnabled = !value;
+
+            if (btnSendApproval != null)
+                btnSendApproval.IsEnabled = !value && isValidationOk;
+
+            if (approvalBusyBar != null)
+                approvalBusyBar.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+
+            Mouse.OverrideCursor = value ? Cursors.Wait : null;
+        }
+
         private void SetStatus(string message)
         {
-            txtStatusMessage.Text = message ?? string.Empty;
+            string statusMessage = NormalizeStatusMessage(message);
+            txtStatusMessage.Text = statusMessage;
+            txtStatusMessage.Foreground = ResolveStatusForeground(statusMessage);
+        }
+
+        //private void UpdateTableUdpStartupResultPanel()
+        //{
+        //    if (tableUdpResultPanel == null ||
+        //        txtTableUdpResultStatus == null ||
+        //        tableUdpResultItems == null)
+        //    {
+        //        return;
+        //    }
+
+        //    if (isTableUdpStartupRunning)
+        //    {
+        //        tableUdpResultPanel.Visibility = Visibility.Visible;
+        //        txtTableUdpResultStatus.Text = "Acilis islemleri calisiyor...";
+        //        txtTableUdpResultStatus.Foreground = new SolidColorBrush(Color.FromRgb(75, 85, 99));
+        //        tableUdpResultItems.ItemsSource = null;
+        //        return;
+        //    }
+
+        //    if (tableUdpStartupResult == null)
+        //    {
+        //        tableUdpResultPanel.Visibility = Visibility.Collapsed;
+        //        tableUdpResultItems.ItemsSource = null;
+        //        return;
+        //    }
+
+        //    string summary = tableUdpStartupResult.ToSummaryLine();
+        //    tableUdpResultPanel.Visibility = Visibility.Visible;
+        //    txtTableUdpResultStatus.Text = summary;
+        //    txtTableUdpResultStatus.Foreground = ResolveStatusForeground(
+        //        tableUdpStartupResult.HasErrors ? summary + " hata" : summary + " basarili");
+        //    tableUdpResultItems.ItemsSource = tableUdpStartupResult.Operations;
+        //}
+
+        private static string NormalizeStatusMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return string.Empty;
+
+            return Regex.Replace(message.Trim(), @"\s*\r?\n\s*", "  ");
+        }
+
+        private static Brush ResolveStatusForeground(string message)
+        {
+            if (ContainsAny(message, "hata", "basarisiz", "başarısız", "bulunamadi", "okunamadi", "iptal", "bos dondu", "kullanilabilir degil"))
+                return new SolidColorBrush(Color.FromRgb(185, 28, 28));
+
+            if (ContainsAny(message, "basarili", "gonderildi", "hazirlandi", "onaya gonderilebilir"))
+                return new SolidColorBrush(Color.FromRgb(4, 120, 87));
+
+            return new SolidColorBrush(Color.FromRgb(75, 85, 99));
+        }
+
+        private static bool ContainsAny(string value, params string[] terms)
+        {
+            if (string.IsNullOrEmpty(value) || terms == null)
+                return false;
+
+            return terms.Any(term => value.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private string ResolveCatalogName()
