@@ -32,6 +32,16 @@ namespace Veloxap.AddIn.Erwin.Services
             return GetServiceUrl(AuthLoginUrlKey);
         }
 
+        public static string GetAuthLoginUrl(string apiBaseUrl)
+        {
+            return GetServiceUrl(AuthLoginUrlKey, apiBaseUrl);
+        }
+
+        public static string GetAuthMeUrl(string apiBaseUrl)
+        {
+            return CombineUrl(apiBaseUrl, "auth/me");
+        }
+
         public static string GetAuthUsername()
         {
             return GetOptionalSetting(AuthUsernameKey);
@@ -150,6 +160,16 @@ namespace Veloxap.AddIn.Erwin.Services
                 return configuredValue.Trim();
 
             return CombineUrl(GetApiBaseUrl(), configuredValue);
+        }
+
+        private static string GetServiceUrl(string key, string apiBaseUrl)
+        {
+            string configuredValue = GetRequiredSetting(key);
+
+            if (IsAbsoluteUrl(configuredValue))
+                return configuredValue.Trim();
+
+            return CombineUrl(apiBaseUrl, configuredValue);
         }
 
         private static string GetRequiredSetting(string key)

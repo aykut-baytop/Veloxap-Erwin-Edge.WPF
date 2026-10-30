@@ -274,6 +274,12 @@
                         Visibility="Hidden"
                         Click="BtnReload_Click"/>
 
+                <Button x:Name="btnTestConnection"
+                        Content="Baglantiyi Test Et"
+                        Style="{StaticResource ActionButtonStyle}"
+                        Background="#475569"
+                        Click="BtnTestConnection_Click"/>
+
                 <Button Content="Kaydet"
                         Style="{StaticResource ActionButtonStyle}"
                         Click="BtnSave_Click"/>

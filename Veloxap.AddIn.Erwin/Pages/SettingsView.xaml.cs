@@ -2,6 +2,10 @@
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -32,9 +36,15 @@ namespace Veloxap.AddIn.Erwin.Pages
             LoadAppSettings(null);
         }
 
-        private void BtnSave_Click(object sender, RoutedEventArgs e)
+        private async void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            SaveAppSettings();
+            if (SaveAppSettings())
+                await TestConnectionAsync();
+        }
+
+        private async void BtnTestConnection_Click(object sender, RoutedEventArgs e)
+        {
+            await TestConnectionAsync();
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
@@ -87,7 +97,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             }
         }
 
-        private void SaveAppSettings()
+        private bool SaveAppSettings()
         {
             try
             {
@@ -113,11 +123,87 @@ namespace Veloxap.AddIn.Erwin.Pages
                 config.Save(ConfigurationSaveMode.Modified);
                 ConfigurationManager.RefreshSection("appSettings");
                 LoadAppSettings("Ayarlar kaydedildi.");
+                return true;
             }
             catch (Exception ex)
             {
                 SetStatus("Ayarlar kaydedilemedi: " + ex.Message, true);
+                return false;
             }
+        }
+
+        private async Task TestConnectionAsync()
+        {
+            btnTestConnection.IsEnabled = false;
+            SetStatus("Baglanti test ediliyor...", false);
+
+            try
+            {
+                string apiBaseUrl = txtApiBaseUrl.Text.Trim();
+                string username = txtAuthUsername.Text.Trim();
+                string password = pwdAuthPassword.Password;
+
+                if (string.IsNullOrWhiteSpace(apiBaseUrl))
+                    throw new InvalidOperationException("ApiBaseUrl bos olamaz.");
+
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+                    throw new InvalidOperationException(MissingAuthCredentialsMessage);
+
+                var cookieContainer = new CookieContainer();
+                using (var loginClient = new HttpClient(CreateHttpClientHandler(cookieContainer)))
+                {
+                    var tokenProvider = new AuthTokenProvider(
+                        loginClient,
+                        RuleApiSettings.GetAuthLoginUrl(apiBaseUrl),
+                        username,
+                        password);
+
+                    using (var apiClient = new HttpClient(new BearerTokenHandler(
+                        tokenProvider,
+                        CreateHttpClientHandler(cookieContainer))))
+                    using (HttpResponseMessage response = await apiClient.GetAsync(
+                        RuleApiSettings.GetAuthMeUrl(apiBaseUrl)))
+                    {
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            SetStatus(
+                                "Baglanti basarisiz. HTTP " + (int)response.StatusCode + ".",
+                                true);
+                            return;
+                        }
+
+                        string responseJson = await response.Content.ReadAsStringAsync();
+                        var serializer = new JavaScriptSerializer();
+                        var result = serializer.DeserializeObject(responseJson) as Dictionary<string, object>;
+                        object successValue;
+                        bool isSuccessful = result != null
+                            && result.TryGetValue("success", out successValue)
+                            && successValue is bool
+                            && (bool)successValue;
+
+                        SetStatus(
+                            isSuccessful ? "Baglanti basarili." : "Baglanti basarisiz.",
+                            !isSuccessful);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Baglanti basarisiz: " + ex.Message, true);
+            }
+            finally
+            {
+                btnTestConnection.IsEnabled = true;
+            }
+        }
+
+        private static HttpClientHandler CreateHttpClientHandler(CookieContainer cookieContainer)
+        {
+            return new HttpClientHandler
+            {
+                UseCookies = true,
+                CookieContainer = cookieContainer
+            };
         }
 
         private void LoadCredentialFields()

@@ -11,14 +11,29 @@ namespace Veloxap.AddIn.Erwin.Services
     internal sealed class AuthTokenProvider
     {
         private readonly HttpClient httpClient;
+        private readonly string configuredLoginUrl;
+        private readonly string configuredUsername;
+        private readonly string configuredPassword;
         private readonly object syncRoot = new object();
 
         private string bearerToken;
         private Task<string> loginTask;
 
         public AuthTokenProvider(HttpClient httpClient)
+            : this(httpClient, null, null, null)
+        {
+        }
+
+        public AuthTokenProvider(
+            HttpClient httpClient,
+            string loginUrl,
+            string username,
+            string password)
         {
             this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            configuredLoginUrl = loginUrl;
+            configuredUsername = username;
+            configuredPassword = password;
         }
 
         public Task<string> GetTokenAsync()
@@ -67,9 +82,9 @@ namespace Veloxap.AddIn.Erwin.Services
 
         private async Task<string> RequestTokenAsync()
         {
-            string loginUrl = RuleApiSettings.GetAuthLoginUrl();
-            string username = RuleApiSettings.GetAuthUsername();
-            string password = RuleApiSettings.GetAuthPassword();
+            string loginUrl = configuredLoginUrl ?? RuleApiSettings.GetAuthLoginUrl();
+            string username = configuredUsername ?? RuleApiSettings.GetAuthUsername();
+            string password = configuredPassword ?? RuleApiSettings.GetAuthPassword();
 
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
                 throw new InvalidOperationException(
