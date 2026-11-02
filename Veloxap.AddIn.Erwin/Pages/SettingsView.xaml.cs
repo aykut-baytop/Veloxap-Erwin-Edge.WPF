@@ -52,6 +52,42 @@ namespace Veloxap.AddIn.Erwin.Pages
             CloseRequested?.Invoke(this, EventArgs.Empty);
         }
 
+        private void BtnTogglePasswordVisibility_Click(object sender, RoutedEventArgs e)
+        {
+            bool showPassword = pwdAuthPassword.Visibility == Visibility.Visible;
+            if (showPassword)
+            {
+                txtAuthPassword.Text = pwdAuthPassword.Password;
+                pwdAuthPassword.Visibility = Visibility.Collapsed;
+                txtAuthPassword.Visibility = Visibility.Visible;
+                btnTogglePasswordVisibility.ToolTip = "Parolayi gizle";
+                PasswordVisibilitySlash.Visibility = Visibility.Visible;
+                txtAuthPassword.Focus();
+                txtAuthPassword.CaretIndex = txtAuthPassword.Text.Length;
+            }
+            else
+            {
+                pwdAuthPassword.Password = txtAuthPassword.Text;
+                txtAuthPassword.Visibility = Visibility.Collapsed;
+                pwdAuthPassword.Visibility = Visibility.Visible;
+                btnTogglePasswordVisibility.ToolTip = "Parolayi goster";
+                PasswordVisibilitySlash.Visibility = Visibility.Collapsed;
+                pwdAuthPassword.Focus();
+            }
+        }
+
+        private void PasswordField_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (pwdAuthPassword.Visibility == Visibility.Visible)
+                txtAuthPassword.Text = pwdAuthPassword.Password;
+        }
+
+        private void PasswordField_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (txtAuthPassword.Visibility == Visibility.Visible)
+                pwdAuthPassword.Password = txtAuthPassword.Text;
+        }
+
         private void BtnReload_Click(object sender, RoutedEventArgs e)
         {
             LoadAppSettings("Ayarlar yeniden yuklendi.");
@@ -141,7 +177,7 @@ namespace Veloxap.AddIn.Erwin.Pages
             {
                 string apiBaseUrl = txtApiBaseUrl.Text.Trim();
                 string username = txtAuthUsername.Text.Trim();
-                string password = pwdAuthPassword.Password;
+                string password = GetPasswordValue();
 
                 if (string.IsNullOrWhiteSpace(apiBaseUrl))
                     throw new InvalidOperationException("ApiBaseUrl bos olamaz.");
@@ -210,6 +246,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         {
             txtAuthUsername.Text = GetUserSettingValue(AuthUsernameKey);
             pwdAuthPassword.Password = GetPasswordForInput(GetUserSettingValue(AuthPasswordKey));
+            txtAuthPassword.Text = pwdAuthPassword.Password;
         }
 
         private void LoadServiceFields()
@@ -237,7 +274,14 @@ namespace Veloxap.AddIn.Erwin.Pages
         private void UpdateUserSettingsFromCredentialFields()
         {
             SetUserSettingValue(AuthUsernameKey, txtAuthUsername.Text);
-            SetUserSettingValue(AuthPasswordKey, CryptoHelper.Encrypt(pwdAuthPassword.Password));
+            SetUserSettingValue(AuthPasswordKey, CryptoHelper.Encrypt(GetPasswordValue()));
+        }
+
+        private string GetPasswordValue()
+        {
+            return txtAuthPassword.Visibility == Visibility.Visible
+                ? txtAuthPassword.Text
+                : pwdAuthPassword.Password;
         }
 
         private void UpdateServiceSettingsFromFields()

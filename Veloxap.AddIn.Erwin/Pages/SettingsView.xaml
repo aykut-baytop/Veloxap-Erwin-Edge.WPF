@@ -216,8 +216,72 @@
                                                 <TextBlock Text="Parola"
                                                            Style="{StaticResource FieldLabelTextStyle}"/>
 
-                                                <PasswordBox x:Name="pwdAuthPassword"
-                                                             Style="{StaticResource SettingsPasswordBoxStyle}"/>
+                                                <Grid>
+                                                    <PasswordBox x:Name="pwdAuthPassword"
+                                                                 Padding="10,7,40,7"
+                                                                 Style="{StaticResource SettingsPasswordBoxStyle}"
+                                                                 PasswordChanged="PasswordField_PasswordChanged"/>
+
+                                                    <TextBox x:Name="txtAuthPassword"
+                                                             Padding="10,7,40,7"
+                                                             Style="{StaticResource SettingsTextBoxStyle}"
+                                                             TextChanged="PasswordField_TextChanged"
+                                                             Visibility="Collapsed"/>
+
+                                                    <Button x:Name="btnTogglePasswordVisibility"
+                                                            Width="32"
+                                                            Height="32"
+                                                            HorizontalAlignment="Right"
+                                                            VerticalAlignment="Center"
+                                                            Margin="0,0,2,0"
+                                                            Padding="0"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Cursor="Hand"
+                                                            Focusable="True"
+                                                            ToolTip="Parolayi goster"
+                                                            AutomationProperties.Name="Parola gorunurlugunu degistir"
+                                                            Click="BtnTogglePasswordVisibility_Click">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border x:Name="Root"
+                                                                        Background="{TemplateBinding Background}"
+                                                                        CornerRadius="4">
+                                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                                      VerticalAlignment="Center"/>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="Root" Property="Background" Value="#F1F5F9"/>
+                                                                    </Trigger>
+                                                                    <Trigger Property="IsPressed" Value="True">
+                                                                        <Setter TargetName="Root" Property="Background" Value="#E2E8F0"/>
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <Grid Width="18" Height="18">
+                                                            <Path Data="M1,9 C4,4 8,1 12,1 C16,1 20,4 23,9 C20,14 16,17 12,17 C8,17 4,14 1,9 Z"
+                                                                  Stretch="Fill"
+                                                                  Stroke="#6B7280"
+                                                                  StrokeThickness="1.5"/>
+                                                            <Ellipse Width="6"
+                                                                     Height="6"
+                                                                     HorizontalAlignment="Center"
+                                                                     VerticalAlignment="Center"
+                                                                     Stroke="#6B7280"
+                                                                     StrokeThickness="1.5"/>
+                                                            <Line x:Name="PasswordVisibilitySlash"
+                                                                  X1="2"
+                                                                  Y1="16"
+                                                                  X2="16"
+                                                                  Y2="2"
+                                                                  Stroke="#6B7280"
+                                                                  StrokeThickness="1.5"
+                                                                  Visibility="Collapsed"/>
+                                                        </Grid>
+                                                    </Button>
+                                                </Grid>
                                             </StackPanel>
                                         </Grid>
                                     </StackPanel>
