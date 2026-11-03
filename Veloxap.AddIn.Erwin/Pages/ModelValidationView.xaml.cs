@@ -369,8 +369,22 @@ namespace Veloxap.AddIn.Erwin.Pages
                     "Version " + sourceVersion.VersionNo,
                     sourceVersion.VersionNo);
 
-                string versionOwner = ownerInfo == null ? string.Empty : ownerInfo.CreatedBy;
-                if (NamesMatch(versionOwner, RuleApiSettings.GetAuthUsername()))
+                string versionOwner = ownerInfo == null ? string.Empty : ownerInfo.CreatedBy_Long;
+                string authenticatedUserName = "";
+
+                try
+                {
+                    authenticatedUserName = await ruleService.GetAuthenticatedUserNameAsync();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("ME api USER okunamadı");
+                }
+
+                ApiTraceLogger.Info("versionOwner : " + versionOwner);
+                ApiTraceLogger.Info("authenticatedUserName : " + authenticatedUserName);
+
+                if (NamesMatch(versionOwner, authenticatedUserName))
                     return ownerInfo;
 
                 string displayedOwner = string.IsNullOrWhiteSpace(versionOwner)

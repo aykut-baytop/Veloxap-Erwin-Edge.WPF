@@ -51,6 +51,45 @@ namespace Veloxap.AddIn.Erwin.Services
             return rules;
         }
 
+        public async Task<string> GetAuthenticatedUserNameAsync()
+        {
+            string requestUrl = RuleApiSettings.GetAuthMeUrl(RuleApiSettings.GetApiBaseUrl());
+
+            ApiTraceLogger.Info(
+                "AUTH ME REQUEST" + Environment.NewLine +
+                "Url: " + requestUrl);
+
+            using (var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false))
+            {
+                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                ApiTraceLogger.Info(
+                    "AUTH ME RESPONSE" + Environment.NewLine +
+                    "Url: " + requestUrl + Environment.NewLine +
+                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                    "Body: " + (json == null ? "" : json));
+
+
+                response.EnsureSuccessStatusCode();
+
+                object payload = DeserializeJson(json);
+                var responseDictionary = payload as Dictionary<string, object>;
+                if (responseDictionary != null && GetNullableBool(responseDictionary, "success") == false)
+                {
+                    string message = ExtractResponseMessage(payload);
+                    throw new InvalidOperationException(
+                        "Auth/me istegi basarisiz oldu." +
+                        (string.IsNullOrWhiteSpace(message) ? string.Empty : " " + message));
+                }
+
+                string username = FindAuthenticatedUserName(payload);
+                if (string.IsNullOrWhiteSpace(username))
+                    throw new InvalidOperationException("Auth/me yanitinda kullanici adi bulunamadi.");
+
+                return username;
+            }
+        }
+
         public async Task<string> GetAlterDdlAsync(
             string serviceUrl,
             long versionId)
@@ -464,7 +503,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 "Url: " + versionsRequestUrl + Environment.NewLine +
                 "Status: " + (int)versionsResponse.StatusCode + " " + versionsResponse.ReasonPhrase + Environment.NewLine +
                 "BodyLength: " + (versionsJson == null ? 0 : versionsJson.Length) + Environment.NewLine +
-                "BodyPreview: " + ApiTraceLogger.Truncate(versionsJson, 2000));
+                "BodyPreview: " + ApiTraceLogger.Truncate(versionsJson, 20000));
 
             versionsResponse.EnsureSuccessStatusCode();
 
@@ -478,7 +517,8 @@ namespace Veloxap.AddIn.Erwin.Services
                 "ContainerId: " + version.ContainerId+ Environment.NewLine +
                 "VersionId: " + (version.Id ?? string.Empty) + Environment.NewLine +
                 "VersionName: " + (version.Name ?? string.Empty) + Environment.NewLine +
-                "CreatedBy: " + (version.CreatedBy ?? string.Empty));
+                "CreatedBy: " + (version.CreatedBy ?? string.Empty) + Environment.NewLine +
+                "CreatedBy_Long: " + (version.CreatedBy_Long ?? string.Empty));
 
             return new CatalogVersionOwnerInfo
             {
@@ -489,7 +529,8 @@ namespace Veloxap.AddIn.Erwin.Services
                 VersionName = version.Name,
                 VersionNumber = version.VersionNumber,
                 CLongId = version.CLongId,
-                CreatedBy = version.CreatedBy
+                CreatedBy = version.CreatedBy,
+                CreatedBy_Long = version.CreatedBy_Long
             };
         }
 
@@ -892,6 +933,7 @@ namespace Veloxap.AddIn.Erwin.Services
                 Id = GetString(dictionary, "id", "versionId"),
                 Name = GetString(dictionary, "name", "versionName"),
                 CreatedBy = GetString(dictionary, "createdBy", "creator", "owner"),
+                CreatedBy_Long = GetString(dictionary, "createdBy_Long"),
                 CreatedDate = GetString(dictionary, "createdDate"),
                 Path = GetString(dictionary, "path"),
                 VersionNumber = GetString(dictionary, "versionNumber", "versionNo"),
@@ -1644,6 +1686,50 @@ namespace Veloxap.AddIn.Erwin.Services
             return value == null ? string.Empty : Convert.ToString(value);
         }
 
+        private static string FindAuthenticatedUserName(object payload)
+        {
+            string username = FindStringValue(payload, "username", "userName", "login", "loginName");
+            if (!string.IsNullOrWhiteSpace(username))
+                return username;
+
+            username = FindStringValue(payload, "email", "emailAddress");
+            if (!string.IsNullOrWhiteSpace(username))
+                return username;
+
+            return FindStringValue(payload, "displayName", "fullName", "name");
+        }
+
+        private static string FindStringValue(object payload, params string[] keys)
+        {
+            var dictionary = payload as Dictionary<string, object>;
+            if (dictionary != null)
+            {
+                string value = GetString(dictionary, keys);
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value;
+
+                foreach (object nestedValue in dictionary.Values)
+                {
+                    value = FindStringValue(nestedValue, keys);
+                    if (!string.IsNullOrWhiteSpace(value))
+                        return value;
+                }
+            }
+
+            var array = payload as object[];
+            if (array != null)
+            {
+                foreach (object nestedValue in array)
+                {
+                    string value = FindStringValue(nestedValue, keys);
+                    if (!string.IsNullOrWhiteSpace(value))
+                        return value;
+                }
+            }
+
+            return string.Empty;
+        }
+
         private static bool? GetNullableBool(Dictionary<string, object> dictionary, params string[] keys)
         {
             object value = GetDictionaryValue(dictionary, keys);
@@ -1784,6 +1870,7 @@ namespace Veloxap.AddIn.Erwin.Services
         public string CLongId { get; set; }
 
         public string CreatedBy { get; set; }
+        public string CreatedBy_Long { get; set; }
 
         public string ContainerId { get; set; }
     }
@@ -1804,6 +1891,7 @@ namespace Veloxap.AddIn.Erwin.Services
         public string Name { get; set; }
 
         public string CreatedBy { get; set; }
+        public string CreatedBy_Long { get; set; }
 
         public string CreatedDate { get; set; }
 

@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Windows;
 using Veloxap.AddIn.Erwin.Models;
 using Veloxap.AddIn.Erwin.Services;
 
@@ -19,6 +20,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
         private string versionOwnerText;
         private string approvalStatusText;
         private string catalogOverviewMessage;
+        private string authenticatedUserName;
         private List<CatalogLockInfo> catalogLocks;
         private CatalogApprovalStatus catalogApprovalStatus;
         private bool canUnlockCatalog;
@@ -216,6 +218,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             string catalogLongId)
         {
             string fallbackOwner = ""; //ResolveModelOwnerText();
+            authenticatedUserName = null;
             VersionOwnerText = "Kontrol ediliyor...";
             ApprovalSteps.Clear();
             ApprovalStatusText = "Kontrol ediliyor...";
@@ -251,8 +254,22 @@ namespace Veloxap.AddIn.Erwin.ViewModels
             bool shouldLoadApprovalStatus = await LoadLockStatusAsync(ruleService, catalogName, catalogLongId);
             if (shouldLoadApprovalStatus && IsLocked)
             {
+                string authenticatedUserError = null;
+                try
+                {
+                    authenticatedUserName = await ruleService.GetAuthenticatedUserNameAsync();
+                }
+                catch (Exception ex)
+                {
+                    authenticatedUserError = "Oturum kullanıcısı okunamadı: " + ex.Message;
+                    UnlockCatalogMessage = authenticatedUserError;
+                }
+
                 await LoadVersionOwnerAsync(ruleService, catalogName, catalogLongId, fallbackOwner);
                 LockDetailText = BuildLockDetailText(catalogLocks, VersionOwnerText);
+                if (!string.IsNullOrWhiteSpace(authenticatedUserError))
+                    LockDetailText += Environment.NewLine + authenticatedUserError;
+                UpdateCanUnlockCatalog();
             }
 
             if (shouldLoadApprovalStatus)
@@ -481,7 +498,7 @@ namespace Veloxap.AddIn.Erwin.ViewModels
 
         private bool IsCurrentUserVersionOwner()
         {
-            return NamesMatch(VersionOwnerText, RuleApiSettings.GetAuthUsername());
+            return NamesMatch(VersionOwnerText, authenticatedUserName);
         }
 
         private static bool IsApprovalNotStarted(CatalogApprovalStatus approvalStatus)
