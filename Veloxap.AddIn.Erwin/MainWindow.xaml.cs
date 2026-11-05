@@ -45,6 +45,7 @@ namespace Veloxap.AddIn.Erwin
         private string loadedDetailedModelKey;
         private string loadedTableUdpModelKey;
         private string loadedRulesModelKey;
+        private int validationRulesRequestVersion;
         private string lastRuleRequestTrace;
         private TableUdpStartupApplyResult tableUdpStartupResult;
         private RadioButton menuBeforeSettings;
@@ -82,9 +83,7 @@ namespace Veloxap.AddIn.Erwin
             models = new List<(string value, string key1, string key2)>();
             rules = new List<string>();
             validationRules = new List<Rule>();
-            apiCookieContainer = new CookieContainer();
-            authTokenProvider = new AuthTokenProvider(CreatePlainHttpClient(apiCookieContainer));
-            ruleService = new RuleService(CreateAuthorizedHttpClient(authTokenProvider, apiCookieContainer));
+            ResetApiSession();
             isValidationActive = true;
             isValidationOk = false;
             if (EnsureAuthCredentialsConfigured(showMessage: true))
@@ -157,7 +156,23 @@ namespace Veloxap.AddIn.Erwin
 
             var settingsView = new SettingsView();
             settingsView.CloseRequested += SettingsView_CloseRequested;
+            settingsView.SettingsSaved += SettingsView_SettingsSaved;
             MainContent.Content = settingsView;
+        }
+
+        private void SettingsView_SettingsSaved(object sender, EventArgs e)
+        {
+            ResetApiSession();
+        }
+
+        private void ResetApiSession()
+        {
+            // Tokens and cookies belong to one login, even when the model stays selected.
+            authTokenProvider?.InvalidateSession();
+            apiCookieContainer = new CookieContainer();
+            authTokenProvider = new AuthTokenProvider(CreatePlainHttpClient(apiCookieContainer));
+            ruleService = new RuleService(CreateAuthorizedHttpClient(authTokenProvider, apiCookieContainer));
+            ClearValidationRules();
         }
 
         private void SettingsView_CloseRequested(object sender, EventArgs e)
@@ -166,6 +181,7 @@ namespace Veloxap.AddIn.Erwin
                 return;
 
             ((SettingsView)sender).CloseRequested -= SettingsView_CloseRequested;
+            ((SettingsView)sender).SettingsSaved -= SettingsView_SettingsSaved;
             RadioButton menu = menuBeforeSettings ?? rbTest;
             menuBeforeSettings = null;
 
@@ -502,6 +518,7 @@ namespace Veloxap.AddIn.Erwin
             }
 
             ClearValidationRules();
+            int requestVersion = validationRulesRequestVersion;
             string serviceUrl = null;
 
             try
@@ -515,6 +532,9 @@ namespace Veloxap.AddIn.Erwin
                 ApiTraceLogger.Info(lastRuleRequestTrace);
 
                 List<Rule> serviceRules = await GetRuleService().GetRulesAsync(serviceUrl);
+
+                if (requestVersion != validationRulesRequestVersion)
+                    return false;
 
                 validationRules.AddRange(serviceRules ?? new List<Rule>());
                 rules.AddRange(validationRules
@@ -530,6 +550,9 @@ namespace Veloxap.AddIn.Erwin
             }
             catch (Exception ex)
             {
+                if (requestVersion != validationRulesRequestVersion)
+                    return false;
+
                 ClearValidationRules();
                 lastRuleRequestTrace = BuildRuleTraceMessage("Istek hatasi: " + ex.Message, serviceUrl);
                 ApiTraceLogger.Error(lastRuleRequestTrace, ex);
@@ -549,6 +572,7 @@ namespace Veloxap.AddIn.Erwin
 
         private void ClearValidationRules()
         {
+            validationRulesRequestVersion++;
             EnsureRuleCollections();
             rules.Clear();
             validationRules.Clear();
@@ -566,12 +590,16 @@ namespace Veloxap.AddIn.Erwin
 
         private async Task InitializeAuthenticationAsync()
         {
+            AuthTokenProvider tokenProvider = GetAuthTokenProvider();
             try
             {
-                await GetAuthTokenProvider().GetTokenAsync();
+                await tokenProvider.GetTokenAsync();
             }
             catch (Exception ex)
             {
+                if (!ReferenceEquals(tokenProvider, authTokenProvider))
+                    return;
+
                 MessageBox.Show(
                     "Servis login islemi basarisiz.\n\n" + ex.Message,
                     "Servis Login",

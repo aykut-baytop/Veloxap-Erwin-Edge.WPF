@@ -18,6 +18,7 @@ namespace Veloxap.AddIn.Erwin.Services
 
         private string bearerToken;
         private Task<string> loginTask;
+        private bool isSessionInvalidated;
 
         public AuthTokenProvider(HttpClient httpClient)
             : this(httpClient, null, null, null)
@@ -40,6 +41,8 @@ namespace Veloxap.AddIn.Erwin.Services
         {
             lock (syncRoot)
             {
+                ThrowIfSessionInvalidated();
+
                 if (!string.IsNullOrWhiteSpace(bearerToken))
                     return Task.FromResult(bearerToken);
 
@@ -59,6 +62,23 @@ namespace Veloxap.AddIn.Erwin.Services
             }
         }
 
+        public void InvalidateSession()
+        {
+            lock (syncRoot)
+            {
+                isSessionInvalidated = true;
+                bearerToken = null;
+                loginTask = null;
+            }
+        }
+
+        private void ThrowIfSessionInvalidated()
+        {
+            if (isSessionInvalidated)
+                throw new InvalidOperationException(
+                    "Kullanici oturumu degisti. Islemi yeni oturumla tekrar baslatin.");
+        }
+
         private async Task<string> LoginAsync()
         {
             try
@@ -67,6 +87,7 @@ namespace Veloxap.AddIn.Erwin.Services
 
                 lock (syncRoot)
                 {
+                    ThrowIfSessionInvalidated();
                     bearerToken = token;
                     loginTask = null;
                 }

@@ -192,12 +192,9 @@ namespace Veloxap.AddIn.Erwin.Services
 
         private static string GetConfiguredSetting(string key)
         {
-            string configuredValue = ReadHostAppSetting(key);
-
-            if (string.IsNullOrWhiteSpace(configuredValue))
-                configuredValue = ReadAssemblyAppSetting(key);
-
-            return configuredValue;
+            // SettingsView saves to the add-in configuration. An explicitly empty
+            // value must not restore credentials from the erwin host configuration.
+            return ReadAssemblyAppSetting(key) ?? ReadHostAppSetting(key);
         }
 
         private static string CombineUrl(string baseUrl, string endpoint)

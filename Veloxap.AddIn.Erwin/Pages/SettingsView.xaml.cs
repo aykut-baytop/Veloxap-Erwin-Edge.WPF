@@ -29,6 +29,7 @@ namespace Veloxap.AddIn.Erwin.Pages
         private List<AppConfigSetting> currentServiceSettings;
 
         internal event EventHandler CloseRequested;
+        internal event EventHandler SettingsSaved;
 
         public SettingsView()
         {
@@ -159,6 +160,7 @@ namespace Veloxap.AddIn.Erwin.Pages
                 config.Save(ConfigurationSaveMode.Modified);
                 ConfigurationManager.RefreshSection("appSettings");
                 LoadAppSettings("Ayarlar kaydedildi.");
+                SettingsSaved?.Invoke(this, EventArgs.Empty);
                 return true;
             }
             catch (Exception ex)
