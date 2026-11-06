@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
@@ -106,39 +107,61 @@ namespace Veloxap.AddIn.Erwin.Services
                 versionId.ToString(CultureInfo.InvariantCulture));
             requestUrl = BuildSingleQueryUrl(requestUrl, "type", "ALTERDDL");
 
+            string requestId = Guid.NewGuid().ToString("N");
             ApiTraceLogger.Info(
                 "ALTER DDL REQUEST" + Environment.NewLine +
+                "RequestId: " + requestId + Environment.NewLine +
+                "Method: GET" + Environment.NewLine +
                 "Url: " + requestUrl);
 
-            using (var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false))
+            var stopwatch = Stopwatch.StartNew();
+            try
             {
-                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                ApiTraceLogger.Info(
-                    "ALTER DDL RESPONSE" + Environment.NewLine +
-                    "Url: " + requestUrl + Environment.NewLine +
-                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
-                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
-                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
-
-                if (!response.IsSuccessStatusCode)
+                using (var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false))
                 {
-                    var error = DeserializeJson(json) as Dictionary<string, object>;
-                    string message = GetString(error, "error", "message");
-                    throw new InvalidOperationException(
-                        "MART Alter DDL servisi hata dondu: " + (int)response.StatusCode + " " +
-                        response.ReasonPhrase +
-                        (string.IsNullOrWhiteSpace(message) ? string.Empty : ". " + message));
+                    string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    stopwatch.Stop();
+
+                    ApiTraceLogger.Info(
+                        "ALTER DDL RESPONSE" + Environment.NewLine +
+                        "RequestId: " + requestId + Environment.NewLine +
+                        "Url: " + requestUrl + Environment.NewLine +
+                        "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                        "ElapsedMilliseconds: " + stopwatch.ElapsedMilliseconds + Environment.NewLine +
+                        "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                        "Body: " + json);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var error = DeserializeJson(json) as Dictionary<string, object>;
+                        string message = GetString(error, "error", "message");
+                        throw new InvalidOperationException(
+                            "MART Alter DDL servisi hata dondu: " + (int)response.StatusCode + " " +
+                            response.ReasonPhrase +
+                            (string.IsNullOrWhiteSpace(message) ? string.Empty : ". " + message));
+                    }
+
+                    string ddl = ExtractDdl(json);
+
+                    ApiTraceLogger.Info(
+                        "ALTER DDL PARSE" + Environment.NewLine +
+                        "RequestId: " + requestId + Environment.NewLine +
+                        "Url: " + requestUrl + Environment.NewLine +
+                        "DdlLength: " + (ddl == null ? 0 : ddl.Length));
+
+                    return ddl ?? string.Empty;
                 }
-
-                string ddl = ExtractDdl(json);
-
-                ApiTraceLogger.Info(
-                    "ALTER DDL PARSE" + Environment.NewLine +
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                ApiTraceLogger.Error(
+                    "ALTER DDL ERROR" + Environment.NewLine +
+                    "RequestId: " + requestId + Environment.NewLine +
                     "Url: " + requestUrl + Environment.NewLine +
-                    "DdlLength: " + (ddl == null ? 0 : ddl.Length));
-
-                return ddl ?? string.Empty;
+                    "ElapsedMilliseconds: " + stopwatch.ElapsedMilliseconds,
+                    ex);
+                throw;
             }
         }
 
@@ -165,34 +188,58 @@ namespace Veloxap.AddIn.Erwin.Services
                 { "targetVersion", targetVersion }
             });
 
+            string requestId = Guid.NewGuid().ToString("N");
             ApiTraceLogger.Info(
                 "UDP DIFF REQUEST" + Environment.NewLine +
+                "RequestId: " + requestId + Environment.NewLine +
+                "Method: POST" + Environment.NewLine +
                 "Url: " + serviceUrl + Environment.NewLine +
                 "Body: " + payload);
 
             using (var content = new StringContent(payload, Encoding.UTF8, "application/json"))
             {
-                var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false);
-                string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var stopwatch = Stopwatch.StartNew();
+                try
+                {
+                    using (var response = await httpClient.PostAsync(serviceUrl, content).ConfigureAwait(false))
+                    {
+                        string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        stopwatch.Stop();
 
-                ApiTraceLogger.Info(
-                    "UDP DIFF RESPONSE" + Environment.NewLine +
-                    "Url: " + serviceUrl + Environment.NewLine +
-                    "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
-                    "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
-                    "BodyPreview: " + ApiTraceLogger.Truncate(json, 2000));
+                        ApiTraceLogger.Info(
+                            "UDP DIFF RESPONSE" + Environment.NewLine +
+                            "RequestId: " + requestId + Environment.NewLine +
+                            "Url: " + serviceUrl + Environment.NewLine +
+                            "Status: " + (int)response.StatusCode + " " + response.ReasonPhrase + Environment.NewLine +
+                            "ElapsedMilliseconds: " + stopwatch.ElapsedMilliseconds + Environment.NewLine +
+                            "BodyLength: " + (json == null ? 0 : json.Length) + Environment.NewLine +
+                            "Body: " + json);
 
-                response.EnsureSuccessStatusCode();
+                        response.EnsureSuccessStatusCode();
 
-                UdpDiffResult result = ParseUdpDiffResult(json);
+                        UdpDiffResult result = ParseUdpDiffResult(json);
 
-                ApiTraceLogger.Info(
-                    "UDP DIFF PARSE" + Environment.NewLine +
-                    "Url: " + serviceUrl + Environment.NewLine +
-                    "Success: " + result.Success + Environment.NewLine +
-                    "ItemCount: " + result.Items.Count);
+                        ApiTraceLogger.Info(
+                            "UDP DIFF PARSE" + Environment.NewLine +
+                            "RequestId: " + requestId + Environment.NewLine +
+                            "Url: " + serviceUrl + Environment.NewLine +
+                            "Success: " + result.Success + Environment.NewLine +
+                            "ItemCount: " + result.Items.Count);
 
-                return result;
+                        return result;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    stopwatch.Stop();
+                    ApiTraceLogger.Error(
+                        "UDP DIFF ERROR" + Environment.NewLine +
+                        "RequestId: " + requestId + Environment.NewLine +
+                        "Url: " + serviceUrl + Environment.NewLine +
+                        "ElapsedMilliseconds: " + stopwatch.ElapsedMilliseconds,
+                        ex);
+                    throw;
+                }
             }
         }
 
